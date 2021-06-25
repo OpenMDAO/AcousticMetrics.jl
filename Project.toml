@@ -1,0 +1,19 @@
+name = "AcousticMetrics"
+uuid = "046f749b-9c1e-43ca-86bc-6902340f753e"
+authors = ["Ingraham, Daniel James (GRC-LTV0) <daniel.j.ingraham@nasa.gov>"]
+version = "0.1.0"
+
+[deps]
+ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+
+[extras]
+# ANOPP2 = "6a4a75d9-c98f-4276-9eff-70e8e993a339"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+# test = ["ANOPP2", "Random", "Test"]
+test = ["Random", "Test"]
