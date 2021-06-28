@@ -329,7 +329,6 @@ end
                 freq, nbs = nbs_from_apth(p, dt)
                 oaspl_time_domain = oaspl_from_apth(p)
                 oaspl_freq_domain = oaspl_from_nbs(nbs)
-                # @show oaspl_expected oaspl_time_domain oaspl_freq_domain
                 @test oaspl_time_domain ≈ oaspl_expected
                 @test oaspl_freq_domain ≈ oaspl_expected
             end
@@ -370,14 +369,12 @@ end
             t = (0:n-1).*dt
             p = f.(t)
             freq, nbs = nbs_from_apth(p, dt)
-            # @show freq nbs
             nbs_A = @. W_A(freq)*nbs
             # nbs_A_a2 = copy(nbs)
             # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
             # Wish I could get this to match more closely. But the weighting
             # function looks pretty nasty numerically (frequencies raised to the
             # 4th power, and one of the coefficients is about 2.24e16).
-            # @show T_ms n nbs_A_a2
             @test all(isapprox.(nbs_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
         end
     end
