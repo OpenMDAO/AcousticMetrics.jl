@@ -354,28 +354,49 @@ end
 end
 
 @testset "A-weighting" begin
-    fr(t) = 2*cos(1e3*2*pi*t) + 4*cos(2e3*2*pi*t) + 6*cos(3e3*2*pi*t) + 8*cos(4e3*2*pi*t)
-    fi(t) = 2*sin(1e3*2*pi*t) + 4*sin(2e3*2*pi*t) + 6*sin(3e3*2*pi*t) + 8*sin(4e3*2*pi*t)
-    f(t) = fr(t) + fi(t)
-    nbs_A_a2 = Dict(
-      (1, 19)=>[0.0, 4.000002539852234, 21.098932320239594, 47.765983983028875, 79.89329612328712, 6.904751939255882e-29, 3.438658433244509e-29, 3.385314868430938e-29, 4.3828241499153937e-29, 3.334042101984942e-29],
-      (1, 20)=>[0.0, 4.000002539852235, 21.09893232023959, 47.76598398302881, 79.89329612328707, 2.4807405180395723e-29, 3.319538256490389e-29, 1.1860147288201262e-29, 1.5894684286161776e-29, 9.168407004474984e-30, 1.4222371367588704e-31],
-      (2, 19)=>[0.0, 4.137956256384954e-30, 4.00000253985224, 2.1118658029791977e-29, 21.098932320239633, 3.4572972532471526e-29, 47.765983983028924, 1.2630134771692395e-28, 79.89329612328716, 8.284388048614786e-29],
-      (2, 20)=>[0.0, 1.2697180778261437e-30, 4.000002539852251, 4.666290179209354e-29, 21.098932320239584, 3.4300386105764425e-29, 47.76598398302884, 6.100255343320017e-29, 79.89329612328727, 1.801023480958872e-28, 6.029776808298499e-29],
-    )
-    for T_ms in [1, 2]
-        for n in [19, 20]
-            dt = T_ms*1e-3/n
-            t = (0:n-1).*dt
-            p = f.(t)
-            freq, nbs = nbs_from_apth(p, dt)
-            nbs_A = @. W_A(freq)*nbs
-            # nbs_A_a2 = copy(nbs)
-            # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
-            # Wish I could get this to match more closely. But the weighting
-            # function looks pretty nasty numerically (frequencies raised to the
-            # 4th power, and one of the coefficients is about 2.24e16).
-            @test all(isapprox.(nbs_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
+    @testset "ANOPP2 comparison" begin
+        fr(t) = 2*cos(1e3*2*pi*t) + 4*cos(2e3*2*pi*t) + 6*cos(3e3*2*pi*t) + 8*cos(4e3*2*pi*t)
+        fi(t) = 2*sin(1e3*2*pi*t) + 4*sin(2e3*2*pi*t) + 6*sin(3e3*2*pi*t) + 8*sin(4e3*2*pi*t)
+        f(t) = fr(t) + fi(t)
+        nbs_A_a2 = Dict(
+          (1, 19)=>[0.0, 4.000002539852234, 21.098932320239594, 47.765983983028875, 79.89329612328712, 6.904751939255882e-29, 3.438658433244509e-29, 3.385314868430938e-29, 4.3828241499153937e-29, 3.334042101984942e-29],
+          (1, 20)=>[0.0, 4.000002539852235, 21.09893232023959, 47.76598398302881, 79.89329612328707, 2.4807405180395723e-29, 3.319538256490389e-29, 1.1860147288201262e-29, 1.5894684286161776e-29, 9.168407004474984e-30, 1.4222371367588704e-31],
+          (2, 19)=>[0.0, 4.137956256384954e-30, 4.00000253985224, 2.1118658029791977e-29, 21.098932320239633, 3.4572972532471526e-29, 47.765983983028924, 1.2630134771692395e-28, 79.89329612328716, 8.284388048614786e-29],
+          (2, 20)=>[0.0, 1.2697180778261437e-30, 4.000002539852251, 4.666290179209354e-29, 21.098932320239584, 3.4300386105764425e-29, 47.76598398302884, 6.100255343320017e-29, 79.89329612328727, 1.801023480958872e-28, 6.029776808298499e-29],
+        )
+        for T_ms in [1, 2]
+            for n in [19, 20]
+                dt = T_ms*1e-3/n
+                t = (0:n-1).*dt
+                p = f.(t)
+                freq, nbs = nbs_from_apth(p, dt)
+                nbs_A = @. W_A(freq)*nbs
+                # nbs_A_a2 = copy(nbs)
+                # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
+                # Wish I could get this to match more closely. But the weighting
+                # function looks pretty nasty numerically (frequencies raised to the
+                # 4th power, and one of the coefficients is about 2.24e16).
+                @test all(isapprox.(nbs_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
+            end
+        end
+    end
+
+    @testset "1kHz check" begin
+        # A 1kHz signal should be unaffected by A-weighting.
+        fr(t) = 2*cos(1e3*2*pi*t)
+        fi(t) = 2*sin(1e3*2*pi*t)
+        f(t) = fr(t) + fi(t)
+        for T_ms in [1, 2]
+            for n in [19, 20]
+                dt = T_ms*1e-3/n
+                t = (0:n-1).*dt
+                p = f.(t)
+                freq, nbs = nbs_from_apth(p, dt)
+                nbs_A = @. W_A(freq)*nbs
+                # This is lame. Should be able to get this to match better,
+                # right?
+                @test all(isapprox.(nbs_A, nbs, atol=1e-5))
+            end
         end
     end
 end
