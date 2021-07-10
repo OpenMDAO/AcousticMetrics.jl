@@ -1,8 +1,12 @@
 using AcousticMetrics
 # using ANOPP2
 using ForwardDiff
+using JLD2
 using Random
 using Test
+
+include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
+
 
 @testset "Fourier transforms" begin
 
@@ -263,33 +267,56 @@ end
         end
     end
     @testset "ANOPP2 comparison" begin
-        freq_a2 = Dict(
-            (1, 19)=>[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
-            (1, 20)=>[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
-            (2, 19)=>[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5],
-            (2, 20)=>[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
-        nbs_msp_a2 = Dict(
-            (1, 19)=>[1.5582437633995294e-31, 3.999999999999993, 15.999999999999993, 36.00000000000002, 64.00000000000004, 2.970402173980353e-30, 1.3245071988896e-30, 9.836413756459529e-30, 6.116106771343153e-30, 3.8956094084988235e-30],
-            (1, 20)=>[1.3331749298235103e-30, 4.0, 15.999999999999986, 36.00000000000001, 64.00000000000003, 1.1146604590772899e-29, 5.5693579908603444e-30, 5.7586846081133874e-30, 6.504158163547243e-30, 1.97215226305253e-30, 1.5461673742331835e-30],
-            (2, 19)=>[1.6773033259467747e-29, 1.9088486101644234e-29, 3.9999999999999907, 1.0673969779286777e-29, 15.99999999999996, 1.9295440351470734e-30, 36.0, 9.739023521247059e-32, 64.00000000000006, 1.1591872746164311e-29],
-            (2, 20)=>[1.0223637331664315e-29, 8.072775188576871e-30, 3.9999999999999907, 1.1393194782051846e-29, 15.999999999999979, 7.699282434957076e-30, 36.0, 7.618353033774544e-30, 64.00000000000006, 1.52932848240695e-29, 2.4738677987730935e-29])
+        # freq_a2 = Dict(
+        #     (1, 19)=>[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+        #     (1, 20)=>[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+        #     (2, 19)=>[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5],
+        #     (2, 20)=>[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+        # nbs_msp_a2 = Dict(
+        #     (1, 19)=>[1.5582437633995294e-31, 3.999999999999993, 15.999999999999993, 36.00000000000002, 64.00000000000004, 2.970402173980353e-30, 1.3245071988896e-30, 9.836413756459529e-30, 6.116106771343153e-30, 3.8956094084988235e-30],
+        #     (1, 20)=>[1.3331749298235103e-30, 4.0, 15.999999999999986, 36.00000000000001, 64.00000000000003, 1.1146604590772899e-29, 5.5693579908603444e-30, 5.7586846081133874e-30, 6.504158163547243e-30, 1.97215226305253e-30, 1.5461673742331835e-30],
+        #     (2, 19)=>[1.6773033259467747e-29, 1.9088486101644234e-29, 3.9999999999999907, 1.0673969779286777e-29, 15.99999999999996, 1.9295440351470734e-30, 36.0, 9.739023521247059e-32, 64.00000000000006, 1.1591872746164311e-29],
+        #     (2, 20)=>[1.0223637331664315e-29, 8.072775188576871e-30, 3.9999999999999907, 1.1393194782051846e-29, 15.999999999999979, 7.699282434957076e-30, 36.0, 7.618353033774544e-30, 64.00000000000006, 1.52932848240695e-29, 2.4738677987730935e-29])
+        a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "nbs.jld2"))
+        freq_a2 = a2_data["a2_nbs_freq"]
+        nbs_msp_a2 = a2_data["a2_nbs_amp"]
+        nbs_phase_a2 = a2_data["a2_nbs_phase"]
         for T in [1, 2]
             for n in [19, 20]
                 dt = T/n
                 t = (0:n-1).*dt
-                p = f.(t)
-                p_fft = rfft(p)./n
+                p = apth_for_nbs.(t)
+                # p_fft = rfft(p)./n
                 freq, nbs = nbs_from_apth(p, dt)
 
-                t_a2 = range(0, T, length=n) |> collect # This needs to be an array, since we'll eventually be passing it to C/Fortran via ccall.
-                if mod(n, 2) == 0
-                    p_a2 = p
-                else
-                    p_a2 = f.(t_a2)
-                end
+                # t_a2 = range(0, T, length=n) |> collect # This needs to be an array, since we'll eventually be passing it to C/Fortran via ccall.
+                # if mod(n, 2) == 0
+                #     p_a2 = p
+                # else
+                #     p_a2 = apth_for_nbs.(t_a2)
+                # end
                 # freq_a2, nbs_msp_a2, nbs_phase_a2 = ANOPP2.a2_aa_nbs(ANOPP2.a2_aa_pa, ANOPP2.a2_aa_pa, t_a2, p_a2)
                 @test all(isapprox.(freq, freq_a2[(T,n)], atol=1e-12))
                 @test all(isapprox.(nbs, nbs_msp_a2[(T,n)], atol=1e-12))
+            end
+        end
+        for T in [1, 2]
+            for n in [19, 20]
+                dt = T/n
+                t = (0:n-1).*dt
+                p = apth_for_nbs.(t)
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                @test all(isapprox.(AcousticMetrics.frequency(nbs), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(AcousticMetrics.amplitude(nbs), nbs_msp_a2[(T,n)], atol=1e-12))
+                # Checking the phase is tricky, since it involves the ratio of
+                # the imaginary component to the real component of the MSP
+                # spectrum (definition is phase = atan(imag(fft(p)),
+                # real(fft(p)))). For the components of the spectrum that have
+                # zero amplitude that ratio ends up being very noisy. So scale
+                # the phase by the amplitude to remove the problematic
+                # zero-amplitude components.
+                @test all(isapprox.(AcousticMetrics.phase(nbs).*AcousticMetrics.amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
             end
         end
     end
