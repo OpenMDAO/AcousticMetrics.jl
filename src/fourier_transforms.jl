@@ -127,7 +127,10 @@ function rfft(x)
     return y
 end
 
-# Wish this was implemented in FFTW.jl.
+# Wish this was implemented in FFTW.jl. Actually, I think it may be. Ah, but
+# only for the real-input FFT that returns a complex array, which I don't want.
+# Sad. Oh, wait: but are the frequencies at fftfreq? I'll need to look at that
+# again. Need to write that up once I figure it out.
 function rfftfreq(n, d=1.0)
     # http://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html
     freq = vcat(0:floor(Int, n/2), floor(Int, (n+1)/2)-1:-1:1)
