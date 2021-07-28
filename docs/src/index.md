@@ -18,12 +18,18 @@ sinusoids. Let's imagine we have a very simple signal
 p(t) = A \sin(ωt+φ)
 ```
 where we call ``A`` the amplitude, ``ω`` the frequency, and ``φ`` the phase. Say
-we evaluate that function ``n`` times over a period ``2π/ω`` and refer to each
-of those samples as ``p_j = p(t_j)``, where ``t_j`` is the time at sample ``j``
-and ``j`` is an index from ``0`` to ``n-1``. What is the discrete Fourier
-transform of our signal ``p_j``? We should be able to figure that out if we can
-express our signal ``p(t)`` as something that looks like FFTW's definition of
-the DFT. How can we do that? Well, first we need to remember that
+we evaluate that function ``n`` times over a period ``T``, and assume that ``ω =
+2πm/T``, i.e., that the period of our signal is some integer fraction of the
+sampling period ``T``, since
+```math
+\frac{2 π}{ω} = \frac{2 π}{\frac{2πm}{T}} = \frac{T}{m}.
+```
+We'll refer to each of those samples as ``p_j = p(t_j)``, where ``t_j``
+is the time at sample ``j`` and ``j`` is an index from ``0`` to ``n-1``. What is
+the discrete Fourier transform of our signal ``p_j``? We should be able to
+figure that out if we can express our signal ``p(t)`` as something that looks
+like FFTW's definition of the DFT. How can we do that? Well, first we need to
+remember that
 ```math
 \sin(α+β) = \sin(α)\cos(β) + \cos(α)\sin(β)
 ```
@@ -52,20 +58,21 @@ p(t) &= A \sin(ωt+φ) = A \cos(φ)\left[ \frac{-\imath e^{\imath ωt} + \imath 
 ```
 This is looking much closer to the definition of the DFT that we started with.
 Next thing we need to do is realize that since we've sampled our signal ``p(t)``
-at ``n`` different times, equally spaced, over a time period ``2π/ω``, then we
+at ``n`` different times, equally spaced, over a time period ``T``, then we
 can replace ``t`` with
 ```math
-t_j = j \frac{\frac{2π}{ω}}{n} = j \frac{T}{n} = j Δt.
+t_j = j \frac{T}{n} = j Δt
 ```
-The quantity ``T = \frac{2π}{ω}`` is the period, i.e. the length of time over
-which we've decided to sample our signal, and so ``T/n`` is ``Δt``, the
-time step size. And of course then ``ω t_j = j \frac{2π}{n}``, so let's throw
-that in there:
+where ``T/n`` is ``Δt``, the time step size. We've previously said that ``ω=\frac{2πm}{T}``, which implies that
+```math
+ω t_j = \left( \frac{2πm}{T} \right) \left(j \frac{T}{n} \right) = \frac{2πmj}{n}
+```
+So if we throw that in there, we find
 ```math
 \begin{aligned}
 p(t_j) = p_j &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{\imath ωt_j} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-\imath ωt_j} \\
-             &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{\imath j \frac{2π}{n}} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-\imath j \frac{2π}{n}} \\
-             &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath j/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath j/n}.
+             &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{\imath \frac{2πmj}{n}} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-\imath \frac{2πmj}{n}} \\
+             &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath jm/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath jm/n}.
 \end{aligned}
 ```
 
@@ -75,9 +82,7 @@ We'll call the discrete Fourier transform of the signal ``\hat{p}_k``. So...
 ```math
 \begin{aligned}
   \hat{p}_k &= \sum_{j=0}^{n-1} p_j e^{-2 \pi \imath jk/n} \\
-            &= \sum_{j=0}^{n-1} \left( \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath j/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath j/n} \right) e^{-2 \pi \imath jk/n}.
+            &= \sum_{j=0}^{n-1} \left( \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath jm/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath jm/n} \right) e^{-2 \pi \imath jk/n} \\
+            &= \sum_{j=0}^{n-1} \left( \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath j(m-k)/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath j(m+k)/n} \right)
 \end{aligned}
 ```
-(Now I've just realized that I want to change the definition of ``ω`` slightly.
-I want it to be some **multiple** of ``2π/T``, not just ``2π/T``. Hopefully
-that's not too hard.)
