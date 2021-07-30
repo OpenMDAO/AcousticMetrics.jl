@@ -221,14 +221,15 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = fi.(t)
-                p_fft = rfft(p)./n
-                freq, nbs = nbs_from_apth(p, dt)
-                nbs_expected = zeros(floor(Int, n/2)+1)
-                nbs_expected[findfirst(x->x≈1, freq)] = 2*(-0.5*2)^2
-                nbs_expected[findfirst(x->x≈2, freq)] = 2*(-0.5*4)^2
-                nbs_expected[findfirst(x->x≈3, freq)] = 2*(-0.5*6)^2
-                nbs_expected[findfirst(x->x≈4, freq)] = 2*(-0.5*8)^2
-                @test all(isapprox.(nbs, nbs_expected, atol=1e-12))
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                freq = AcousticMetrics.frequency(nbs)
+                amp_expected = zeros(floor(Int, n/2)+1)
+                amp_expected[findfirst(x->x≈1, freq)] = 2*(-0.5*2)^2
+                amp_expected[findfirst(x->x≈2, freq)] = 2*(-0.5*4)^2
+                amp_expected[findfirst(x->x≈3, freq)] = 2*(-0.5*6)^2
+                amp_expected[findfirst(x->x≈4, freq)] = 2*(-0.5*8)^2
+                @test all(isapprox.(AcousticMetrics.amplitude(nbs), amp_expected, atol=1e-12))
             end
         end
     end
@@ -238,14 +239,15 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = fr.(t)
-                p_fft = rfft(p)./n
-                freq, nbs = nbs_from_apth(p, dt)
-                nbs_expected = zeros(floor(Int, n/2)+1)
-                nbs_expected[findfirst(x->x≈1, freq)] = 2*(0.5*2)^2
-                nbs_expected[findfirst(x->x≈2, freq)] = 2*(0.5*4)^2
-                nbs_expected[findfirst(x->x≈3, freq)] = 2*(0.5*6)^2
-                nbs_expected[findfirst(x->x≈4, freq)] = 2*(0.5*8)^2
-                @test all(isapprox.(nbs, nbs_expected, atol=1e-12))
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                freq = AcousticMetrics.frequency(nbs)
+                amp_expected = zeros(floor(Int, n/2)+1)
+                amp_expected[findfirst(x->x≈1, freq)] = 2*(0.5*2)^2
+                amp_expected[findfirst(x->x≈2, freq)] = 2*(0.5*4)^2
+                amp_expected[findfirst(x->x≈3, freq)] = 2*(0.5*6)^2
+                amp_expected[findfirst(x->x≈4, freq)] = 2*(0.5*8)^2
+                @test all(isapprox.(AcousticMetrics.amplitude(nbs), amp_expected, atol=1e-12))
             end
         end
     end
@@ -255,51 +257,23 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                p_fft = rfft(p)./n
-                freq, nbs = nbs_from_apth(p, dt)
-                nbs_expected = zeros(floor(Int, n/2)+1)
-                nbs_expected[findfirst(x->x≈1, freq)] = 2*((-0.5*2)^2 + (0.5*2)^2)
-                nbs_expected[findfirst(x->x≈2, freq)] = 2*((-0.5*4)^2 + (0.5*4)^2)
-                nbs_expected[findfirst(x->x≈3, freq)] = 2*((-0.5*6)^2 + (0.5*6)^2)
-                nbs_expected[findfirst(x->x≈4, freq)] = 2*((-0.5*8)^2 + (0.5*8)^2)
-                @test all(isapprox.(nbs, nbs_expected, atol=1e-12))
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                freq = AcousticMetrics.frequency(nbs)
+                amp_expected = zeros(floor(Int, n/2)+1)
+                amp_expected[findfirst(x->x≈1, freq)] = 2*((-0.5*2)^2 + (0.5*2)^2)
+                amp_expected[findfirst(x->x≈2, freq)] = 2*((-0.5*4)^2 + (0.5*4)^2)
+                amp_expected[findfirst(x->x≈3, freq)] = 2*((-0.5*6)^2 + (0.5*6)^2)
+                amp_expected[findfirst(x->x≈4, freq)] = 2*((-0.5*8)^2 + (0.5*8)^2)
+                @test all(isapprox.(AcousticMetrics.amplitude(nbs), amp_expected, atol=1e-12))
             end
         end
     end
     @testset "ANOPP2 comparison" begin
-        # freq_a2 = Dict(
-        #     (1, 19)=>[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
-        #     (1, 20)=>[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
-        #     (2, 19)=>[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5],
-        #     (2, 20)=>[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
-        # nbs_msp_a2 = Dict(
-        #     (1, 19)=>[1.5582437633995294e-31, 3.999999999999993, 15.999999999999993, 36.00000000000002, 64.00000000000004, 2.970402173980353e-30, 1.3245071988896e-30, 9.836413756459529e-30, 6.116106771343153e-30, 3.8956094084988235e-30],
-        #     (1, 20)=>[1.3331749298235103e-30, 4.0, 15.999999999999986, 36.00000000000001, 64.00000000000003, 1.1146604590772899e-29, 5.5693579908603444e-30, 5.7586846081133874e-30, 6.504158163547243e-30, 1.97215226305253e-30, 1.5461673742331835e-30],
-        #     (2, 19)=>[1.6773033259467747e-29, 1.9088486101644234e-29, 3.9999999999999907, 1.0673969779286777e-29, 15.99999999999996, 1.9295440351470734e-30, 36.0, 9.739023521247059e-32, 64.00000000000006, 1.1591872746164311e-29],
-        #     (2, 20)=>[1.0223637331664315e-29, 8.072775188576871e-30, 3.9999999999999907, 1.1393194782051846e-29, 15.999999999999979, 7.699282434957076e-30, 36.0, 7.618353033774544e-30, 64.00000000000006, 1.52932848240695e-29, 2.4738677987730935e-29])
         a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "nbs.jld2"))
         freq_a2 = a2_data["a2_nbs_freq"]
         nbs_msp_a2 = a2_data["a2_nbs_amp"]
         nbs_phase_a2 = a2_data["a2_nbs_phase"]
-        for T in [1, 2]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = apth_for_nbs.(t)
-                # p_fft = rfft(p)./n
-                freq, nbs = nbs_from_apth(p, dt)
-
-                # t_a2 = range(0, T, length=n) |> collect # This needs to be an array, since we'll eventually be passing it to C/Fortran via ccall.
-                # if mod(n, 2) == 0
-                #     p_a2 = p
-                # else
-                #     p_a2 = apth_for_nbs.(t_a2)
-                # end
-                # freq_a2, nbs_msp_a2, nbs_phase_a2 = ANOPP2.a2_aa_nbs(ANOPP2.a2_aa_pa, ANOPP2.a2_aa_pa, t_a2, p_a2)
-                @test all(isapprox.(freq, freq_a2[(T,n)], atol=1e-12))
-                @test all(isapprox.(nbs, nbs_msp_a2[(T,n)], atol=1e-12))
-            end
-        end
         for T in [1, 2]
             for n in [19, 20]
                 dt = T/n
@@ -332,9 +306,10 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                freq, nbs = nbs_from_apth(p, dt)
-                oaspl_time_domain = AcousticMetrics.oaspl_from_apth(p)
-                oaspl_freq_domain = AcousticMetrics.oaspl_from_nbs(nbs)
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                oaspl_time_domain = AcousticMetrics.OASPL(ap)
+                oaspl_freq_domain = AcousticMetrics.OASPL(nbs)
                 @test oaspl_freq_domain ≈ oaspl_time_domain
             end
         end
@@ -353,9 +328,10 @@ end
                 p = f.(t)
                 msp_expected = 4^2/2
                 oaspl_expected = 10*log10(msp_expected/p_ref^2)
-                freq, nbs = nbs_from_apth(p, dt)
-                oaspl_time_domain = oaspl_from_apth(p)
-                oaspl_freq_domain = oaspl_from_nbs(nbs)
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                oaspl_time_domain = AcousticMetrics.OASPL(ap)
+                oaspl_freq_domain = AcousticMetrics.OASPL(nbs)
                 @test oaspl_time_domain ≈ oaspl_expected
                 @test oaspl_freq_domain ≈ oaspl_expected
             end
@@ -371,8 +347,8 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                freq, nbs = nbs_from_apth(p, dt)
-                oaspl = AcousticMetrics.oaspl_from_nbs(nbs)
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                oaspl = AcousticMetrics.OASPL(ap)
                 # oaspl_a2 = ANOPP2.a2_aa_oaspl(ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs)
                 @test isapprox(oaspl, oaspl_a2, atol=1e-12)
             end
@@ -396,9 +372,11 @@ end
                 dt = T_ms*1e-3/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                freq, nbs = nbs_from_apth(p, dt)
-                nbs_A = @. W_A(freq)*nbs
-                # nbs_A_a2 = copy(nbs)
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                freq = AcousticMetrics.frequency(nbs)
+                amp = AcousticMetrics.amplitude(nbs)
+                nbs_A = @. W_A(freq)*amp
                 # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
                 # Wish I could get this to match more closely. But the weighting
                 # function looks pretty nasty numerically (frequencies raised to the
@@ -418,11 +396,14 @@ end
                 dt = T_ms*1e-3/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                freq, nbs = nbs_from_apth(p, dt)
-                nbs_A = @. W_A(freq)*nbs
+                ap = AcousticMetrics.AcousticPressure(p, dt)
+                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
+                amp = AcousticMetrics.amplitude(nbs)
+                freq = AcousticMetrics.frequency(nbs)
+                nbs_A = @. W_A(freq)*amp
                 # This is lame. Should be able to get this to match better,
                 # right?
-                @test all(isapprox.(nbs_A, nbs, atol=1e-5))
+                @test all(isapprox.(nbs_A, amp, atol=1e-5))
             end
         end
     end

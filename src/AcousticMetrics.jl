@@ -15,6 +15,5 @@ include("fourier_transforms.jl")
 export RFFTCache, rfft!, rfft, rfftfreq
 
 include("metrics.jl")
-export nbs_from_apth, oaspl_from_apth, oaspl_from_nbs
 
 end # module
