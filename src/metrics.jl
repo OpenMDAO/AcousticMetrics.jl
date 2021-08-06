@@ -3,14 +3,18 @@ abstract type AbstractAcousticPressure end
 @concrete struct AcousticPressure <: AbstractAcousticPressure
     p
     dt
+    t0
 end
+
+AcousticPressure(p, dt) = AcousticPressure(p, dt, zero(typeof(dt)))
 
 @inline pressure(ap::AbstractAcousticPressure) = ap.p
 @inline timestep(ap::AbstractAcousticPressure) = ap.dt
+@inline starttime(ap::AbstractAcousticPressure) = ap.t0
 
 @inline function time(ap::AbstractAcousticPressure)
     n = length(pressure(ap))
-    return (0:n-1) .* timestep(ap)
+    return starttime(ap) .+ (0:n-1) .* timestep(ap)
 end
 
 abstract type AbstractNarrowbandSpectrum end

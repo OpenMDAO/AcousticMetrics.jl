@@ -1,4 +1,7 @@
-using AcousticMetrics
+using AcousticMetrics: p_ref
+using AcousticMetrics: rfftfreq, rfft, rfft!, RFFTCache, dft_r2hc
+using AcousticMetrics: AcousticPressure, NarrowbandSpectrum, frequency, amplitude, phase, OASPL
+using AcousticMetrics: W_A
 # using ANOPP2
 using ForwardDiff
 using JLD2
@@ -80,7 +83,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
             x = rand(n)
             y_fft = similar(x)
             rfft!(y_fft, x)
-            y_dft = AcousticMetrics.dft_r2hc(x)
+            y_dft = dft_r2hc(x)
             @test all(y_dft .≈ y_fft)
         end
     end
@@ -92,7 +95,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
                 x = rand(n)
                 y = similar(x)
                 dy_dx_fft = ForwardDiff.jacobian(rfft!, y, x)
-                dy_dx_dft = ForwardDiff.jacobian(AcousticMetrics.dft_r2hc, x)
+                dy_dx_dft = ForwardDiff.jacobian(dft_r2hc, x)
                 @test all(isapprox.(dy_dx_fft, dy_dx_dft, atol=1e-13))
             end
         end
@@ -108,7 +111,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
             function f1_dft(t)
                 x = range(t[begin], t[end], length=8)
                 x = @. 2*x^2 + 3*x + 5
-                y = AcousticMetrics.dft_r2hc(x)
+                y = dft_r2hc(x)
                 return y
             end
             dy_dx_fft = ForwardDiff.jacobian(f1_fft, [1.1, 3.5])
@@ -134,7 +137,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
                 xend = xstart + 2
                 x = range(xstart, xend, length=nx)
                 x = @. 2*x^2 + 3*x + 5
-                y = AcousticMetrics.dft_r2hc(x)
+                y = dft_r2hc(x)
                 return y
             end
             t = rand(nt)
@@ -221,15 +224,15 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = fi.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                freq = AcousticMetrics.frequency(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                freq = frequency(nbs)
                 amp_expected = zeros(floor(Int, n/2)+1)
                 amp_expected[findfirst(x->x≈1, freq)] = 2*(-0.5*2)^2
                 amp_expected[findfirst(x->x≈2, freq)] = 2*(-0.5*4)^2
                 amp_expected[findfirst(x->x≈3, freq)] = 2*(-0.5*6)^2
                 amp_expected[findfirst(x->x≈4, freq)] = 2*(-0.5*8)^2
-                @test all(isapprox.(AcousticMetrics.amplitude(nbs), amp_expected, atol=1e-12))
+                @test all(isapprox.(amplitude(nbs), amp_expected, atol=1e-12))
             end
         end
     end
@@ -239,15 +242,15 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = fr.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                freq = AcousticMetrics.frequency(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                freq = frequency(nbs)
                 amp_expected = zeros(floor(Int, n/2)+1)
                 amp_expected[findfirst(x->x≈1, freq)] = 2*(0.5*2)^2
                 amp_expected[findfirst(x->x≈2, freq)] = 2*(0.5*4)^2
                 amp_expected[findfirst(x->x≈3, freq)] = 2*(0.5*6)^2
                 amp_expected[findfirst(x->x≈4, freq)] = 2*(0.5*8)^2
-                @test all(isapprox.(AcousticMetrics.amplitude(nbs), amp_expected, atol=1e-12))
+                @test all(isapprox.(amplitude(nbs), amp_expected, atol=1e-12))
             end
         end
     end
@@ -257,15 +260,15 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                freq = AcousticMetrics.frequency(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                freq = frequency(nbs)
                 amp_expected = zeros(floor(Int, n/2)+1)
                 amp_expected[findfirst(x->x≈1, freq)] = 2*((-0.5*2)^2 + (0.5*2)^2)
                 amp_expected[findfirst(x->x≈2, freq)] = 2*((-0.5*4)^2 + (0.5*4)^2)
                 amp_expected[findfirst(x->x≈3, freq)] = 2*((-0.5*6)^2 + (0.5*6)^2)
                 amp_expected[findfirst(x->x≈4, freq)] = 2*((-0.5*8)^2 + (0.5*8)^2)
-                @test all(isapprox.(AcousticMetrics.amplitude(nbs), amp_expected, atol=1e-12))
+                @test all(isapprox.(amplitude(nbs), amp_expected, atol=1e-12))
             end
         end
     end
@@ -279,10 +282,10 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = apth_for_nbs.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                @test all(isapprox.(AcousticMetrics.frequency(nbs), freq_a2[(T,n)], atol=1e-12))
-                @test all(isapprox.(AcousticMetrics.amplitude(nbs), nbs_msp_a2[(T,n)], atol=1e-12))
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                @test all(isapprox.(frequency(nbs), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(amplitude(nbs), nbs_msp_a2[(T,n)], atol=1e-12))
                 # Checking the phase is tricky, since it involves the ratio of
                 # the imaginary component to the real component of the MSP
                 # spectrum (definition is phase = atan(imag(fft(p)),
@@ -290,7 +293,7 @@ end
                 # zero amplitude that ratio ends up being very noisy. So scale
                 # the phase by the amplitude to remove the problematic
                 # zero-amplitude components.
-                @test all(isapprox.(AcousticMetrics.phase(nbs).*AcousticMetrics.amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
+                @test all(isapprox.(phase(nbs).*amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
             end
         end
     end
@@ -306,10 +309,10 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                oaspl_time_domain = AcousticMetrics.OASPL(ap)
-                oaspl_freq_domain = AcousticMetrics.OASPL(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                oaspl_time_domain = OASPL(ap)
+                oaspl_freq_domain = OASPL(nbs)
                 @test oaspl_freq_domain ≈ oaspl_time_domain
             end
         end
@@ -328,10 +331,10 @@ end
                 p = f.(t)
                 msp_expected = 4^2/2
                 oaspl_expected = 10*log10(msp_expected/p_ref^2)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                oaspl_time_domain = AcousticMetrics.OASPL(ap)
-                oaspl_freq_domain = AcousticMetrics.OASPL(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                oaspl_time_domain = OASPL(ap)
+                oaspl_freq_domain = OASPL(nbs)
                 @test oaspl_time_domain ≈ oaspl_expected
                 @test oaspl_freq_domain ≈ oaspl_expected
             end
@@ -347,8 +350,8 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                oaspl = AcousticMetrics.OASPL(ap)
+                ap = AcousticPressure(p, dt)
+                oaspl = OASPL(ap)
                 # oaspl_a2 = ANOPP2.a2_aa_oaspl(ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs)
                 @test isapprox(oaspl, oaspl_a2, atol=1e-12)
             end
@@ -372,10 +375,10 @@ end
                 dt = T_ms*1e-3/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                freq = AcousticMetrics.frequency(nbs)
-                amp = AcousticMetrics.amplitude(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                freq = frequency(nbs)
+                amp = amplitude(nbs)
                 nbs_A = @. W_A(freq)*amp
                 # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
                 # Wish I could get this to match more closely. But the weighting
@@ -396,10 +399,10 @@ end
                 dt = T_ms*1e-3/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticMetrics.AcousticPressure(p, dt)
-                nbs = AcousticMetrics.NarrowbandSpectrum(ap)
-                amp = AcousticMetrics.amplitude(nbs)
-                freq = AcousticMetrics.frequency(nbs)
+                ap = AcousticPressure(p, dt)
+                nbs = NarrowbandSpectrum(ap)
+                amp = amplitude(nbs)
+                freq = frequency(nbs)
                 nbs_A = @. W_A(freq)*amp
                 # This is lame. Should be able to get this to match better,
                 # right?

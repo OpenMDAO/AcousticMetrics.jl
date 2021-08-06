@@ -6,13 +6,10 @@ using ForwardDiff: ForwardDiff
 using OffsetArrays: OffsetArray
 
 include("constants.jl")
-export p_ref
 
 include("weighting.jl")
-export W_A
 
 include("fourier_transforms.jl")
-export RFFTCache, rfft!, rfft, rfftfreq
 
 include("metrics.jl")
 
