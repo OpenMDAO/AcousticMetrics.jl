@@ -83,6 +83,47 @@ We'll call the discrete Fourier transform of the signal ``\hat{p}_k``. So...
 \begin{aligned}
   \hat{p}_k &= \sum_{j=0}^{n-1} p_j e^{-2 \pi \imath jk/n} \\
             &= \sum_{j=0}^{n-1} \left( \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath jm/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath jm/n} \right) e^{-2 \pi \imath jk/n} \\
-            &= \sum_{j=0}^{n-1} \left( \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath j(m-k)/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath j(m+k)/n} \right)
+            &= \sum_{j=0}^{n-1} \left( \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath j(m-k)/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath j(m+k)/n} \right) \\
+            &=\frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] \sum_{j=0}^{n-1} e^{2π\imath j(m-k)/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] \sum_{j=0}^{n-1} e^{-2π\imath j(m+k)/n} 
+\end{aligned}
+```
+Pretty close now. Let's think about those two summations in the last
+expression. First assume that ``m - k = q \ne 0``, where ``m`` and ``k`` are
+both integers. Then the first sum would be
+```math
+  \sum_{j=0}^{n-1} e^{2π\imath j(m-k)/n} = \sum_{j=0}^{n-1} e^{2π\imath jq/n}.
+```
+That's a signal that has period
+```math
+\frac{2π}{2πq/n} = n/q
+```
+that we're sampling ``n`` times. So we're sampling a sinusoid an integer number
+of times over its entire period. That will give us... zero. Same thing will
+happen to the second sum if ``m+k=r \ne 0``: we'll also get zero. So now we just
+have to figure out what happens when ``m - k = 0`` and ``m + k = 0``, i.e., when
+``k ± m``. Let's try ``k = m`` first. The first sum will be
+of times, 
+```math
+  \sum_{j=0}^{n-1} e^{2π\imath j(m-m)/n} = \sum_{j=0}^{n-1} e^{0} = \sum_{j=0}^{n-1} 1 = n
+```
+and, from the previous argument, we know the second sum will be 0, since
+``m+k=2m \ne 0``. For ``k = -m``, the first sum will be zero, since ``m - -m =
+2m \ne 0``, and the second sum will be
+```math
+  \sum_{j=0}^{n-1} e^{2π\imath j(m-m))/n} = n
+```
+again.
+
+Great! So now we finally can write down the DFT of our example signal
+```math
+p(t) = A \sin(ωt+φ) = A \sin\left(\left[\frac{2πm}{T}\right]t+φ\right),
+```
+which is (wish I could figure out how to do the `cases` LaTeX environment)...
+```math
+\begin{aligned}
+  \hat{p}_k &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] \sum_{j=0}^{n-1} e^{2π\imath j(m-k)/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] \sum_{j=0}^{n-1} e^{-2π\imath j(m+k)/n} \\
+  \hat{p}_m & = \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] n \\
+  \hat{p}_{-m} & = \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] n \\
+  \hat{p}_{k} & = 0\,\text{otherwise}.
 \end{aligned}
 ```
