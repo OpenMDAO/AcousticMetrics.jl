@@ -6,11 +6,8 @@ using ForwardDiff: ForwardDiff
 using OffsetArrays: OffsetArray
 
 include("constants.jl")
-
-include("weighting.jl")
-
 include("fourier_transforms.jl")
-
 include("metrics.jl")
+include("weighting.jl")
 
 end # module

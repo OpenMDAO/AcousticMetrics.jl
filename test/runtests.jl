@@ -377,14 +377,12 @@ end
                 p = f.(t)
                 ap = AcousticPressure(p, dt)
                 nbs = NarrowbandSpectrum(ap)
-                freq = frequency(nbs)
-                amp = amplitude(nbs)
-                nbs_A = @. W_A(freq)*amp
+                nbs_A = W_A(nbs)
                 # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
                 # Wish I could get this to match more closely. But the weighting
                 # function looks pretty nasty numerically (frequencies raised to the
                 # 4th power, and one of the coefficients is about 2.24e16).
-                @test all(isapprox.(nbs_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
+                @test all(isapprox.(amplitude(nbs_A), nbs_A_a2[(T_ms, n)], atol=1e-6))
             end
         end
     end
@@ -402,11 +400,10 @@ end
                 ap = AcousticPressure(p, dt)
                 nbs = NarrowbandSpectrum(ap)
                 amp = amplitude(nbs)
-                freq = frequency(nbs)
-                nbs_A = @. W_A(freq)*amp
+                nbs_A = W_A(nbs)
                 # This is lame. Should be able to get this to match better,
                 # right?
-                @test all(isapprox.(nbs_A, amp, atol=1e-5))
+                @test all(isapprox.(amplitude(nbs_A), amp, atol=1e-5))
             end
         end
     end

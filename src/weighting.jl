@@ -1,7 +1,7 @@
 """
-    W_A(f)
+    W_A(f::AbstractFloat)
 
-Calculate the A-weighting for a frequency `f` in Hertz.
+Calculate the A-weighting factor for a frequency `f` in Hertz.
 
 Taken from the ANOPP2 Acoustics Analysis API Reference Manual.
 """
@@ -23,8 +23,30 @@ function W_A(f)
     K_6 = 11723776.0
 
     W_C = (K_1*f^4) / ((f^2 + f_1^2)^2*(f^2 + f_4^2)^2)
-    W_A = (K_3*f^4*W_C) / ((f^2 + f_2^2)*(f^2 + f_3^2))
+    w_a = (K_3*f^4*W_C) / ((f^2 + f_2^2)*(f^2 + f_3^2))
 
-    return W_A
+    return w_a
 end
 
+"""
+    W_A!(nbs::AbstractNarrowbandSpectrum)
+
+A-weight an `AbstractNarrowbandSpectrum` in place and return it.
+"""
+function W_A!(nbs::AbstractNarrowbandSpectrum)
+    freq = frequency(nbs)
+    amp = amplitude(nbs)
+    amp .*= W_A.(freq)
+    return nbs
+end
+
+"""
+    W_A(nbs::AbstractNarrowbandSpectrum)
+
+Create and return an A-weighted copy of `nbs`.
+"""
+function W_A(nbs::AbstractNarrowbandSpectrum)
+    nbs_new = deepcopy(nbs)
+    W_A!(nbs_new)
+    return nbs_new
+end
