@@ -5,8 +5,8 @@
 implementation of the fast Fourier transform (FFT) algorithm. The FFT is a
 method of computing the discrete Fourier transform (DFT) that reduces the
 computational complexity from ``n^2`` to ``n \log(n)``, where ``n`` is the length
-of the input to the transform. FFTW's definition of the discrete Fourier
-transform is
+of the input to the transform. [FFTW's definition of the discrete Fourier
+transform](http://www.fftw.org/fftw3_doc/The-1d-Discrete-Fourier-Transform-_0028DFT_0029.html#The-1d-Discrete-Fourier-Transform-_0028DFT_0029) is
 ```math
   y_k = \sum_{j=0}^{n-1} x_j e^{-2 \pi \imath jk/n}
 ```
@@ -17,8 +17,10 @@ sinusoids. Let's imagine we have a very simple signal
 ```math
 p(t) = A \sin(ωt+φ)
 ```
-where we call ``A`` the amplitude, ``ω`` the frequency, and ``φ`` the phase. Say
-we evaluate that function ``n`` times over a period ``T``, and assume that ``ω =
+where we call ``A`` the amplitude, ``ω`` the frequency, and ``φ`` the phase.
+`AcousticAnalogies.jl` is interested in (suprise!) acoustics, which are real
+numbers, so we'll assume that ``A``, ``ω``, and ``φ`` are all real. Say we
+evaluate that function ``n`` times over a period ``T``, and assume that ``ω =
 2πm/T``, i.e., that the period of our signal is some integer fraction of the
 sampling period ``T``, since
 ```math
@@ -98,7 +100,7 @@ That's a signal that has period
 \frac{2π}{2πq/n} = n/q
 ```
 that we're sampling ``n`` times. So we're sampling a sinusoid an integer number
-of times over its entire period. That will give us... zero. Same thing will
+of times over its period, and summing it up. That will give us... zero. Same thing will
 happen to the second sum if ``m+k=r \ne 0``: we'll also get zero. So now we just
 have to figure out what happens when ``m - k = 0`` and ``m + k = 0``, i.e., when
 ``k ± m``. Let's try ``k = m`` first. The first sum will be
@@ -127,3 +129,51 @@ which is (wish I could figure out how to do the `cases` LaTeX environment)...
   \hat{p}_{k} & = 0\,\text{otherwise}.
 \end{aligned}
 ```
+
+What if we would have used `\cos` instead of `\sin` in our example signal? Well,
+we have the identity
+```math
+\cos(ωt + θ) = \sin(ωt + θ + π/2).
+```
+So to find the DFT of the signal
+```math
+p(t) = A \cos(ωt+θ)
+```
+we just need to make the substitution $φ = θ + π/2$ in our original result,
+which would give
+```math
+\begin{aligned}
+  \hat{p}_m & = \frac{A}{2}\left[\sin(θ+π/2) - \imath \cos(θ+π/2) \right] n \\
+  \hat{p}_{-m} & = \frac{A}{2}\left[\sin(θ+π/2) + \imath \cos(θ+π/2) \right] n \\
+  \hat{p}_{k} & = 0\,\text{otherwise},
+\end{aligned}
+```
+or
+```math
+\begin{aligned}
+  \hat{p}_m & = \frac{A}{2}\left[\cos(θ) + \imath \sin(θ) \right] n \\
+  \hat{p}_{-m} & = \frac{A}{2}\left[\cos(θ) - \imath \sin(θ) \right] n \\
+  \hat{p}_{k} & = 0\,\text{otherwise}.
+\end{aligned}
+```
+
+We're almost ready to compare our example signal to the output of the FFTW
+library. The last thing we need to think about is how FFTW's output is ordered.
+FFT libraries have different conventions, but [here is what FFTW does](http://www.fftw.org/fftw3_doc/The-1d-Discrete-Fourier-Transform-_0028DFT_0029.html#The-1d-Discrete-Fourier-Transform-_0028DFT_0029):
+> Note also that we use the standard “in-order” output ordering—the k-th output
+> corresponds to the frequency k/n (or k/T, where T is your total sampling
+> period). For those who like to think in terms of positive and negative
+> frequencies, this means that the positive frequencies are stored in the first
+> half of the output and the negative frequencies are stored in backwards order
+> in the second half of the output. (The frequency -k/n is the same as the
+> frequency (n-k)/n.)
+So for our original example signal
+```math
+\begin{aligned}
+  p(t) &= A \sin(ωt+φ) \\
+  \hat{p}_m & = \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] n \\
+  \hat{p}_{-m} & = \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] n \\
+  \hat{p}_{k} & = 0\,\text{otherwise}.
+\end{aligned}
+```
+we would expect `\hat{p}_m` to appear in the `m+1`th position (since we're counting from zero), and `\hat{p}_{-m}` to appear in the
