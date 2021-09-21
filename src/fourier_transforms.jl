@@ -83,7 +83,7 @@ end
 
     Just a wrapper of `FFTW.r2r!(y, FFTW.R2HC)`. The `cache` argument is
     optional and not used, and is included to keep the function signiture the
-    same to the method that takes `Vector`s of `Dual`s.
+    same as the method that takes `Vector`s of `Dual`s.
 """
 function rfft!(y, x, cache=nothing)
     y .= x
@@ -131,7 +131,7 @@ end
 # only for the real-input FFT that returns a complex array, which I don't want.
 # Sad. Oh, wait: but are the frequencies at fftfreq? I'll need to look at that
 # again. Need to write that up once I figure it out.
-function rfftfreq(n, d=1.0)
+function r2rfftfreq(n, d=1.0)
     # http://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html
     freq = vcat(0:floor(Int, n/2), floor(Int, (n+1)/2)-1:-1:1)
     # Get the period.

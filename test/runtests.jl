@@ -1,6 +1,6 @@
 using AcousticMetrics: p_ref
-using AcousticMetrics: rfftfreq, rfft, rfft!, RFFTCache, dft_r2hc
-using AcousticMetrics: AcousticPressure, NarrowbandSpectrum, frequency, amplitude, phase, OASPL
+using AcousticMetrics: r2rfftfreq, rfft, rfft!, RFFTCache, dft_r2hc
+using AcousticMetrics: AcousticPressure, PressureSpectrum, NarrowbandSpectrum, frequency, amplitude, phase, OASPL
 using AcousticMetrics: W_A
 # using ANOPP2
 using ForwardDiff
@@ -24,7 +24,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
                     dt = T/n
                     t = (0:n-1).*dt
                     p = fi.(t)
-                    freq = rfftfreq(n, dt)
+                    freq = r2rfftfreq(n, dt)
                     p_fft = rfft(p)./n
                     p_fft_expected = zeros(n)
                     p_fft_expected[findlast(x->x≈1.0, freq)] = -0.5*2
@@ -42,7 +42,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
                     dt = T/n
                     t = (0:n-1).*dt
                     p = fr.(t)
-                    freq = rfftfreq(n, dt)
+                    freq = r2rfftfreq(n, dt)
                     p_fft = rfft(p)./n
                     p_fft_expected = zeros(n)
                     p_fft_expected[findfirst(x->x≈1.0, freq)] = 0.5*2
@@ -59,7 +59,7 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
                     dt = T/n
                     t = (0:n-1).*dt
                     p = f.(t)
-                    freq = rfftfreq(n, dt)
+                    freq = r2rfftfreq(n, dt)
                     p_fft = rfft(p)./n
                     p_fft_expected = zeros(n)
                     p_fft_expected[findfirst(x->x≈1.0, freq)] = 0.5*2
@@ -184,12 +184,12 @@ end
 #            # t = collect(t)
 #            p = f.(t)
 #            p_fft = rfft(p)./n
-#            # freq_half = rfftfreq(n, dt)
+#            # freq_half = r2rfftfreq(n, dt)
 #            # freq_fft = zeros(n)
 #            # freq_fft[1] = freq_half[1]
 #            # freq_fft[2:floor(Int, n/2)+1] = freq_half[2:end]
 #            # freq_fft[end:-1:floor(Int, n/2)+2] = freq_half[2:end]
-#            freq_fft = rfftfreq(n, dt)
+#            freq_fft = r2rfftfreq(n, dt)
 #            # p = rand(n)
 #            # freq, nbs = nbs_from_apth(t, p)
 #            freq, nbs = nbs_from_apth(p, dt)
@@ -213,6 +213,36 @@ end
 #    end
 
 # end
+
+@testset "Pressure Spectrum" begin
+    f(t) = 6 + 8*cos(1*2*pi*t + 0.2) + 2.5*cos(2*2*pi*t - 3.0) + 9*cos(3*2*pi*t + 3.1) + 0.5*cos(4*2*pi*t - 1.1)
+    T = 1.0
+    n = 10
+    dt = T/n
+    t = (0:n-1).*dt
+    p = f.(t)
+    ap = AcousticPressure(p, dt)
+    ps = PressureSpectrum(ap)
+    amp_expected = similar(amplitude(ps))
+    amp_expected[1] = 6
+    amp_expected[2] = 8
+    amp_expected[3] = 2.5
+    amp_expected[4] = 9
+    amp_expected[5] = 0.5
+    amp_expected[6:end] .= 0
+    # @show frequency(ps)
+    # @show amplitude(ps) amp_expected
+    @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+    phase_expected = similar(phase(ps))
+    phase_expected[1] = 0
+    phase_expected[2] = 0.2
+    phase_expected[3] = -3
+    phase_expected[4] = 3.1
+    phase_expected[5] = -1.1
+    phase_expected[6:end] .= 0
+    # @show phase(ps) phase_expected
+    @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+end
 
 @testset "Narrowband Spectrum" begin
     fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)

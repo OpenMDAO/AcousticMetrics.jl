@@ -17,6 +17,68 @@ AcousticPressure(p, dt) = AcousticPressure(p, dt, zero(typeof(dt)))
     return starttime(ap) .+ (0:n-1) .* timestep(ap)
 end
 
+abstract type AbstractPressureSpectrum end
+
+@concrete struct PressureSpectrum <: AbstractPressureSpectrum
+    n
+    fs
+    amp
+    ϕ
+end
+
+@inline inputlength(ps::AbstractPressureSpectrum) = ps.n
+@inline samplerate(ps::AbstractPressureSpectrum) = ps.fs
+@inline frequency(ps::AbstractPressureSpectrum) = rfftfreq(inputlength(ps), samplerate(ps))
+@inline amplitude(ps::AbstractPressureSpectrum) = ps.amp
+@inline phase(ps::AbstractPressureSpectrum) = ps.ϕ
+
+function PressureSpectrum(ap::AbstractAcousticPressure)
+    p = pressure(ap)
+    n = length(p)
+
+    # output length.
+    m = 1 + floor(Int, n/2)
+
+    # Get the FFT of the acoustic pressure. FFTW computes "unnormalized" FFTs,
+    # so we need to divide by the length of the input array (the number of
+    # observer times).
+    p_fft = rfft(p)./n
+
+    # The mean of the signal is in the first element of the output array.
+    # Always real for a real-input FFT.
+    p_fft_mean = p_fft[begin]
+    # Then the real parts of the positive frequencies.
+    # p_fft_real = @view p_fft[2:floor(Int, n/2)+1]
+    p_fft_real = @view p_fft[begin+1:m]
+    # Then the imaginary parts of the negative frequencies, which are
+    # "backwards" and have the opposite sign of the coresponding positive
+    # frequency. But that's not working, sad. Seems like the negative is wrong.
+    # Hmm... Maybe the second half of the rfft output are actually the positive
+    # frequencies? Oh, shoot, that's right. Yay!
+    # p_fft_imag = @view p_fft[end:-1:floor(Int, n/2)+2]
+    p_fft_imag = @view p_fft[end:-1:m+1]
+    # p_fft_imag .*= -1
+
+    # Now I want to get the amplitude and phase.
+    amp = similar(p, m)
+    ϕ = similar(p, m)
+    amp[begin] = p_fft_mean
+    ϕ[begin] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
+    if mod(n, 2) == 0
+        @. amp[begin+1:end-1] = 2*sqrt(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
+        amp[end] = p_fft_real[end]
+        @. ϕ[begin+1:end-1] = atan(p_fft_imag, p_fft_real[begin:end-1])
+        ϕ[end] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
+    else
+        @. amp[begin+1:end] = 2*sqrt(p_fft_real^2 + p_fft_imag^2)
+        @. ϕ[begin+1:end] = atan(p_fft_imag, p_fft_real)
+    end
+
+    # Find the sampling rate, which we can use later to find the frequency bins.
+    fs = 1/timestep(ap)
+    return PressureSpectrum(n, fs, amp, ϕ)
+end
+
 abstract type AbstractNarrowbandSpectrum end
 
 @concrete struct NarrowbandSpectrum <: AbstractNarrowbandSpectrum
@@ -72,7 +134,7 @@ function NarrowbandSpectrum(ap::AbstractAcousticPressure)
 
     # Also need the frequency.
     dt = timestep(ap)
-    freq = rfftfreq(n, dt)[1:nbs_length]
+    freq = r2rfftfreq(n, dt)[1:nbs_length]
 
     return NarrowbandSpectrum(freq, amp, phase)
 end

@@ -1,7 +1,7 @@
 module AcousticMetrics
 
 using ConcreteStructs: @concrete
-using FFTW: r2r!, R2HC
+using FFTW: r2r!, R2HC, rfftfreq
 using ForwardDiff: ForwardDiff
 using OffsetArrays: OffsetArray
 
