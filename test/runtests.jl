@@ -215,33 +215,42 @@ end
 # end
 
 @testset "Pressure Spectrum" begin
-    f(t) = 6 + 8*cos(1*2*pi*t + 0.2) + 2.5*cos(2*2*pi*t - 3.0) + 9*cos(3*2*pi*t + 3.1) + 0.5*cos(4*2*pi*t - 1.1)
-    T = 1.0
-    n = 10
-    dt = T/n
-    t = (0:n-1).*dt
-    p = f.(t)
-    ap = AcousticPressure(p, dt)
-    ps = PressureSpectrum(ap)
-    amp_expected = similar(amplitude(ps))
-    amp_expected[1] = 6
-    amp_expected[2] = 8
-    amp_expected[3] = 2.5
-    amp_expected[4] = 9
-    amp_expected[5] = 0.5
-    amp_expected[6:end] .= 0
-    # @show frequency(ps)
-    # @show amplitude(ps) amp_expected
-    @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-    phase_expected = similar(phase(ps))
-    phase_expected[1] = 0
-    phase_expected[2] = 0.2
-    phase_expected[3] = -3
-    phase_expected[4] = 3.1
-    phase_expected[5] = -1.1
-    phase_expected[6:end] .= 0
-    # @show phase(ps) phase_expected
-    @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+    for T in [1.0, 2.0]
+        f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.5*pi)
+        for n in [10, 11]
+            dt = T/n
+            t = (0:n-1).*dt
+            p = f.(t)
+            ap = AcousticPressure(p, dt)
+            ps = PressureSpectrum(ap)
+            amp_expected = similar(amplitude(ps))
+            amp_expected[1] = 6
+            amp_expected[2] = 8
+            amp_expected[3] = 2.5
+            amp_expected[4] = 9
+            amp_expected[5] = 0.5
+            phase_expected = similar(phase(ps))
+            phase_expected[1] = 0
+            phase_expected[2] = 0.2
+            phase_expected[3] = -3
+            phase_expected[4] = 3.1
+            phase_expected[5] = -1.1
+            # The Nyquist frequency component can only be resolved when it's phase is
+            # such that it's sampled from peak to peak, I think. So I'm not sure what
+            # the right way to test that is. I guess I know that it should be perfect if
+            # it's sampled from peak to peak, and zero when at each of the... zero points.
+            if n == 10
+                amp_expected[6] = 0
+                phase_expected[6] = 0
+            else
+                amp_expected[6] = 3
+                phase_expected[6] = 0.5*pi
+            end
+            # @show n frequency(ps) amplitude(ps) amp_expected phase(ps) phase_expected
+            @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+            @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+        end
+    end
 end
 
 @testset "Narrowband Spectrum" begin
