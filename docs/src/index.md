@@ -176,4 +176,68 @@ So for our original example signal
   \hat{p}_{k} & = 0\,\text{otherwise}.
 \end{aligned}
 ```
-we would expect `\hat{p}_m` to appear in the `m+1`th position (since we're counting from zero), and `\hat{p}_{-m}` to appear in the
+we would expect ``\hat{p}_m`` to appear in the ``m+1``th position (since we're
+counting from zero), and `\hat{p}_{-m}` to appear in the... which position?
+Well, turns out that the ``-k`` frequency is the same as the ``n-k`` frequency,
+according to the FFTW docs. Why is that? Well, if we start with a Fourier
+component for ``k=-m``,
+```math
+e^{2 \pi \imath j(-m)/n} = e^{-2 \pi \imath jm/n} 
+```
+but then we compare it to ``k=n-m``
+```math
+e^{2 \pi \imath j(n-m)/n} = e^{2 \pi \imath j(n)/n}e^{2 \pi \imath j(-m)/n} = e^{2 \pi \imath j}e^{-2 \pi \imath jm/n} = (1)e^{-2 \pi \imath jm/n}
+```
+we get the same thing. So we expect the ``-m`` to show up in the ``n-m+1``
+position (again, because ``m`` starts at zero). Cool cool cool.
+
+### Mean and Nyquist Components
+The mean component of the Fourier transform corresponds to ``\hat{p}_k`` where
+``k=0``. So, let's imagine that we have a signal
+```math
+p(t) = A\sin(ωt + φ)
+```
+but ``ω=0``. So then we have
+```math
+\begin{aligned}
+p(t) &= A \sin(ωt+φ) \\
+     &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{\imath ωt} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-\imath ωt} \\
+     &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{0} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{0}\\
+     &= \frac{A}{2}\left[2\sin(φ)\right]\\
+     &= A\sin(φ).
+\end{aligned}
+```
+(Now I should show that if I plug that into the definition of the Fourier
+transform with ``k=0`` I get back ``A\sin(φ)n``. But I'm feeling lazy right now.)
+If instead we had used
+```math
+p(t) = A \cos(ωt+θ)
+```
+with ``ω=0``, we then just need to remember that ``\cos(ωt+θ) = \sin(ωt+θ+π/2)``, and so we'll make the substitution ``φ=θ+π/2`` in our result, which would give
+```math
+\begin{aligned}
+p(t) &= A \sin(ωt+θ+π/2) \\
+     &= A\sin(θ+π/2) \\
+     &= A\cos(θ).
+\end{aligned}
+```
+(Now I should show that if I plug that into the definition of the Fourier
+transform with ``k=0`` I get back ``A\cos(θ)n``. But I'm feeling lazy right now.)
+The takeaway is that
+
+  * the mean component doesn't contain a ``\frac{1}{2}`` factor
+  * the mean component is always real
+
+
+What about the Nyquist component? Well, that's the component with two samples
+per period, which corresponds to the `k=n/2` component. So that means our signal
+will look like
+```math
+\begin{aligned}
+p(t) &= A \sin(ωt_j+φ) \\
+p(t_j) = p_j &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath jm/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath jm/n} \\
+p(t_j) = p_j &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath j(\frac{n}{2})/n} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-2π\imath j(\frac{n}{2})/n} \\
+p(t_j) = p_j &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{π\imath j} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-π\imath j}
+\end{aligned}
+```
+Hmm... Now, ``e^{π\imath j} = e^{-π\imath j}``

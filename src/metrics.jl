@@ -48,14 +48,12 @@ function PressureSpectrum(ap::AbstractAcousticPressure)
     # Always real for a real-input FFT.
     p_fft_mean = p_fft[begin]
     # Then the real parts of the positive frequencies.
-    # p_fft_real = @view p_fft[2:floor(Int, n/2)+1]
     p_fft_real = @view p_fft[begin+1:m]
     # Then the imaginary parts of the negative frequencies, which are
     # "backwards" and have the opposite sign of the coresponding positive
     # frequency. But that's not working, sad. Seems like the negative is wrong.
     # Hmm... Maybe the second half of the rfft output are actually the positive
     # frequencies? Oh, shoot, that's right. Yay!
-    # p_fft_imag = @view p_fft[end:-1:floor(Int, n/2)+2]
     p_fft_imag = @view p_fft[end:-1:m+1]
     # p_fft_imag .*= -1
 
@@ -66,7 +64,7 @@ function PressureSpectrum(ap::AbstractAcousticPressure)
     ϕ[begin] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
     if mod(n, 2) == 0
         @. amp[begin+1:end-1] = 2*sqrt(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
-        amp[end] = p_fft_real[end]
+        amp[end] = p_fft_real[end]  # Is this really right? Apparently it is, but I don't know why. I should look at that.
         @. ϕ[begin+1:end-1] = atan(p_fft_imag, p_fft_real[begin:end-1])
         ϕ[end] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
     else
@@ -77,6 +75,23 @@ function PressureSpectrum(ap::AbstractAcousticPressure)
     # Find the sampling rate, which we can use later to find the frequency bins.
     fs = 1/timestep(ap)
     return PressureSpectrum(n, fs, amp, ϕ)
+end
+
+function AcousticPressure(ps::AbstractPressureSpectrum)
+    amp = amplitude(ps)
+    ϕ = phase(ps)
+    n = inputlength(ps)
+    m = length(amp)  # this is the number of FFT amplitude/phase outputs...
+    p_fft = zeros(eltype(amp), n)
+    p_fft[begin] = amp[begin]
+    if mod(n, 2) == 0
+        @. p_fft[begin+1:m] = 0.5*amp[begin+1:end-1]*cos(ϕ[begin+1:end-1])
+        # @. p_fft[begin+1:end-1] = 0.5*amp[begin+1:end-1]*cos(ϕ[begin+1:end-1])
+    else
+        @. p_fft[begin+1:m] = 0.5*amp[begin+1:end]*cos(ϕ[begin+1:end])
+        @. p_fft[end:-1:m+1] = 0.5*amp[begin+1:end]*sin(ϕ[begin+1:end])
+    end
+
 end
 
 abstract type AbstractNarrowbandSpectrum end

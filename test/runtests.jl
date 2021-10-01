@@ -216,7 +216,8 @@ end
 
 @testset "Pressure Spectrum" begin
     for T in [1.0, 2.0]
-        f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.5*pi)
+        # f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.5*pi)
+        f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t)
         for n in [10, 11]
             dt = T/n
             t = (0:n-1).*dt
@@ -240,13 +241,14 @@ end
             # the right way to test that is. I guess I know that it should be perfect if
             # it's sampled from peak to peak, and zero when at each of the... zero points.
             if n == 10
-                amp_expected[6] = 0
+                amp_expected[6] = 3
                 phase_expected[6] = 0
             else
                 amp_expected[6] = 3
-                phase_expected[6] = 0.5*pi
+                # phase_expected[6] = 0.5*pi
+                phase_expected[6] = 0
             end
-            # @show n frequency(ps) amplitude(ps) amp_expected phase(ps) phase_expected
+            @show n frequency(ps) amplitude(ps) amp_expected phase(ps) phase_expected
             @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
             @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
         end
