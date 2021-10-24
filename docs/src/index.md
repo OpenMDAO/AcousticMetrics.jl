@@ -207,8 +207,15 @@ p(t) &= A \sin(ωt+φ) \\
      &= A\sin(φ).
 \end{aligned}
 ```
-(Now I should show that if I plug that into the definition of the Fourier
-transform with ``k=0`` I get back ``A\sin(φ)n``. But I'm feeling lazy right now.)
+What happens if we plug that into the definition of the discrete Fourier
+transform? Well, we'll get
+```math
+\begin{aligned}
+\hat{p}_0 = A\sin(φ)
+\hat{p}_k = 0 \,\text{otherwise}.
+\end{aligned}
+```
+
 If instead we had used
 ```math
 p(t) = A \cos(ωt+θ)
@@ -218,16 +225,21 @@ with ``ω=0``, we then just need to remember that ``\cos(ωt+θ) = \sin(ωt+θ+�
 \begin{aligned}
 p(t) &= A \sin(ωt+θ+π/2) \\
      &= A\sin(θ+π/2) \\
-     &= A\cos(θ).
+     &= A\cos(θ),
 \end{aligned}
 ```
-(Now I should show that if I plug that into the definition of the Fourier
-transform with ``k=0`` I get back ``A\cos(θ)n``. But I'm feeling lazy right now.)
+and so the Fourier transform would be
+```math
+\begin{aligned}
+\hat{p}_0 = A\cos(θ)
+\hat{p}_k = 0 \,\text{otherwise}.
+\end{aligned}
+```
+
 The takeaway is that
 
   * the mean component doesn't contain a ``\frac{1}{2}`` factor
   * the mean component is always real
-
 
 What about the Nyquist component? Well, that's the component with two samples
 per period, which corresponds to the `k=n/2` component. So that means our signal
@@ -240,4 +252,47 @@ p(t_j) = p_j &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{2π\imath
 p(t_j) = p_j &= \frac{A}{2}\left[\sin(φ) - \imath \cos(φ) \right] e^{π\imath j} + \frac{A}{2}\left[\sin(φ) + \imath \cos(φ) \right] e^{-π\imath j}
 \end{aligned}
 ```
-Hmm... Now, ``e^{π\imath j} = e^{-π\imath j}``
+So, we know that ``e^{π\imath j} = e^{-π\imath j} = \left(-1\right)^j``. So that
+allows us to write
+```math
+\begin{aligned}
+p(t) &= A \sin(ωt_j+φ) \\
+p(t_j) = p_j &= A\sin(φ)e^{\pi \imath j}
+\end{aligned}
+```
+
+So, if that's put in the definition of the Fourier transform, we'll find that we
+get 
+```math
+\begin{aligned}
+\hat{p}_{n/2} &= A\sin(φ) \\
+\hat{p}_k &= 0 \,\text{otherwise}.
+\end{aligned}
+```
+
+Similarly, if we started with a signal ``p(t) = A\cos(ωt + θ)`` where the
+frequency ``ω`` corresponding to the Nyquist frequency we would have ended up
+with
+```math
+\begin{aligned}
+p(t) &= A \cos(ωt_j+θ) \\
+p(t_j) = p_j &= A\cos(θ)e^{\pi \imath j}
+\end{aligned}
+```
+and a Fourier transform of
+```math
+\begin{aligned}
+\hat{p}_{n/2} &= A\cos(θ) \\
+\hat{p}_k &= 0 \,\text{otherwise}.
+\end{aligned}
+```
+
+So, the takeaways for the Nyquist component are similar to those of the mean
+component:
+
+  * the Nyquist component doesn't contain a ``\frac{1}{2}`` factor
+  * the Nyquist component is always real
+
+# The Half-Complex Format
+The last thing we need to understand is the [half-complex format](https://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html) that FFTW uses
+for real-input Fourier transforms:
