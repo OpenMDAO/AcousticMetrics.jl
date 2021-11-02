@@ -1,9 +1,3 @@
-function spectrumfreq(n, dt)
-    freq = 0:floor(Int, n/2)
-    T = n*dt
-    return freq./T
-end
-
 abstract type AbstractAcousticPressure end
 
 @concrete struct AcousticPressure <: AbstractAcousticPressure
@@ -155,8 +149,7 @@ function NarrowbandSpectrum(ap::AbstractAcousticPressure)
 
     # Also need the frequency.
     dt = timestep(ap)
-    # freq = spectrumfreq(n, dt)
-    freq = rfftfreq(n, dt)
+    freq = rfftfreq(n, 1/dt)
 
     return NarrowbandSpectrum(freq, amp, phase)
 end

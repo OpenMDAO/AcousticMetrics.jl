@@ -224,6 +224,7 @@ end
             p = f.(t)
             ap = AcousticPressure(p, dt)
             ps = PressureSpectrum(ap)
+            freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
             amp_expected = similar(amplitude(ps))
             amp_expected[1] = 6
             amp_expected[2] = 8
@@ -248,7 +249,8 @@ end
                 # phase_expected[6] = 0.5*pi
                 phase_expected[6] = 0
             end
-            @show n frequency(ps) amplitude(ps) amp_expected phase(ps) phase_expected
+            # @show n frequency(ps) amplitude(ps) amp_expected phase(ps) phase_expected
+            @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
             @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
             @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
         end
