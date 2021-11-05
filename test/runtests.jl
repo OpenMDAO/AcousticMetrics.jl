@@ -1,6 +1,7 @@
 using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, RFFTCache, dft_r2hc
-using AcousticMetrics: AcousticPressure, PressureSpectrum, NarrowbandSpectrum, frequency, amplitude, phase, OASPL
+using AcousticMetrics: AcousticPressure, PressureSpectrum, NarrowbandSpectrum
+using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, phase, OASPL
 using AcousticMetrics: W_A
 # using ANOPP2
 using ForwardDiff
@@ -14,64 +15,30 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
 @testset "Fourier transforms" begin
 
     @testset "FFTW compared to a function with a known Fourier transform" begin
-        fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)
-        fi(t) = 2*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t)
-        f(t) = fr(t) + fi(t)
-        @testset "imaginary only" begin
-            # a*sin(2*pi*k*t) = a*(0 - 0.5*i)*exp(2*pi*i*k*t) + a*(0 + 0.5*i)*exp(-2*pi*i*k*t)
-            for T in [1.0, 2.0]
-                for n in [19, 20]
-                    dt = T/n
-                    t = (0:n-1).*dt
-                    p = fi.(t)
-                    freq = r2rfftfreq(n, dt)
-                    p_fft = rfft(p)./n
-                    p_fft_expected = zeros(n)
-                    p_fft_expected[findlast(x->x≈1.0, freq)] = -0.5*2
-                    p_fft_expected[findlast(x->x≈2.0, freq)] = -0.5*4
-                    p_fft_expected[findlast(x->x≈3.0, freq)] = -0.5*6
-                    p_fft_expected[findlast(x->x≈4.0, freq)] = -0.5*8
-                    @test all(isapprox.(p_fft, p_fft_expected, atol=1e-12))
+        for T in [1.0, 2.0]
+            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+            for n in [10, 11]
+                dt = T/n
+                t = (0:n-1).*dt
+                p = f.(t)
+                p_fft = rfft(p)./n
+                p_fft_expected = similar(p_fft)
+                p_fft_expected[1] = 6.0
+                p_fft_expected[2] = 0.5*8*cos(0.2)
+                p_fft_expected[end] = 0.5*8*sin(0.2)
+                p_fft_expected[3] = 0.5*2.5*cos(-3.0)
+                p_fft_expected[end-1] = 0.5*2.5*sin(-3.0)
+                p_fft_expected[4] = 0.5*9*cos(3.1)
+                p_fft_expected[end-2] = 0.5*9*sin(3.1)
+                p_fft_expected[5] = 0.5*0.5*cos(-1.1)
+                p_fft_expected[end-3] = 0.5*0.5*sin(-1.1)
+                if n == 10
+                    p_fft_expected[6] = 3*cos(0.2)
+                else
+                    p_fft_expected[6] = 0.5*3*cos(0.2)
+                    p_fft_expected[end-4] = 0.5*3*sin(0.2)
                 end
-            end
-        end
-        @testset "real only" begin
-            # a*cos(2*pi*k*t) = a*(0.5 + 0.0*i)*exp(2*pi*i*k*t) + a*(0.5 + 0.0*i)*exp(-2*pi*i*k*t)
-            for T in [1.0, 2.0]
-                for n in [19, 20]
-                    dt = T/n
-                    t = (0:n-1).*dt
-                    p = fr.(t)
-                    freq = r2rfftfreq(n, dt)
-                    p_fft = rfft(p)./n
-                    p_fft_expected = zeros(n)
-                    p_fft_expected[findfirst(x->x≈1.0, freq)] = 0.5*2
-                    p_fft_expected[findfirst(x->x≈2.0, freq)] = 0.5*4
-                    p_fft_expected[findfirst(x->x≈3.0, freq)] = 0.5*6
-                    p_fft_expected[findfirst(x->x≈4.0, freq)] = 0.5*8
-                    @test all(isapprox.(p_fft, p_fft_expected, atol=1e-12))
-                end
-            end
-        end
-        @testset "complex" begin
-            for T in [1.0, 2.0]
-                for n in [19, 20]
-                    dt = T/n
-                    t = (0:n-1).*dt
-                    p = f.(t)
-                    freq = r2rfftfreq(n, dt)
-                    p_fft = rfft(p)./n
-                    p_fft_expected = zeros(n)
-                    p_fft_expected[findfirst(x->x≈1.0, freq)] = 0.5*2
-                    p_fft_expected[findfirst(x->x≈2.0, freq)] = 0.5*4
-                    p_fft_expected[findfirst(x->x≈3.0, freq)] = 0.5*6
-                    p_fft_expected[findfirst(x->x≈4.0, freq)] = 0.5*8
-                    p_fft_expected[findlast(x->x≈1.0, freq)] = -0.5*2
-                    p_fft_expected[findlast(x->x≈2.0, freq)] = -0.5*4
-                    p_fft_expected[findlast(x->x≈3.0, freq)] = -0.5*6
-                    p_fft_expected[findlast(x->x≈4.0, freq)] = -0.5*8
-                    @test all(isapprox.(p_fft, p_fft_expected, atol=1e-12))
-                end
+                @test all(isapprox.(p_fft, p_fft_expected, atol=1e-12))
             end
         end
     end
@@ -216,8 +183,7 @@ end
 
 @testset "Pressure Spectrum" begin
     for T in [1.0, 2.0]
-        # f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.5*pi)
-        f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t)
+        f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
         for n in [10, 11]
             dt = T/n
             t = (0:n-1).*dt
@@ -237,84 +203,90 @@ end
             phase_expected[3] = -3
             phase_expected[4] = 3.1
             phase_expected[5] = -1.1
-            # The Nyquist frequency component can only be resolved when it's phase is
-            # such that it's sampled from peak to peak, I think. So I'm not sure what
-            # the right way to test that is. I guess I know that it should be perfect if
-            # it's sampled from peak to peak, and zero when at each of the... zero points.
+            # Handle the Nyquist frequency (kinda tricky). There isn't really a
+            # Nyquist frequency for the odd input length case.
             if n == 10
-                amp_expected[6] = 3
+                amp_expected[6] = 3*cos(0.2)
                 phase_expected[6] = 0
             else
                 amp_expected[6] = 3
-                # phase_expected[6] = 0.5*pi
-                phase_expected[6] = 0
+                phase_expected[6] = 0.2
             end
-            # @show n frequency(ps) amplitude(ps) amp_expected phase(ps) phase_expected
             @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
             @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
             @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+
+            # Make sure I can go from a PressureSpectrum to an AcousticPressure.
+            ap_from_ps = AcousticPressure(ps)
+            @test timestep(ap_from_ps) ≈ timestep(ap)
+            @test starttime(ap_from_ps) ≈ starttime(ap)
+            @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
         end
     end
 end
 
 @testset "Narrowband Spectrum" begin
-    fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)
-    fi(t) = 2*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t)
-    f(t) = fr(t) + fi(t)
-    @testset "imaginary only" begin
-        for T in [1.0, 2.0]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = fi.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                freq = frequency(nbs)
-                amp_expected = zeros(floor(Int, n/2)+1)
-                amp_expected[findfirst(x->x≈1, freq)] = 2*(-0.5*2)^2
-                amp_expected[findfirst(x->x≈2, freq)] = 2*(-0.5*4)^2
-                amp_expected[findfirst(x->x≈3, freq)] = 2*(-0.5*6)^2
-                amp_expected[findfirst(x->x≈4, freq)] = 2*(-0.5*8)^2
-                @test all(isapprox.(amplitude(nbs), amp_expected, atol=1e-12))
+    for T in [1.0, 2.0]
+        f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+        for n in [10, 11]
+            dt = T/n
+            t = (0:n-1).*dt
+            p = f.(t)
+            ap = AcousticPressure(p, dt)
+            nbs = NarrowbandSpectrum(ap)
+            freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
+            amp_expected = similar(amplitude(nbs))
+            amp_expected[1] = 6^2
+            amp_expected[2] = 0.5*8^2
+            amp_expected[3] = 0.5*2.5^2
+            amp_expected[4] = 0.5*9^2
+            amp_expected[5] = 0.5*0.5^2
+            phase_expected = similar(phase(nbs))
+            phase_expected[1] = 0
+            phase_expected[2] = 0.2
+            phase_expected[3] = -3
+            phase_expected[4] = 3.1
+            phase_expected[5] = -1.1
+            # Handle the Nyquist frequency (kinda tricky). There isn't really a
+            # Nyquist frequency for the odd input length case.
+            if n == 10
+                amp_expected[6] = (3*cos(0.2))^2
+                phase_expected[6] = 0
+            else
+                amp_expected[6] = 0.5*3^2
+                phase_expected[6] = 0.2
             end
+            @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
+            @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
+            @test all(isapprox.(phase(nbs).*amplitude(nbs), phase_expected.*amp_expected; atol=1e-12))
+
+            # Make sure I can convert a NBS to a pressure spectrum.
+            ps = PressureSpectrum(nbs)
+            amp_expected = similar(amplitude(ps))
+            amp_expected[1] = 6
+            amp_expected[2] = 8
+            amp_expected[3] = 2.5
+            amp_expected[4] = 9
+            amp_expected[5] = 0.5
+            # Handle the Nyquist frequency (kinda tricky). There isn't really a
+            # Nyquist frequency for the odd input length case.
+            if n == 10
+                amp_expected[6] = 3*cos(0.2)
+            else
+                amp_expected[6] = 3
+            end
+            @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+            @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+            @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+
+            # Make sure I can convert a NBS to the acoustic pressure.
+            ap_from_nbs = AcousticPressure(nbs)
+            @test timestep(ap_from_nbs) ≈ timestep(ap)
+            @test starttime(ap_from_nbs) ≈ starttime(ap)
+            @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
         end
     end
-    @testset "real only" begin
-        for T in [1.0, 2.0]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = fr.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                freq = frequency(nbs)
-                amp_expected = zeros(floor(Int, n/2)+1)
-                amp_expected[findfirst(x->x≈1, freq)] = 2*(0.5*2)^2
-                amp_expected[findfirst(x->x≈2, freq)] = 2*(0.5*4)^2
-                amp_expected[findfirst(x->x≈3, freq)] = 2*(0.5*6)^2
-                amp_expected[findfirst(x->x≈4, freq)] = 2*(0.5*8)^2
-                @test all(isapprox.(amplitude(nbs), amp_expected, atol=1e-12))
-            end
-        end
-    end
-    @testset "complex" begin
-        for T in [1.0, 2.0]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                freq = frequency(nbs)
-                amp_expected = zeros(floor(Int, n/2)+1)
-                amp_expected[findfirst(x->x≈1, freq)] = 2*((-0.5*2)^2 + (0.5*2)^2)
-                amp_expected[findfirst(x->x≈2, freq)] = 2*((-0.5*4)^2 + (0.5*4)^2)
-                amp_expected[findfirst(x->x≈3, freq)] = 2*((-0.5*6)^2 + (0.5*6)^2)
-                amp_expected[findfirst(x->x≈4, freq)] = 2*((-0.5*8)^2 + (0.5*8)^2)
-                @test all(isapprox.(amplitude(nbs), amp_expected, atol=1e-12))
-            end
-        end
-    end
+
     @testset "ANOPP2 comparison" begin
         a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "nbs.jld2"))
         freq_a2 = a2_data["a2_nbs_freq"]
