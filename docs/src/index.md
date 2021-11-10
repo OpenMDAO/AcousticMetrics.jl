@@ -261,8 +261,8 @@ If we look back at the results for the DFT of our simple signal
 ```
 we can't help but notice that the negative and positive frequency results are closely related.
 If we know one, we can figure out the other.
-And if we want to find `A` and `φ`, we just need either the positive or negative result.
-For example, if `a_r` and `a_i` are the real and imaginary parts of ``\hat{p}_m``, respectively, then
+And if we want to find ``A`` and ``φ``, we just need either the positive or negative result.
+For example, if ``a_r`` and ``a_i`` are the real and imaginary parts of ``\hat{p}_m``, respectively, then
 ```math
 A = \frac{2}{n}\sqrt{a_r^2 + a_i^2}
 ```
@@ -270,6 +270,23 @@ and
 ```math
 φ = \arctan(a_i/a_r).
 ```
+For the Nyquist frequency, though, we know that
+```math
+\begin{aligned}
+\hat{p}_{n/2} &= A\cos(φ)n \\
+\hat{p}_k &= 0 \,\text{otherwise},
+\end{aligned}
+```
+and so ``a_r = A\cos(φ)n`` and ``a_i = 0``.
+We have only one non-zero component, so we'll have to define 
+```math
+A = a_r/n
+```
+and
+```math
+φ = 0.
+```
+Or, wait, maybe it would be better to make `A = abs(a_r)/n` and `φ = π` if `a_r < 0`, and `φ = 0` otherwise.
 
 So, for real-input FFTs, FFTW only gives you the non-negative frequencies of the DFT.
 Finally, if we want to avoid complex numbers entirely, we can use the "real-to-real" transform that returns the DFT in the [halfcomplex format](https://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html).
@@ -294,3 +311,110 @@ Then the output will be
 r_0, r_1, r_2, r_3, r_4, i_4, i_3, i_2, i_1
 ```
 This time the ``i_4`` component isn't "missing," which is a good thing, since it's not zero.
+
+### Time Offset
+So far we've been assuming that the time ``t`` starts at 0.
+What if that's not true, i.e., that ``t_j = t_0 + j\frac{T}{n}``?
+Then
+```math
+ω t_j = \left( \frac{2πm}{T} \right) \left(t_0 + j \frac{T}{n} \right) = \frac{2πm t_0}{T} + \frac{2πmj}{n}
+```
+and the signal is now
+```math
+\begin{aligned}
+p(t_j) = p_j &= A\cos(ω[t_0 + j\frac{T}{n}] + φ) \\
+             &= \frac{A}{2}\left[ \cos(φ) + \imath \sin(φ)\right] e^{2π\imath m t_0/T + 2π\imath jm/n} + \frac{A}{2}\left[ \cos(φ) - \imath \sin(φ)\right] e^{-2π\imath m t_0/T - 2π\imath jm/n} \\
+             &= \frac{A}{2}\left[ \cos(φ) + \imath \sin(φ)\right] e^{2π\imath m t_0/T} e^{2π\imath jm/n} + \frac{A}{2}\left[ \cos(φ) - \imath \sin(φ)\right] e^{-2π\imath m t_0/T} e^{-2π\imath jm/n}.
+\end{aligned}
+```
+Next, we substitute the signal into the definition of the DFT:
+```math
+\begin{aligned}
+  \hat{p}_k &= \sum_{j=0}^{n-1} p_j e^{-2 \pi \imath jk/n} \\
+            &=\frac{A}{2}\left[\cos(φ) + \imath \sin(φ) \right] e^{2π\imath m t_0/T} \sum_{j=0}^{n-1} e^{2π\imath j(m-k)/n} + \frac{A}{2}\left[\cos(φ) - \imath \sin(φ) \right] e^{-2π\imath m t_0/T} \sum_{j=0}^{n-1} e^{-2π\imath j(m+k)/n} 
+\end{aligned}
+```
+then use the same arguments we used before for the summations to find that
+```math
+\begin{aligned}
+  \hat{p}_m & = \frac{A}{2}\left[\cos(φ) + \imath \sin(φ) \right] e^{2π\imath m t_0/T} n \\
+  \hat{p}_{-m} & = \frac{A}{2}\left[\cos(φ) - \imath \sin(φ) \right] e^{-2π\imath m t_0/T} n \\
+  \hat{p}_{k} & = 0\,\text{otherwise}.
+\end{aligned}
+```
+Let's work on the non-zero ``\hat{p}`` components a bit.
+First, the positive-``m`` one:
+```math
+\begin{aligned}
+  \hat{p}_m & = \frac{A}{2}\left[\cos(φ) + \imath \sin(φ) \right] e^{2π\imath m t_0/T} n \\
+            & = \frac{A}{2}\left[e^{\imath φ} \right] e^{2π\imath m t_0/T} n \\
+            & = \frac{A}{2}\left[e^{\imath φ + 2π\imath m t_0/T} \right] n \\
+            & = \frac{A}{2}\left[e^{\imath (φ + 2π m t_0/T)} \right] n \\
+            & = \frac{A}{2}\left[\cos(φ + 2π m t_0/T) + \imath \sin(φ+ 2π m t_0/T) \right] n
+\end{aligned}
+```
+Then, the negative-``m`` one:
+```math
+\begin{aligned}
+  \hat{p}_{-m} & = \frac{A}{2}\left[\cos(φ) - \imath \sin(φ) \right] e^{-2π\imath m t_0/T} n \\
+               & = \frac{A}{2}\left[e^{-\imath φ} \right] e^{-2π\imath m t_0/T} n \\
+               & = \frac{A}{2}\left[e^{-\imath φ - 2π\imath m t_0/T} \right] n \\
+               & = \frac{A}{2}\left[e^{-\imath (φ + 2π m t_0/T)} \right] n \\
+               & = \frac{A}{2}\left[\cos(φ + 2π m t_0/T) - \imath \sin(φ+ 2π m t_0/T) \right] n
+\end{aligned}
+```
+So now, if we want to find ``A`` and ``φ`` from the ``\hat{p}_m`` components ``a_r`` 
+```math
+a_r = \frac{A}{2}\cos(φ + 2π m t_0/T)n
+```
+and ``a_i``
+```math
+a_i = \frac{A}{2}\sin(φ + 2π m t_0/T)n
+```
+we can use the same formula for ``A``
+```math
+A = \frac{2}{n}\sqrt{a_r^2 + a_i^2}
+```
+and a slightly modified version of the formula for ``φ``
+```math
+φ = \arctan(a_i/a_r) - 2π m t_0/T.
+```
+
+And we don't need to worry about the two special cases discussed previously, since the ``φ`` angle for both the mean and Nyquist components is always zero.
+What about the special cases we discussed previously (the mean and the Nyquist frequencies)?
+Obviously shifting the mean component shouldn't change anything.
+But what about the Nyquist frequency?
+
+#### Nyquist Component with a Time Offset
+We know from previous work that the odd-input length Nyquist component isn't special, so we'll ignore that case.
+So, for the even-input length Nyquist component, we'll start with the same signal
+```math
+\begin{aligned}
+p(t_j) = p_j &= \frac{A}{2}\left[ \cos(φ) + \imath \sin(φ)\right] e^{2π\imath m t_0/T + 2π\imath jm/n} + \frac{A}{2}\left[ \cos(φ) - \imath \sin(φ)\right] e^{-2π\imath m t_0/T - 2π\imath jm/n} \\
+             &= \frac{A}{2}\left[ \cos(φ) + \imath \sin(φ)\right] e^{2π\imath m t_0/T} e^{2π\imath jm/n} + \frac{A}{2}\left[ \cos(φ) - \imath \sin(φ)\right] e^{-2π\imath m t_0/T} e^{-2π\imath jm/n},
+\end{aligned}
+```
+and then say that ``m = n/2``, like previously
+```math
+\begin{aligned}
+  p_j &= \frac{A}{2}\left[ \cos(φ) + \imath \sin(φ)\right] e^{2π\imath (n/2) t_0/T} e^{2π\imath j(n/2)/n} + \frac{A}{2}\left[ \cos(φ) - \imath \sin(φ)\right] e^{-2π\imath (n/2) t_0/T} e^{-2π\imath j(n/2)/n} \\
+      &= \frac{A}{2}\left[ \cos(φ) + \imath \sin(φ)\right] e^{π\imath n t_0/T} e^{π\imath j} + \frac{A}{2}\left[ \cos(φ) - \imath \sin(φ)\right] e^{-π\imath n t_0/T} e^{-π\imath j} \\
+      &= \frac{A}{2}\left[e^{\imath φ}\right] e^{π\imath n t_0/T} e^{π\imath j} + \frac{A}{2}\left[ e^{-\imath φ}\right] e^{-π\imath n t_0/T} e^{-π\imath j} \\
+      &= \frac{A}{2}\left[e^{\imath (φ + πn t_0/T)}\right] e^{π\imath j} + \frac{A}{2}\left[ e^{-\imath (φ + πn t_0/T)}\right] e^{-π\imath j} \\
+      &= \frac{A}{2}\left[\cos(φ + πn t_0/T) + \imath \sin(φ + πn t_0/T)\right] e^{π\imath j} + \frac{A}{2}\left[ \cos(φ + πn t_0/T) - \imath \sin(φ + πn t_0/T)\right] e^{-π\imath j} \\
+      &= A\cos(φ + πn t_0/T)e^{π\imath j} \\
+      &= A\cos(φ + 2π (n/2) t_0/T)e^{2π\imath j (n/2)/n}
+\end{aligned}
+```
+So this means the Fourier transform is
+```math
+\hat{p}_{n/2} = A\cos(φ + 2π (n/2) t_0/T) n
+```
+and so we can find
+```math
+A = a_r/n
+```
+and
+```math
+φ = -2π(n/2) t_0/T.
+```

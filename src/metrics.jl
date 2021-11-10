@@ -20,17 +20,21 @@ end
 abstract type AbstractPressureSpectrum end
 
 @concrete struct PressureSpectrum <: AbstractPressureSpectrum
-    n
-    fs
     amp
     ϕ
+    n
+    fs
+    t0
 end
+
+PressureSpectrum(amp, ϕ, n, fs) = PressureSpectrum(amp, ϕ, n, fs, zero(typeof(fs)))
 
 @inline inputlength(ps::AbstractPressureSpectrum) = ps.n
 @inline samplerate(ps::AbstractPressureSpectrum) = ps.fs
+@inline starttime(ps::AbstractPressureSpectrum) = ps.t0
 @inline frequency(ps::AbstractPressureSpectrum) = rfftfreq(inputlength(ps), samplerate(ps))
 @inline amplitude(ps::AbstractPressureSpectrum) = ps.amp
-@inline phase(ps::AbstractPressureSpectrum) = ps.ϕ
+@inline phase(ps::AbstractPressureSpectrum) = rem2pi.(ps.ϕ .- 2 .* pi .* frequency(ps) .* starttime(ps), RoundNearest)
 
 function split_hc_real_imag(p_fft)
     n = length(p_fft)
@@ -61,7 +65,8 @@ function PressureSpectrum(ap::AbstractAcousticPressure)
     p_fft_mean, p_fft_real, p_fft_imag = split_hc_real_imag(p_fft)
 
     # output length.
-    m = 1 + length(p_fft_real)
+    n_real = length(p_fft_real)
+    m = 1 + n_real
 
     # Now I want to get the amplitude and phase.
     amp = similar(p, m)
@@ -70,27 +75,39 @@ function PressureSpectrum(ap::AbstractAcousticPressure)
     amp[begin] = p_fft_mean
     phi[begin] = zero(eltype(phi))  # imaginary component is zero, so atan(0) == 0.
     if mod(n, 2) == 0
+        # There is one more real component than imaginary component (not
+        # counting the mean).
         @. amp[begin+1:end-1] = 2*sqrt(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
-        amp[end] = p_fft_real[end]
         @. phi[begin+1:end-1] = atan(p_fft_imag, p_fft_real[begin:end-1])
-        phi[end] = zero(eltype(phi))  # imaginary component is zero, so atan(0) == 0.
+        # phi[end] = zero(eltype(phi))  # imaginary component is zero, so atan(0) == 0.
+        if p_fft_real[end] < 0
+            amp[end] = -p_fft_real[end]
+            phi[end] = pi*one(eltype(phi))
+        else
+            amp[end] = p_fft_real[end]
+            phi[end] = zero(eltype(phi))
+        end
     else
+        # There are the same number of real and imaginary components (not
+        # counting the mean).
         @. amp[begin+1:end] = 2*sqrt(p_fft_real^2 + p_fft_imag^2)
         @. phi[begin+1:end] = atan(p_fft_imag, p_fft_real)
     end
 
     # Find the sampling rate, which we can use later to find the frequency bins.
     fs = 1/timestep(ap)
-    return PressureSpectrum(n, fs, amp, phi)
+    return PressureSpectrum(amp, phi, n, fs, starttime(ap))
 end
 
 function AcousticPressure(ps::AbstractPressureSpectrum)
     amp = amplitude(ps)
-    ϕ = phase(ps)
+    ϕ = ps.ϕ
     n = inputlength(ps)
     T = promote_type(eltype(amp), eltype(ϕ))
     p_fft = Vector{T}(undef, n)
     _, p_fft_real, p_fft_imag = split_hc_real_imag(p_fft)
+
+    n_real = length(p_fft_real)
 
     p_fft[begin] = amp[begin]
     # Both amp and phi always have the same length, and it's always one more
@@ -99,7 +116,7 @@ function AcousticPressure(ps::AbstractPressureSpectrum)
         # The length of p_fft_real is one greater than p_fft_imag.
         # So the length of amp and phi are two greater than p_fft_imag.
         @. p_fft_real[begin:end-1] = 0.5*amp[begin+1:end-1]*cos(ϕ[begin+1:end-1])
-        p_fft_real[end] = amp[end]
+        p_fft_real[end] = amp[end]*cos(ϕ[end])
         @. p_fft_imag = 0.5*amp[begin+1:end-1]*sin(ϕ[begin+1:end-1])
     else
         # The length of p_fft_real is the same as p_fft_imag.
@@ -114,23 +131,28 @@ function AcousticPressure(ps::AbstractPressureSpectrum)
 
     # Now we just have to figure out dt and t0.
     dt = 1/samplerate(ps)
-    return AcousticPressure(p, dt)
+    t0 = starttime(ps)
+    return AcousticPressure(p, dt, t0)
 end
 
 abstract type AbstractNarrowbandSpectrum end
 
 @concrete struct NarrowbandSpectrum <: AbstractNarrowbandSpectrum
-    n
-    fs
     amp
     ϕ
+    n
+    fs
+    t0
 end
+
+NarrowbandSpectrum(amp, ϕ, n, fs) = NarrowbandSpectrum(amp, ϕ, n, fs, zero(typeof(fs)))
 
 @inline inputlength(nbs::AbstractNarrowbandSpectrum) = nbs.n
 @inline samplerate(nbs::AbstractNarrowbandSpectrum) = nbs.fs
 @inline frequency(nbs::AbstractNarrowbandSpectrum) = rfftfreq(inputlength(nbs), samplerate(nbs))
 @inline amplitude(nbs::AbstractNarrowbandSpectrum) = nbs.amp
-@inline phase(nbs::AbstractNarrowbandSpectrum) = nbs.ϕ
+@inline phase(nbs::AbstractNarrowbandSpectrum) = rem2pi.(nbs.ϕ .- 2 .* pi .* frequency(nbs) .* starttime(nbs), RoundNearest)
+@inline starttime(nbs::AbstractNarrowbandSpectrum) = nbs.t0
 
 function NarrowbandSpectrum(ap::AbstractAcousticPressure)
     p = pressure(ap)
@@ -145,7 +167,8 @@ function NarrowbandSpectrum(ap::AbstractAcousticPressure)
     p_fft_mean, p_fft_real, p_fft_imag = split_hc_real_imag(p_fft)
 
     # output length.
-    m = 1 + length(p_fft_real)
+    n_real = length(p_fft_real)
+    m = 1 + n_real
 
     # Now I want to get the amplitude and phase.
     amp = similar(p, m)
@@ -155,9 +178,13 @@ function NarrowbandSpectrum(ap::AbstractAcousticPressure)
     ϕ[begin] = zero(eltype(ϕ))
     if mod(n, 2) == 0
         @. amp[begin+1:end-1] = 2*(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
-        amp[end] = p_fft_real[end]^2
         @. ϕ[2:end-1] = atan(p_fft_imag, p_fft_real[begin:end-1])
-        ϕ[end] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
+        amp[end] = p_fft_real[end]^2
+        if p_fft_real[end] < 0
+            ϕ[end] = pi*one(eltype(ϕ))
+        else
+            ϕ[end] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
+        end
     else
         @. amp[begin+1:end] = 2*(p_fft_real^2 + p_fft_imag^2)
         @. ϕ[begin+1:end] = atan(p_fft_imag, p_fft_real)
@@ -165,7 +192,7 @@ function NarrowbandSpectrum(ap::AbstractAcousticPressure)
 
     # Find the sampling rate, which we can use later to find the frequency bins.
     fs = 1/timestep(ap)
-    return NarrowbandSpectrum(n, fs, amp, ϕ)
+    return NarrowbandSpectrum(amp, ϕ, n, fs, starttime(ap))
 end
 
 function PressureSpectrum(nbs::AbstractNarrowbandSpectrum)
@@ -191,14 +218,14 @@ function PressureSpectrum(nbs::AbstractNarrowbandSpectrum)
         @. amp[begin+1:end] = sqrt(2*nbs_amp[begin+1:end])
     end
 
-    phi = copy(phase(nbs))
+    phi = copy(nbs.ϕ)
     fs = samplerate(nbs)
-    return PressureSpectrum(n, fs, amp, phi)
+    return PressureSpectrum(amp, phi, n, fs, starttime(nbs))
 end
 
 function AcousticPressure(nbs::AbstractNarrowbandSpectrum)
     amp = amplitude(nbs)
-    ϕ = phase(nbs)
+    ϕ = nbs.ϕ
     n = inputlength(nbs)
     T = promote_type(eltype(amp), eltype(ϕ))
     p_fft = Vector{T}(undef, n)
@@ -211,7 +238,7 @@ function AcousticPressure(nbs::AbstractNarrowbandSpectrum)
         # The length of p_fft_real is one greater than p_fft_imag.
         # So the length of amp and phi are two greater than p_fft_imag.
         @. p_fft_real[begin:end-1] = 0.5*sqrt(2*amp[begin+1:end-1])*cos(ϕ[begin+1:end-1])
-        p_fft_real[end] = sqrt(amp[end])
+        p_fft_real[end] = sqrt(amp[end])*cos(ϕ[end])
         @. p_fft_imag = 0.5*sqrt(2*amp[begin+1:end-1])*sin(ϕ[begin+1:end-1])
     else
         # The length of p_fft_real is the same as p_fft_imag.
@@ -226,7 +253,7 @@ function AcousticPressure(nbs::AbstractNarrowbandSpectrum)
 
     # Now we just have to figure out dt and t0.
     dt = 1/samplerate(nbs)
-    return AcousticPressure(p, dt)
+    return AcousticPressure(p, dt, starttime(nbs))
 end
 
 function OASPL(ap::AbstractAcousticPressure)
