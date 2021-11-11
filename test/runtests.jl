@@ -224,6 +224,49 @@ end
                 @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
             end
         end
+        @testset "negative amplitudes" begin
+            for T in [1.0, 2.0]
+                f(t) = -6 - 8*cos(1*2*pi/T*t + 0.2) - 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+                for n in [10, 11]
+                    dt = T/n
+                    t = (0:n-1).*dt
+                    p = f.(t)
+                    ap = AcousticPressure(p, dt)
+                    ps = PressureSpectrum(ap)
+                    freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
+                    amp_expected = similar(amplitude(ps))
+                    amp_expected[1] = 6
+                    amp_expected[2] = 8
+                    amp_expected[3] = 2.5
+                    amp_expected[4] = 9
+                    amp_expected[5] = 0.5
+                    phase_expected = similar(phase(ps))
+                    phase_expected[1] = pi
+                    phase_expected[2] = -pi + 0.2
+                    phase_expected[3] = pi - 3
+                    phase_expected[4] = 3.1
+                    phase_expected[5] = -1.1
+                    # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                    # Nyquist frequency for the odd input length case.
+                    if n == 10
+                        amp_expected[6] = 3*cos(0.2)
+                        phase_expected[6] = 0
+                    else
+                        amp_expected[6] = 3
+                        phase_expected[6] = 0.2
+                    end
+                    @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+                    @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+                    @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+
+                    # # Make sure I can go from a PressureSpectrum to an AcousticPressure.
+                    # ap_from_ps = AcousticPressure(ps)
+                    # @test timestep(ap_from_ps) ≈ timestep(ap)
+                    # @test starttime(ap_from_ps) ≈ starttime(ap)
+                    # @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+                end
+            end
+        end
     end
 
     @testset "t0 !== 0" begin

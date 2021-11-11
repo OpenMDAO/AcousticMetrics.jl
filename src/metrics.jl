@@ -72,21 +72,15 @@ function PressureSpectrum(ap::AbstractAcousticPressure)
     amp = similar(p, m)
     phi = similar(p, m)
     # Set the amplitude and phase for the mean component.
-    amp[begin] = p_fft_mean
-    phi[begin] = zero(eltype(phi))  # imaginary component is zero, so atan(0) == 0.
+    amp[begin] = abs(p_fft_mean)
+    phi[begin] = atan(zero(eltype(phi)), p_fft_mean)
     if mod(n, 2) == 0
         # There is one more real component than imaginary component (not
         # counting the mean).
         @. amp[begin+1:end-1] = 2*sqrt(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
         @. phi[begin+1:end-1] = atan(p_fft_imag, p_fft_real[begin:end-1])
-        # phi[end] = zero(eltype(phi))  # imaginary component is zero, so atan(0) == 0.
-        if p_fft_real[end] < 0
-            amp[end] = -p_fft_real[end]
-            phi[end] = pi*one(eltype(phi))
-        else
-            amp[end] = p_fft_real[end]
-            phi[end] = zero(eltype(phi))
-        end
+        amp[end] = abs(p_fft_real[end])
+        phi[end] = atan(zero(eltype(phi)), p_fft_real[end])
     else
         # There are the same number of real and imaginary components (not
         # counting the mean).
@@ -109,7 +103,7 @@ function AcousticPressure(ps::AbstractPressureSpectrum)
 
     n_real = length(p_fft_real)
 
-    p_fft[begin] = amp[begin]
+    p_fft[begin] = amp[begin]*cos(ϕ[begin])
     # Both amp and phi always have the same length, and it's always one more
     # than p_fft_real.
     if mod(n, 2) == 0
@@ -175,16 +169,12 @@ function NarrowbandSpectrum(ap::AbstractAcousticPressure)
     ϕ = similar(p, m)
 
     amp[begin] = p_fft_mean^2
-    ϕ[begin] = zero(eltype(ϕ))
+    ϕ[begin] = atan(zero(eltype(ϕ)), p_fft_mean)
     if mod(n, 2) == 0
         @. amp[begin+1:end-1] = 2*(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
         @. ϕ[2:end-1] = atan(p_fft_imag, p_fft_real[begin:end-1])
         amp[end] = p_fft_real[end]^2
-        if p_fft_real[end] < 0
-            ϕ[end] = pi*one(eltype(ϕ))
-        else
-            ϕ[end] = zero(eltype(ϕ))  # imaginary component is zero, so atan(0) == 0.
-        end
+        ϕ[end] = atan(zero(eltype(ϕ)), p_fft_real[end])
     else
         @. amp[begin+1:end] = 2*(p_fft_real^2 + p_fft_imag^2)
         @. ϕ[begin+1:end] = atan(p_fft_imag, p_fft_real)
@@ -231,7 +221,7 @@ function AcousticPressure(nbs::AbstractNarrowbandSpectrum)
     p_fft = Vector{T}(undef, n)
     _, p_fft_real, p_fft_imag = split_hc_real_imag(p_fft)
 
-    p_fft[begin] = sqrt(amp[begin])
+    p_fft[begin] = sqrt(amp[begin])*cos(ϕ[begin])
     # Both amp and phi always have the same length, and it's always one more
     # than p_fft_real.
     if mod(n, 2) == 0
