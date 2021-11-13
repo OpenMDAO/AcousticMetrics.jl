@@ -29,24 +29,13 @@ function W_A(f)
 end
 
 """
-    W_A!(nbs::AbstractNarrowbandSpectrum)
+    W_A(nbs::AbstractNarrowbandSpectrum)
 
-A-weight an `AbstractNarrowbandSpectrum` in place and return it.
+A-weight and return the amplitudes of `nbs`.
 """
-function W_A!(nbs::AbstractNarrowbandSpectrum)
+function W_A(nbs::AbstractNarrowbandSpectrum)
     freq = frequency(nbs)
     amp = amplitude(nbs)
     amp .*= W_A.(freq)
-    return nbs
-end
-
-"""
-    W_A(nbs::AbstractNarrowbandSpectrum)
-
-Create and return an A-weighted copy of `nbs`.
-"""
-function W_A(nbs::AbstractNarrowbandSpectrum)
-    nbs_new = deepcopy(nbs)
-    W_A!(nbs_new)
-    return nbs_new
+    return amp
 end

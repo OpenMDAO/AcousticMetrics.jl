@@ -353,24 +353,24 @@ end
                 @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
                 @test all(isapprox.(phase(nbs).*amplitude(nbs), phase_expected.*amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to a pressure spectrum.
-                ps = PressureSpectrum(nbs)
-                amp_expected = similar(amplitude(ps))
-                amp_expected[1] = 6
-                amp_expected[2] = 8
-                amp_expected[3] = 2.5
-                amp_expected[4] = 9
-                amp_expected[5] = 0.5
-                # Handle the Nyquist frequency (kinda tricky). There isn't really a
-                # Nyquist frequency for the odd input length case.
-                if n == 10
-                    amp_expected[6] = 3*cos(0.2)
-                else
-                    amp_expected[6] = 3
-                end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+                # # Make sure I can convert a NBS to a pressure spectrum.
+                # ps = PressureSpectrum(nbs)
+                # amp_expected = similar(amplitude(ps))
+                # amp_expected[1] = 6
+                # amp_expected[2] = 8
+                # amp_expected[3] = 2.5
+                # amp_expected[4] = 9
+                # amp_expected[5] = 0.5
+                # # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                # # Nyquist frequency for the odd input length case.
+                # if n == 10
+                #     amp_expected[6] = 3*cos(0.2)
+                # else
+                #     amp_expected[6] = 3
+                # end
+                # @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+                # @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+                # @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
 
                 # Make sure I can convert a NBS to the acoustic pressure.
                 ap_from_nbs = AcousticPressure(nbs)
@@ -419,28 +419,28 @@ end
                 @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
                 @test all(isapprox.(phase(nbs), phase_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to a pressure spectrum.
-                ps = PressureSpectrum(nbs)
-                amp_expected = similar(amplitude(ps))
-                amp_expected[1] = 6
-                amp_expected[2] = 8
-                amp_expected[3] = 2.5
-                amp_expected[4] = 9
-                amp_expected[5] = 0.5
-                # Handle the Nyquist frequency (kinda tricky). There isn't really a
-                # Nyquist frequency for the odd input length case.
-                if n == 10
-                    # The `t0` term pushes the cosine below zero, which messes
-                    # up the test. Hmm... what's the right thing to do here?
-                    # Well, what should the phase and amplitude be?
-                    # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
-                    amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
-                else
-                    amp_expected[6] = 3
-                end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
+                # # Make sure I can convert a NBS to a pressure spectrum.
+                # ps = PressureSpectrum(nbs)
+                # amp_expected = similar(amplitude(ps))
+                # amp_expected[1] = 6
+                # amp_expected[2] = 8
+                # amp_expected[3] = 2.5
+                # amp_expected[4] = 9
+                # amp_expected[5] = 0.5
+                # # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                # # Nyquist frequency for the odd input length case.
+                # if n == 10
+                #     # The `t0` term pushes the cosine below zero, which messes
+                #     # up the test. Hmm... what's the right thing to do here?
+                #     # Well, what should the phase and amplitude be?
+                #     # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
+                #     amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
+                # else
+                #     amp_expected[6] = 3
+                # end
+                # @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+                # @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+                # @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
 
                 # Make sure I can convert a NBS to the acoustic pressure.
                 ap_from_nbs = AcousticPressure(nbs)
@@ -556,12 +556,14 @@ end
                 p = f.(t)
                 ap = AcousticPressure(p, dt)
                 nbs = NarrowbandSpectrum(ap)
-                nbs_A = W_A(nbs)
+                # nbs_A = W_A(nbs)
+                amp_A = W_A(nbs)
                 # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
                 # Wish I could get this to match more closely. But the weighting
                 # function looks pretty nasty numerically (frequencies raised to the
                 # 4th power, and one of the coefficients is about 2.24e16).
-                @test all(isapprox.(amplitude(nbs_A), nbs_A_a2[(T_ms, n)], atol=1e-6))
+                @show T_ms n amp_A nbs_A_a2[(T_ms, n)]
+                @test all(isapprox.(amp_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
             end
         end
     end
@@ -579,10 +581,11 @@ end
                 ap = AcousticPressure(p, dt)
                 nbs = NarrowbandSpectrum(ap)
                 amp = amplitude(nbs)
-                nbs_A = W_A(nbs)
+                # nbs_A = W_A(nbs)
+                amp_A = W_A(nbs)
                 # This is lame. Should be able to get this to match better,
                 # right?
-                @test all(isapprox.(amplitude(nbs_A), amp, atol=1e-5))
+                @test all(isapprox.(amp_A, amp, atol=1e-5))
             end
         end
     end
