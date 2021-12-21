@@ -1,20 +1,44 @@
-abstract type AbstractAcousticPressure end
+abstract type AbstractPressureTimeHistory{IsEven} end
 
-@concrete struct AcousticPressure <: AbstractAcousticPressure
-    p
-    dt
-    t0
+struct PressureTimeHistory{IsEven,Tp,Tdt,Tt0} <: AbstractPressureTimeHistory{IsEven}
+    p::Tp
+    dt::Tdt
+    t0::Tt0
+
+    function PressureTimeHistory{IsEven}(p, dt, t0) where {IsEven}
+        n = length(p)
+        iseven(n) == IsEven || error("IsEven = $(IsEven) is not consistent with length(p) = $n")
+        return new{IsEven, typeof(p), typeof(dt), typeof(t0)}(p, dt, t0)
+    end
 end
 
-AcousticPressure(p, dt) = AcousticPressure(p, dt, zero(typeof(dt)))
+PressureTimeHistory(p, dt) = AcousticPressure(p, dt, zero(typeof(dt)))
 
-@inline pressure(ap::AbstractAcousticPressure) = ap.p
-@inline timestep(ap::AbstractAcousticPressure) = ap.dt
-@inline starttime(ap::AbstractAcousticPressure) = ap.t0
+@inline pressure(ap::AbstractPressureTimeHistory) = ap.p
+@inline inputlength(ap::AbstractPressureTimeHistory) = length(pressure(ap))
+@inline timestep(ap::AbstractPressureTimeHistory) = ap.dt
+@inline starttime(ap::AbstractPressureTimeHistory) = ap.t0
 
-@inline function time(ap::AbstractAcousticPressure)
+@inline function time(ap::AbstractPressureTimeHistory)
     n = length(pressure(ap))
     return starttime(ap) .+ (0:n-1) .* timestep(ap)
+end
+
+@inline function size_hc_real(hc)
+    n = length(hc)
+    n_real = n >> 1
+    return n_real
+end
+
+@inline function size_hc_imag(hc)
+    n = length(hc)
+    n_imag = ((n + 1) >> 1) - 1
+    return n_imag
+end
+
+@inline function size_amp_phase(hc)
+    n_real = size_hc_real(hc)
+    return 1 + n_real
 end
 
 """
@@ -28,9 +52,8 @@ Returns a length-three tuple with the mean (a scalar) first, then a `@view` of
 the real components, and a `@view` of the imaginary components.
 """
 function split_hc_real_imag(hc)
-    n = length(hc)
-    n_real = n >> 1 # number of real outputs, not counting the mean
-    n_imag = ((n + 1) >> 1) - 1
+    n_real = size_hc_real(hc)
+    n_imag = size_hc_imag(hc)
 
     # The mean of the signal is in the first element of the output array.
     # Always real for a real-input FFT.
@@ -43,7 +66,21 @@ function split_hc_real_imag(hc)
     return hc_mean, hc_real, hc_imag
 end
 
-abstract type AbstractPressureSpectrum end
+abstract type AbstractPressureSpectrum{IsEven} end
+
+struct PressureSpectrum{IsEven,Thc,Tdt,Tt0} <: AbstractPressureSpectrum{IsEven}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function PressureSpectrum{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || error("IsEven = $(IsEven) is not consistent with length(hc) = $n")
+        return new{IsEven, typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+PressureSpectrum(hc, dt) = PressureSpectrum(hc, dt, zero(typeof(dt)))
 
 # @concrete struct PressureSpectrum <: AbstractPressureSpectrum
 #     amp
@@ -53,13 +90,13 @@ abstract type AbstractPressureSpectrum end
 #     t0
 # end
 
-@concrete struct PressureSpectrum <: AbstractPressureSpectrum
-    hc
-    fs
-    t0
-end
+# @concrete struct PressureSpectrum <: AbstractPressureSpectrum
+#     hc
+#     fs
+#     t0
+# end
 
-PressureSpectrum(hc, fs) = PressureSpectrum(hc, fs, zero(typeof(fs)))
+# PressureSpectrum(hc, fs) = PressureSpectrum(hc, fs, zero(typeof(fs)))
 
 # @inline inputlength(ps::AbstractPressureSpectrum) = ps.n
 # @inline samplerate(ps::AbstractPressureSpectrum) = ps.fs
@@ -69,15 +106,16 @@ PressureSpectrum(hc, fs) = PressureSpectrum(hc, fs, zero(typeof(fs)))
 # @inline phase(ps::AbstractPressureSpectrum) = rem2pi.(ps.ϕ .- 2 .* pi .* frequency(ps) .* starttime(ps), RoundNearest)
 @inline halfcomplex(ps::AbstractPressureSpectrum) = ps.hc
 @inline inputlength(ps::AbstractPressureSpectrum) = length(halfcomplex(ps))
-@inline samplerate(ps::AbstractPressureSpectrum) = ps.fs
+@inline timestep(ps::AbstractPressureSpectrum) = ps.dt
+@inline samplerate(ps::AbstractPressureSpectrum) = 1/timestep(ps)
 @inline starttime(ps::AbstractPressureSpectrum) = ps.t0
 @inline frequency(ps::AbstractPressureSpectrum) = rfftfreq(inputlength(ps), samplerate(ps))
 # @inline amplitude(ps::AbstractPressureSpectrum) = ps.amp
 @inline phase(ps::AbstractPressureSpectrum) = rem2pi.(phase_t0(ps) .- 2 .* pi .* frequency(ps) .* starttime(ps), RoundNearest)
 
-function PressureSpectrum(ap::AbstractAcousticPressure, buf=similar(pressure(ap)))
-    p = pressure(ap)
-    n = length(p)
+function PressureSpectrum{IsEven}(pth::AbstractPressureTimeHistory{IsEven}, buf=similar(pressure(pth))) where {IsEven}
+    p = pressure(pth)
+    n = inputlength(pth)
 
     # # Get the FFT of the acoustic pressure. Divide by n since FFT computes an
     # # "unnormalized" FFT.
@@ -117,34 +155,104 @@ function PressureSpectrum(ap::AbstractAcousticPressure, buf=similar(pressure(ap)
 
     rfft!(buf, p)
     buf ./= n
-    return PressureSpectrum(buf, 1/timestep(ap), starttime(ap))
+    return PressureSpectrum(buf, timestep(pth), starttime(pth))
 end
 
-function amplitude(ps::AbstractPressureSpectrum)
-    hc = halfcomplex(ps)
-    n = length(hc)
+# function amplitude(ps::AbstractPressureSpectrum)
+#     hc = halfcomplex(ps)
+#     n = length(hc)
 
-    # Split the FFT output in half-complex format into mean, real, and imaginary
-    # components (returns views for the latter two).
-    p_fft_mean, p_fft_real, p_fft_imag = split_hc_real_imag(hc)
+#     # Split the FFT output in half-complex format into mean, real, and imaginary
+#     # components (returns views for the latter two).
+#     p_fft_mean, p_fft_real, p_fft_imag = split_hc_real_imag(hc)
 
-    # output length.
-    n_real = length(p_fft_real)
-    m = 1 + n_real
+#     # output length.
+#     n_real = length(p_fft_real)
+#     m = 1 + n_real
 
-    # Now I want to get the amplitude and phase.
-    amp = similar(hc, m)
-    # Set the amplitude and phase for the mean component.
-    amp[begin] = abs(p_fft_mean)
-    if iseven(n)
-        # There is one more real component than imaginary component (not
-        # counting the mean).
-        @. amp[begin+1:end-1] = 2*sqrt(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
-        amp[end] = abs(p_fft_real[end])
+#     # Now I want to get the amplitude and phase.
+#     amp = similar(hc, m)
+#     # Set the amplitude and phase for the mean component.
+#     amp[begin] = abs(p_fft_mean)
+#     if iseven(n)
+#         # There is one more real component than imaginary component (not
+#         # counting the mean).
+#         @. amp[begin+1:end-1] = 2*sqrt(p_fft_real[begin:end-1]^2 + p_fft_imag^2)
+#         amp[end] = abs(p_fft_real[end])
+#     else
+#         # There are the same number of real and imaginary components (not
+#         # counting the mean).
+#         @. amp[begin+1:end] = 2*sqrt(p_fft_real^2 + p_fft_imag^2)
+#     end
+
+#     return amp
+# end
+
+@concrete struct PressureSpectrumAmplitude{T,IsEven,TData} <: AbstractVector{T} where {T,IsEven,TData<:AbstractVector{T}}
+    hc::TData
+    dt
+    t0
+end
+
+@inline function Base.size(psa::PressureSpectrumAmplitude)
+    return (size_amp_phase(psa),)
+end
+
+@inline function Base.getindex(psa::PressureSpectrumAmplitude, i::Int)
+    n = size_amp_phase(psa)
+    checkindex(Bool, 1:n, i) || throw(BoundsError(psa, i))
+
+    hc_mean, hc_real, hc_imag = split_hc_real_imag(halfcomplex(psa))
+    # n = length(psa.hc)
+    # Hmm... so I need to figure out which parts of hc I want.
+    if i == 1
+        amp = abs(hc_mean)
     else
-        # There are the same number of real and imaginary components (not
-        # counting the mean).
-        @. amp[begin+1:end] = 2*sqrt(p_fft_real^2 + p_fft_imag^2)
+        if iseven(n)
+            if i == n
+                # Nyquist frequency.
+                amp = abs(hc_real[i])
+            else
+                amp = 2*sqrt(hc_real[i]^2 + hc_imag[i]^2)
+            end
+        else
+            amp = 2*sqrt(hc_real[i]^2 + hc_imag[i]^2)
+        end
+    end
+
+    return amp
+end
+
+@concrete struct PressureSpectrumPhase{T, TData} <: AbstractVector{T} where {T,TData<:AbstractVector{T}}
+    hc::TData
+    fs
+    t0
+end
+
+@inline function Base.size(psa::PressureSpectrumAmplitude)
+    return (size_amp_phase(psa),)
+end
+
+@inline function Base.getindex(psa::PressureSpectrumAmplitude, i::Int)
+    n = size_amp_phase(psa)
+    checkindex(Bool, 1:n, i) || throw(BoundsError(psa, i))
+
+    hc_mean, hc_real, hc_imag = split_hc_real_imag(halfcomplex(psa))
+    # n = length(psa.hc)
+    # Hmm... so I need to figure out which parts of hc I want.
+    if i == 1
+        amp = abs(hc_mean)
+    else
+        if iseven(n)
+            if i == n
+                # Nyquist frequency.
+                amp = abs(hc_real[i])
+            else
+                amp = 2*sqrt(hc_real[i]^2 + hc_imag[i]^2)
+            end
+        else
+            amp = 2*sqrt(hc_real[i]^2 + hc_imag[i]^2)
+        end
     end
 
     return amp
