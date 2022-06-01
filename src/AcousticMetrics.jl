@@ -8,6 +8,8 @@ using OffsetArrays: OffsetArray
 include("constants.jl")
 include("fourier_transforms.jl")
 include("metrics.jl")
+export AbstractPressureTimeHistory, PressureTimeHistory
+
 include("weighting.jl")
 
 end # module

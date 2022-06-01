@@ -28,14 +28,14 @@ function W_A(f)
     return w_a
 end
 
-"""
-    W_A(nbs::AbstractNarrowbandSpectrum)
+# """
+#     W_A(nbs::AbstractNarrowbandSpectrum)
 
-A-weight and return the amplitudes of `nbs`.
-"""
-function W_A(nbs::AbstractNarrowbandSpectrum)
-    freq = frequency(nbs)
-    amp = amplitude(nbs)
-    amp .*= W_A.(freq)
-    return amp
-end
+# A-weight and return the amplitudes of `nbs`.
+# """
+# function W_A(nbs::AbstractNarrowbandSpectrum)
+#     freq = frequency(nbs)
+#     amp = amplitude(nbs)
+#     amp .*= W_A.(freq)
+#     return amp
+# end
