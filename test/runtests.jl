@@ -1,7 +1,7 @@
 using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, RFFTCache, dft_r2hc
-using AcousticMetrics: AcousticPressure, PressureSpectrum, NarrowbandSpectrum
-using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, phase, OASPL
+using AcousticMetrics: PressureTimeHistory, PressureSpectrum#, NarrowbandSpectrum
+using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, halfcomplex, phase#, OASPL
 using AcousticMetrics: W_A
 # using ANOPP2
 using ForwardDiff
@@ -189,8 +189,10 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticPressure(p, dt)
+                # ap = AcousticPressure(p, dt)
+                ap = PressureTimeHistory(p, dt)
                 ps = PressureSpectrum(ap)
+                amp = amplitude(ps)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
                 amp_expected = similar(amplitude(ps))
                 amp_expected[1] = 6
@@ -217,11 +219,11 @@ end
                 @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
                 @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
 
-                # Make sure I can go from a PressureSpectrum to an AcousticPressure.
-                ap_from_ps = AcousticPressure(ps)
-                @test timestep(ap_from_ps) ≈ timestep(ap)
-                @test starttime(ap_from_ps) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+                # # Make sure I can go from a PressureSpectrum to an AcousticPressure.
+                # ap_from_ps = AcousticPressure(ps)
+                # @test timestep(ap_from_ps) ≈ timestep(ap)
+                # @test starttime(ap_from_ps) ≈ starttime(ap)
+                # @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
             end
         end
         @testset "negative amplitudes" begin
@@ -231,7 +233,8 @@ end
                     dt = T/n
                     t = (0:n-1).*dt
                     p = f.(t)
-                    ap = AcousticPressure(p, dt)
+                    # ap = AcousticPressure(p, dt)
+                    ap = PressureTimeHistory(p, dt)
                     ps = PressureSpectrum(ap)
                     freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
                     amp_expected = similar(amplitude(ps))
@@ -277,7 +280,8 @@ end
                 dt = T/n
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
-                ap = AcousticPressure(p, dt, t0)
+                # ap = AcousticPressure(p, dt, t0)
+                ap = PressureTimeHistory(p, dt, t0)
                 ps = PressureSpectrum(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
                 amp_expected = similar(amplitude(ps))
@@ -295,8 +299,6 @@ end
                 # Handle the Nyquist frequency (kinda tricky). There isn't really a
                 # Nyquist frequency for the odd input length case.
                 if n == 10
-                    # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
-                    # phase_expected[6] = rem2pi(-5*2*pi/T*t0, RoundNearest)
                     amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
                     phase_expected[6] = rem2pi(pi - 5*2*pi/T*t0, RoundNearest)
                 else
@@ -307,286 +309,286 @@ end
                 @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
                 @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
 
-                # Make sure I can go from a PressureSpectrum to an AcousticPressure.
-                ap_from_ps = AcousticPressure(ps)
-                @test timestep(ap_from_ps) ≈ timestep(ap)
-                @test starttime(ap_from_ps) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+                # # Make sure I can go from a PressureSpectrum to an AcousticPressure.
+                # ap_from_ps = AcousticPressure(ps)
+                # @test timestep(ap_from_ps) ≈ timestep(ap)
+                # @test starttime(ap_from_ps) ≈ starttime(ap)
+                # @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
             end
         end
     end
 end
 
 @testset "Narrowband Spectrum" begin
-    @testset "t0 == 0" begin
-        for T in [1.0, 2.0]
-            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
-            for n in [10, 11]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(nbs))
-                amp_expected[1] = 6^2
-                amp_expected[2] = 0.5*8^2
-                amp_expected[3] = 0.5*2.5^2
-                amp_expected[4] = 0.5*9^2
-                amp_expected[5] = 0.5*0.5^2
-                phase_expected = similar(phase(nbs))
-                phase_expected[1] = 0
-                phase_expected[2] = 0.2
-                phase_expected[3] = -3
-                phase_expected[4] = 3.1
-                phase_expected[5] = -1.1
-                # Handle the Nyquist frequency (kinda tricky). There isn't really a
-                # Nyquist frequency for the odd input length case.
-                if n == 10
-                    amp_expected[6] = (3*cos(0.2))^2
-                    phase_expected[6] = 0
-                else
-                    amp_expected[6] = 0.5*3^2
-                    phase_expected[6] = 0.2
-                end
-                @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(nbs).*amplitude(nbs), phase_expected.*amp_expected; atol=1e-12))
+    # @testset "t0 == 0" begin
+    #     for T in [1.0, 2.0]
+    #         f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+    #         for n in [10, 11]
+    #             dt = T/n
+    #             t = (0:n-1).*dt
+    #             p = f.(t)
+    #             ap = AcousticPressure(p, dt)
+    #             nbs = NarrowbandSpectrum(ap)
+    #             freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
+    #             amp_expected = similar(amplitude(nbs))
+    #             amp_expected[1] = 6^2
+    #             amp_expected[2] = 0.5*8^2
+    #             amp_expected[3] = 0.5*2.5^2
+    #             amp_expected[4] = 0.5*9^2
+    #             amp_expected[5] = 0.5*0.5^2
+    #             phase_expected = similar(phase(nbs))
+    #             phase_expected[1] = 0
+    #             phase_expected[2] = 0.2
+    #             phase_expected[3] = -3
+    #             phase_expected[4] = 3.1
+    #             phase_expected[5] = -1.1
+    #             # Handle the Nyquist frequency (kinda tricky). There isn't really a
+    #             # Nyquist frequency for the odd input length case.
+    #             if n == 10
+    #                 amp_expected[6] = (3*cos(0.2))^2
+    #                 phase_expected[6] = 0
+    #             else
+    #                 amp_expected[6] = 0.5*3^2
+    #                 phase_expected[6] = 0.2
+    #             end
+    #             @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
+    #             @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
+    #             @test all(isapprox.(phase(nbs).*amplitude(nbs), phase_expected.*amp_expected; atol=1e-12))
 
-                # # Make sure I can convert a NBS to a pressure spectrum.
-                # ps = PressureSpectrum(nbs)
-                # amp_expected = similar(amplitude(ps))
-                # amp_expected[1] = 6
-                # amp_expected[2] = 8
-                # amp_expected[3] = 2.5
-                # amp_expected[4] = 9
-                # amp_expected[5] = 0.5
-                # # Handle the Nyquist frequency (kinda tricky). There isn't really a
-                # # Nyquist frequency for the odd input length case.
-                # if n == 10
-                #     amp_expected[6] = 3*cos(0.2)
-                # else
-                #     amp_expected[6] = 3
-                # end
-                # @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                # @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                # @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+    #             # # Make sure I can convert a NBS to a pressure spectrum.
+    #             # ps = PressureSpectrum(nbs)
+    #             # amp_expected = similar(amplitude(ps))
+    #             # amp_expected[1] = 6
+    #             # amp_expected[2] = 8
+    #             # amp_expected[3] = 2.5
+    #             # amp_expected[4] = 9
+    #             # amp_expected[5] = 0.5
+    #             # # Handle the Nyquist frequency (kinda tricky). There isn't really a
+    #             # # Nyquist frequency for the odd input length case.
+    #             # if n == 10
+    #             #     amp_expected[6] = 3*cos(0.2)
+    #             # else
+    #             #     amp_expected[6] = 3
+    #             # end
+    #             # @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+    #             # @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+    #             # @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to the acoustic pressure.
-                ap_from_nbs = AcousticPressure(nbs)
-                @test timestep(ap_from_nbs) ≈ timestep(ap)
-                @test starttime(ap_from_nbs) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
-            end
-        end
-    end
+    #             # Make sure I can convert a NBS to the acoustic pressure.
+    #             ap_from_nbs = AcousticPressure(nbs)
+    #             @test timestep(ap_from_nbs) ≈ timestep(ap)
+    #             @test starttime(ap_from_nbs) ≈ starttime(ap)
+    #             @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
+    #         end
+    #     end
+    # end
 
-    @testset "t0 !== 0" begin
-        for T in [1.0, 2.0]
-            t0 = 0.13
-            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
-            for n in [10, 11]
-                dt = T/n
-                t = t0 .+ (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt, t0)
-                nbs = NarrowbandSpectrum(ap)
-                freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(nbs))
-                amp_expected[1] = 6^2
-                amp_expected[2] = 0.5*8^2
-                amp_expected[3] = 0.5*2.5^2
-                amp_expected[4] = 0.5*9^2
-                amp_expected[5] = 0.5*0.5^2
-                phase_expected = similar(phase(nbs))
-                phase_expected[1] = 0
-                phase_expected[2] = 0.2
-                phase_expected[3] = -3
-                phase_expected[4] = 3.1
-                phase_expected[5] = -1.1
-                # Handle the Nyquist frequency (kinda tricky). There isn't really a
-                # Nyquist frequency for the odd input length case.
-                if n == 10
-                    # amp_expected[6] = (3*cos(5*2*pi/T*t0 + 0.2))^2
-                    # phase_expected[6] = rem2pi(-5*2*pi/T*t0, RoundNearest)
-                    amp_expected[6] = (3*cos(5*2*pi/T*t0 + 0.2))^2
-                    phase_expected[6] = rem2pi(pi - 5*2*pi/T*t0, RoundNearest)
-                else
-                    amp_expected[6] = 0.5*3^2
-                    phase_expected[6] = 0.2
-                end
-                @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(nbs), phase_expected; atol=1e-12))
+    # @testset "t0 !== 0" begin
+    #     for T in [1.0, 2.0]
+    #         t0 = 0.13
+    #         f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+    #         for n in [10, 11]
+    #             dt = T/n
+    #             t = t0 .+ (0:n-1).*dt
+    #             p = f.(t)
+    #             ap = AcousticPressure(p, dt, t0)
+    #             nbs = NarrowbandSpectrum(ap)
+    #             freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
+    #             amp_expected = similar(amplitude(nbs))
+    #             amp_expected[1] = 6^2
+    #             amp_expected[2] = 0.5*8^2
+    #             amp_expected[3] = 0.5*2.5^2
+    #             amp_expected[4] = 0.5*9^2
+    #             amp_expected[5] = 0.5*0.5^2
+    #             phase_expected = similar(phase(nbs))
+    #             phase_expected[1] = 0
+    #             phase_expected[2] = 0.2
+    #             phase_expected[3] = -3
+    #             phase_expected[4] = 3.1
+    #             phase_expected[5] = -1.1
+    #             # Handle the Nyquist frequency (kinda tricky). There isn't really a
+    #             # Nyquist frequency for the odd input length case.
+    #             if n == 10
+    #                 # amp_expected[6] = (3*cos(5*2*pi/T*t0 + 0.2))^2
+    #                 # phase_expected[6] = rem2pi(-5*2*pi/T*t0, RoundNearest)
+    #                 amp_expected[6] = (3*cos(5*2*pi/T*t0 + 0.2))^2
+    #                 phase_expected[6] = rem2pi(pi - 5*2*pi/T*t0, RoundNearest)
+    #             else
+    #                 amp_expected[6] = 0.5*3^2
+    #                 phase_expected[6] = 0.2
+    #             end
+    #             @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
+    #             @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
+    #             @test all(isapprox.(phase(nbs), phase_expected; atol=1e-12))
 
-                # # Make sure I can convert a NBS to a pressure spectrum.
-                # ps = PressureSpectrum(nbs)
-                # amp_expected = similar(amplitude(ps))
-                # amp_expected[1] = 6
-                # amp_expected[2] = 8
-                # amp_expected[3] = 2.5
-                # amp_expected[4] = 9
-                # amp_expected[5] = 0.5
-                # # Handle the Nyquist frequency (kinda tricky). There isn't really a
-                # # Nyquist frequency for the odd input length case.
-                # if n == 10
-                #     # The `t0` term pushes the cosine below zero, which messes
-                #     # up the test. Hmm... what's the right thing to do here?
-                #     # Well, what should the phase and amplitude be?
-                #     # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
-                #     amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
-                # else
-                #     amp_expected[6] = 3
-                # end
-                # @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                # @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                # @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
+    #             # # Make sure I can convert a NBS to a pressure spectrum.
+    #             # ps = PressureSpectrum(nbs)
+    #             # amp_expected = similar(amplitude(ps))
+    #             # amp_expected[1] = 6
+    #             # amp_expected[2] = 8
+    #             # amp_expected[3] = 2.5
+    #             # amp_expected[4] = 9
+    #             # amp_expected[5] = 0.5
+    #             # # Handle the Nyquist frequency (kinda tricky). There isn't really a
+    #             # # Nyquist frequency for the odd input length case.
+    #             # if n == 10
+    #             #     # The `t0` term pushes the cosine below zero, which messes
+    #             #     # up the test. Hmm... what's the right thing to do here?
+    #             #     # Well, what should the phase and amplitude be?
+    #             #     # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
+    #             #     amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
+    #             # else
+    #             #     amp_expected[6] = 3
+    #             # end
+    #             # @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+    #             # @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+    #             # @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to the acoustic pressure.
-                ap_from_nbs = AcousticPressure(nbs)
-                @test timestep(ap_from_nbs) ≈ timestep(ap)
-                @test starttime(ap_from_nbs) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
-            end
-        end
-    end
+    #             # Make sure I can convert a NBS to the acoustic pressure.
+    #             ap_from_nbs = AcousticPressure(nbs)
+    #             @test timestep(ap_from_nbs) ≈ timestep(ap)
+    #             @test starttime(ap_from_nbs) ≈ starttime(ap)
+    #             @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
+    #         end
+    #     end
+    # end
 
-    @testset "ANOPP2 comparison" begin
-        a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "nbs.jld2"))
-        freq_a2 = a2_data["a2_nbs_freq"]
-        nbs_msp_a2 = a2_data["a2_nbs_amp"]
-        nbs_phase_a2 = a2_data["a2_nbs_phase"]
-        for T in [1, 2]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = apth_for_nbs.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                @test all(isapprox.(frequency(nbs), freq_a2[(T,n)], atol=1e-12))
-                @test all(isapprox.(amplitude(nbs), nbs_msp_a2[(T,n)], atol=1e-12))
-                # Checking the phase is tricky, since it involves the ratio of
-                # the imaginary component to the real component of the MSP
-                # spectrum (definition is phase = atan(imag(fft(p)),
-                # real(fft(p)))). For the components of the spectrum that have
-                # zero amplitude that ratio ends up being very noisy. So scale
-                # the phase by the amplitude to remove the problematic
-                # zero-amplitude components.
-                @test all(isapprox.(phase(nbs).*amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
-            end
-        end
-    end
+    # @testset "ANOPP2 comparison" begin
+    #     a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "nbs.jld2"))
+    #     freq_a2 = a2_data["a2_nbs_freq"]
+    #     nbs_msp_a2 = a2_data["a2_nbs_amp"]
+    #     nbs_phase_a2 = a2_data["a2_nbs_phase"]
+    #     for T in [1, 2]
+    #         for n in [19, 20]
+    #             dt = T/n
+    #             t = (0:n-1).*dt
+    #             p = apth_for_nbs.(t)
+    #             ap = AcousticPressure(p, dt)
+    #             nbs = NarrowbandSpectrum(ap)
+    #             @test all(isapprox.(frequency(nbs), freq_a2[(T,n)], atol=1e-12))
+    #             @test all(isapprox.(amplitude(nbs), nbs_msp_a2[(T,n)], atol=1e-12))
+    #             # Checking the phase is tricky, since it involves the ratio of
+    #             # the imaginary component to the real component of the MSP
+    #             # spectrum (definition is phase = atan(imag(fft(p)),
+    #             # real(fft(p)))). For the components of the spectrum that have
+    #             # zero amplitude that ratio ends up being very noisy. So scale
+    #             # the phase by the amplitude to remove the problematic
+    #             # zero-amplitude components.
+    #             @test all(isapprox.(phase(nbs).*amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
+    #         end
+    #     end
+    # end
 end
 
-@testset "OASPL" begin
-    @testset "Parseval's theorem" begin
-        fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)
-        fi(t) = 2*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t)
-        f(t) = fr(t) + fi(t)
-        for T in [1.0, 2.0]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                oaspl_time_domain = OASPL(ap)
-                oaspl_freq_domain = OASPL(nbs)
-                @test oaspl_freq_domain ≈ oaspl_time_domain
-            end
-        end
-    end
-    @testset "function with know mean squared pressure" begin
-        f(t) = 4*cos(2*2*pi*t)
-        # What's the mean-square of that function? I think the mean-square of
-        # 
-        #   f(t) = a*cos(2*pi*k*t) 
-        # 
-        # is a^2/2. So
-        for T in [1.0, 2.0]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                msp_expected = 4^2/2
-                oaspl_expected = 10*log10(msp_expected/p_ref^2)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                oaspl_time_domain = OASPL(ap)
-                oaspl_freq_domain = OASPL(nbs)
-                @test oaspl_time_domain ≈ oaspl_expected
-                @test oaspl_freq_domain ≈ oaspl_expected
-            end
-        end
-    end
-    @testset "ANOPP2 comparison" begin
-        fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)
-        fi(t) = 2*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t)
-        f(t) = fr(t) + fi(t)
-        oaspl_a2 = 114.77121254719663
-        for T in [1, 2]
-            for n in [19, 20]
-                dt = T/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt)
-                oaspl = OASPL(ap)
-                # oaspl_a2 = ANOPP2.a2_aa_oaspl(ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs)
-                @test isapprox(oaspl, oaspl_a2, atol=1e-12)
-            end
-        end
-    end
-end
+#@testset "OASPL" begin
+#    @testset "Parseval's theorem" begin
+#        fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)
+#        fi(t) = 2*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t)
+#        f(t) = fr(t) + fi(t)
+#        for T in [1.0, 2.0]
+#            for n in [19, 20]
+#                dt = T/n
+#                t = (0:n-1).*dt
+#                p = f.(t)
+#                ap = AcousticPressure(p, dt)
+#                nbs = NarrowbandSpectrum(ap)
+#                oaspl_time_domain = OASPL(ap)
+#                oaspl_freq_domain = OASPL(nbs)
+#                @test oaspl_freq_domain ≈ oaspl_time_domain
+#            end
+#        end
+#    end
+#    @testset "function with know mean squared pressure" begin
+#        f(t) = 4*cos(2*2*pi*t)
+#        # What's the mean-square of that function? I think the mean-square of
+#        # 
+#        #   f(t) = a*cos(2*pi*k*t) 
+#        # 
+#        # is a^2/2. So
+#        for T in [1.0, 2.0]
+#            for n in [19, 20]
+#                dt = T/n
+#                t = (0:n-1).*dt
+#                p = f.(t)
+#                msp_expected = 4^2/2
+#                oaspl_expected = 10*log10(msp_expected/p_ref^2)
+#                ap = AcousticPressure(p, dt)
+#                nbs = NarrowbandSpectrum(ap)
+#                oaspl_time_domain = OASPL(ap)
+#                oaspl_freq_domain = OASPL(nbs)
+#                @test oaspl_time_domain ≈ oaspl_expected
+#                @test oaspl_freq_domain ≈ oaspl_expected
+#            end
+#        end
+#    end
+#    @testset "ANOPP2 comparison" begin
+#        fr(t) = 2*cos(1*2*pi*t) + 4*cos(2*2*pi*t) + 6*cos(3*2*pi*t) + 8*cos(4*2*pi*t)
+#        fi(t) = 2*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t)
+#        f(t) = fr(t) + fi(t)
+#        oaspl_a2 = 114.77121254719663
+#        for T in [1, 2]
+#            for n in [19, 20]
+#                dt = T/n
+#                t = (0:n-1).*dt
+#                p = f.(t)
+#                ap = AcousticPressure(p, dt)
+#                oaspl = OASPL(ap)
+#                # oaspl_a2 = ANOPP2.a2_aa_oaspl(ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs)
+#                @test isapprox(oaspl, oaspl_a2, atol=1e-12)
+#            end
+#        end
+#    end
+#end
 
-@testset "A-weighting" begin
-    @testset "ANOPP2 comparison" begin
-        fr(t) = 2*cos(1e3*2*pi*t) + 4*cos(2e3*2*pi*t) + 6*cos(3e3*2*pi*t) + 8*cos(4e3*2*pi*t)
-        fi(t) = 2*sin(1e3*2*pi*t) + 4*sin(2e3*2*pi*t) + 6*sin(3e3*2*pi*t) + 8*sin(4e3*2*pi*t)
-        f(t) = fr(t) + fi(t)
-        nbs_A_a2 = Dict(
-          (1, 19)=>[0.0, 4.000002539852234, 21.098932320239594, 47.765983983028875, 79.89329612328712, 6.904751939255882e-29, 3.438658433244509e-29, 3.385314868430938e-29, 4.3828241499153937e-29, 3.334042101984942e-29],
-          (1, 20)=>[0.0, 4.000002539852235, 21.09893232023959, 47.76598398302881, 79.89329612328707, 2.4807405180395723e-29, 3.319538256490389e-29, 1.1860147288201262e-29, 1.5894684286161776e-29, 9.168407004474984e-30, 1.4222371367588704e-31],
-          (2, 19)=>[0.0, 4.137956256384954e-30, 4.00000253985224, 2.1118658029791977e-29, 21.098932320239633, 3.4572972532471526e-29, 47.765983983028924, 1.2630134771692395e-28, 79.89329612328716, 8.284388048614786e-29],
-          (2, 20)=>[0.0, 1.2697180778261437e-30, 4.000002539852251, 4.666290179209354e-29, 21.098932320239584, 3.4300386105764425e-29, 47.76598398302884, 6.100255343320017e-29, 79.89329612328727, 1.801023480958872e-28, 6.029776808298499e-29],
-        )
-        for T_ms in [1, 2]
-            for n in [19, 20]
-                dt = T_ms*1e-3/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                # nbs_A = W_A(nbs)
-                amp_A = W_A(nbs)
-                # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
-                # Wish I could get this to match more closely. But the weighting
-                # function looks pretty nasty numerically (frequencies raised to the
-                # 4th power, and one of the coefficients is about 2.24e16).
-                @show T_ms n amp_A nbs_A_a2[(T_ms, n)]
-                @test all(isapprox.(amp_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
-            end
-        end
-    end
+#@testset "A-weighting" begin
+#    @testset "ANOPP2 comparison" begin
+#        fr(t) = 2*cos(1e3*2*pi*t) + 4*cos(2e3*2*pi*t) + 6*cos(3e3*2*pi*t) + 8*cos(4e3*2*pi*t)
+#        fi(t) = 2*sin(1e3*2*pi*t) + 4*sin(2e3*2*pi*t) + 6*sin(3e3*2*pi*t) + 8*sin(4e3*2*pi*t)
+#        f(t) = fr(t) + fi(t)
+#        nbs_A_a2 = Dict(
+#          (1, 19)=>[0.0, 4.000002539852234, 21.098932320239594, 47.765983983028875, 79.89329612328712, 6.904751939255882e-29, 3.438658433244509e-29, 3.385314868430938e-29, 4.3828241499153937e-29, 3.334042101984942e-29],
+#          (1, 20)=>[0.0, 4.000002539852235, 21.09893232023959, 47.76598398302881, 79.89329612328707, 2.4807405180395723e-29, 3.319538256490389e-29, 1.1860147288201262e-29, 1.5894684286161776e-29, 9.168407004474984e-30, 1.4222371367588704e-31],
+#          (2, 19)=>[0.0, 4.137956256384954e-30, 4.00000253985224, 2.1118658029791977e-29, 21.098932320239633, 3.4572972532471526e-29, 47.765983983028924, 1.2630134771692395e-28, 79.89329612328716, 8.284388048614786e-29],
+#          (2, 20)=>[0.0, 1.2697180778261437e-30, 4.000002539852251, 4.666290179209354e-29, 21.098932320239584, 3.4300386105764425e-29, 47.76598398302884, 6.100255343320017e-29, 79.89329612328727, 1.801023480958872e-28, 6.029776808298499e-29],
+#        )
+#        for T_ms in [1, 2]
+#            for n in [19, 20]
+#                dt = T_ms*1e-3/n
+#                t = (0:n-1).*dt
+#                p = f.(t)
+#                ap = AcousticPressure(p, dt)
+#                nbs = NarrowbandSpectrum(ap)
+#                # nbs_A = W_A(nbs)
+#                amp_A = W_A(nbs)
+#                # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
+#                # Wish I could get this to match more closely. But the weighting
+#                # function looks pretty nasty numerically (frequencies raised to the
+#                # 4th power, and one of the coefficients is about 2.24e16).
+#                @show T_ms n amp_A nbs_A_a2[(T_ms, n)]
+#                @test all(isapprox.(amp_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
+#            end
+#        end
+#    end
 
-    @testset "1kHz check" begin
-        # A 1kHz signal should be unaffected by A-weighting.
-        fr(t) = 2*cos(1e3*2*pi*t)
-        fi(t) = 2*sin(1e3*2*pi*t)
-        f(t) = fr(t) + fi(t)
-        for T_ms in [1, 2]
-            for n in [19, 20]
-                dt = T_ms*1e-3/n
-                t = (0:n-1).*dt
-                p = f.(t)
-                ap = AcousticPressure(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                amp = amplitude(nbs)
-                # nbs_A = W_A(nbs)
-                amp_A = W_A(nbs)
-                # This is lame. Should be able to get this to match better,
-                # right?
-                @test all(isapprox.(amp_A, amp, atol=1e-5))
-            end
-        end
-    end
-end
+#    @testset "1kHz check" begin
+#        # A 1kHz signal should be unaffected by A-weighting.
+#        fr(t) = 2*cos(1e3*2*pi*t)
+#        fi(t) = 2*sin(1e3*2*pi*t)
+#        f(t) = fr(t) + fi(t)
+#        for T_ms in [1, 2]
+#            for n in [19, 20]
+#                dt = T_ms*1e-3/n
+#                t = (0:n-1).*dt
+#                p = f.(t)
+#                ap = AcousticPressure(p, dt)
+#                nbs = NarrowbandSpectrum(ap)
+#                amp = amplitude(nbs)
+#                # nbs_A = W_A(nbs)
+#                amp_A = W_A(nbs)
+#                # This is lame. Should be able to get this to match better,
+#                # right?
+#                @test all(isapprox.(amp_A, amp, atol=1e-5))
+#            end
+#        end
+#    end
+#end

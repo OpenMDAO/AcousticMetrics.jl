@@ -53,7 +53,39 @@ end
 @inline samplerate(ps::AbstractPressureSpectrum) = 1/timestep(ps)
 @inline frequency(ps::AbstractPressureSpectrum) = rfftfreq(inputlength(ps), samplerate(ps))
 
-struct PressureSpectrumAmplitude{IsEven,Thc,Tdt,Tt0} <: AbstractVector{Thc}
+function PressureSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+    # Copy over the pressure to the buffer.
+    hc .= p
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    # Divide by the input length since FFTW computes an "unnormalized" FFT.
+    n = inputlength(pth)
+    hc ./= n
+
+    return PressureSpectrum(hc, timestep(pth), starttime(pth))
+end
+
+abstract type PressureSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
+
+@inline halfcomplex(psa::PressureSpectrumMetric) = psa.hc
+@inline timestep(psa::PressureSpectrumMetric) = psa.dt
+@inline starttime(psa::PressureSpectrumMetric) = psa.t0
+@inline inputlength(psa::PressureSpectrumMetric) = length(halfcomplex(psa))
+@inline samplerate(psa::PressureSpectrumMetric) = 1/timestep(psa)
+@inline frequency(psa::PressureSpectrumMetric) = rfftfreq(inputlength(psa), samplerate(psa))
+
+@inline function Base.size(psm::PressureSpectrumMetric)
+    # So, what's the maximum and minimum index?
+    # Minimum is 1, aka 0 + 1.
+    # Max is n/2 (rounded down) + 1
+    n = inputlength(psm)
+    return (n>>1 + 1,)
+end
+
+struct PressureSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: PressureSpectrumMetric{IsEven,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
@@ -61,39 +93,93 @@ struct PressureSpectrumAmplitude{IsEven,Thc,Tdt,Tt0} <: AbstractVector{Thc}
     function PressureSpectrumAmplitude{IsEven}(hc, dt, t0) where {IsEven}
         n = length(hc)
         iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
 end
 
-@inline function Base.size(psa::PressureSpectrumAmplitude)
-    # So, what's the maximum and minimum index?
-    # Minimum is 1, aka 0 + 1.
-    # Max is n/2 (rounded down) + 1
-    n = inputlength(psa)
-    return (n>>2 + 1,)
+function PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return PressureSpectrumAmplitude{iseven(n)}(hc, dt, t0)
 end
-
 
 @inline function Base.getindex(psa::PressureSpectrumAmplitude{false}, i::Int)
     n = length(psa)
     @boundscheck 1 ≤ i ≤ n
+    m = inputlength(psa)
     if i == 1
         return abs(psa.hc[i])
     else
-        return 2*sqrt(psa.hc[i]^2 + psa.hc[n-i+1]^2)
+        hc_real = psa.hc[i]
+        hc_imag = psa.hc[m-i+2]
+        return 2*sqrt(hc_real^2 + hc_imag^2)
     end
 end
 
 @inline function Base.getindex(psa::PressureSpectrumAmplitude{true}, i::Int)
     n = length(psa)
     @boundscheck 1 ≤ i ≤ n
+    m = inputlength(psa)
     if i == 1 || i == n
         return abs(psa.hc[i])
     else
-        return 2*sqrt(psa.hc[i]^2 + psa.hc[n-i+1]^2)
+        hc_real = psa.hc[i]
+        hc_imag = psa.hc[m-i+2]
+        return 2*sqrt(hc_real^2 + hc_imag^2)
     end
 end
 
+@inline amplitude(ps::AbstractPressureSpectrum) = PressureSpectrumAmplitude(halfcomplex(ps), timestep(ps), starttime(ps))
+
+struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: PressureSpectrumMetric{IsEven,Tel}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function PressureSpectrumPhase{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+function PressureSpectrumPhase(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return PressureSpectrumPhase{iseven(n)}(hc, dt, t0)
+end
+
+@inline function Base.getindex(psp::PressureSpectrumPhase{false}, i::Int)
+    n = length(psp)
+    @boundscheck 1 ≤ i ≤ n
+    m = inputlength(psp)
+    if i == 1
+        hc_real = psp.hc[i]
+        hc_imag = zero(eltype(halfcomplex(psp)))
+        phase_t0 = atan(hc_imag, hc_real)
+    else
+        hc_real = psp.hc[i]
+        hc_imag = psp.hc[m-i+2]
+        phase_t0 = atan(hc_imag, hc_real)
+    end
+    return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
+end
+
+@inline function Base.getindex(psp::PressureSpectrumPhase{true}, i::Int)
+    n = length(psp)
+    @boundscheck 1 ≤ i ≤ n
+    m = inputlength(psp)
+    if i == 1 || i == n
+        hc_real = psp.hc[i]
+        hc_imag = zero(eltype(halfcomplex(psp)))
+        phase_t0 = atan(hc_imag, hc_real)
+    else
+        hc_real = psp.hc[i]
+        hc_imag = psp.hc[m-i+2]
+        phase_t0 = atan(hc_imag, hc_real)
+    end
+    return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
+end
+
+@inline phase(ps::AbstractPressureSpectrum) = PressureSpectrumPhase(halfcomplex(ps), timestep(ps), starttime(ps))
 
 #@inline inputlength(ps::AbstractPressureSpectrum) = length(halfcomplex(ps))
 #@inline timestep(ps::AbstractPressureSpectrum) = ps.dt
