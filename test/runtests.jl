@@ -1,9 +1,8 @@
 using AcousticMetrics: p_ref
-using AcousticMetrics: r2rfftfreq, rfft, rfft!, RFFTCache, dft_r2hc
+using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
 using AcousticMetrics: PressureTimeHistory, PressureSpectrum#, NarrowbandSpectrum
 using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, halfcomplex, phase#, OASPL
 using AcousticMetrics: W_A
-# using ANOPP2
 using ForwardDiff
 using JLD2
 using Random
@@ -52,6 +51,11 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
             rfft!(y_fft, x)
             y_dft = dft_r2hc(x)
             @test all(y_dft .≈ y_fft)
+
+            y_ifft = similar(x)
+            irfft!(y_ifft, x)
+            y_idft = dft_hc2r(x)
+            @test all(y_idft .≈ y_ifft)
         end
     end
 
@@ -64,6 +68,10 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
                 dy_dx_fft = ForwardDiff.jacobian(rfft!, y, x)
                 dy_dx_dft = ForwardDiff.jacobian(dft_r2hc, x)
                 @test all(isapprox.(dy_dx_fft, dy_dx_dft, atol=1e-13))
+
+                dy_dx_ifft = ForwardDiff.jacobian(irfft!, y, x)
+                dy_dx_idft = ForwardDiff.jacobian(dft_hc2r, x)
+                @test all(isapprox.(dy_dx_ifft, dy_dx_idft, atol=1e-13))
             end
         end
 
@@ -84,6 +92,23 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
             dy_dx_fft = ForwardDiff.jacobian(f1_fft, [1.1, 3.5])
             dy_dx_dft = ForwardDiff.jacobian(f1_dft, [1.1, 3.5])
             @test all(isapprox.(dy_dx_fft, dy_dx_dft, atol=1e-13))
+
+            function f1_ifft(t)
+                x = range(t[begin], t[end], length=8)
+                x = @. 2*x^2 + 3*x + 5
+                y = similar(x)
+                irfft!(y, x)
+                return y
+            end
+            function f1_idft(t)
+                x = range(t[begin], t[end], length=8)
+                x = @. 2*x^2 + 3*x + 5
+                y = dft_hc2r(x)
+                return y
+            end
+            dy_dx_ifft = ForwardDiff.jacobian(f1_ifft, [1.1, 3.5])
+            dy_dx_idft = ForwardDiff.jacobian(f1_idft, [1.1, 3.5])
+            @test all(isapprox.(dy_dx_ifft, dy_dx_idft, atol=1e-13))
         end
 
         @testset "with user-supplied cache" begin
@@ -111,6 +136,28 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
             dy_dx_fft = ForwardDiff.jacobian(f2_fft, t)
             dy_dx_dft = ForwardDiff.jacobian(f2_dft, t)
             @test all(isapprox.(dy_dx_fft, dy_dx_dft, atol=1e-13))
+
+            function f2_ifft(t)
+                xstart = sum(t)
+                xend = xstart + 2
+                x = range(xstart, xend, length=nx)
+                x = @. 2*x^2 + 3*x + 5
+                y = similar(x)
+                irfft!(y, x, cache)
+                return y
+            end
+            function f2_idft(t)
+                xstart = sum(t)
+                xend = xstart + 2
+                x = range(xstart, xend, length=nx)
+                x = @. 2*x^2 + 3*x + 5
+                y = dft_hc2r(x)
+                return y
+            end
+            t = rand(nt)
+            dy_dx_ifft = ForwardDiff.jacobian(f2_ifft, t)
+            dy_dx_idft = ForwardDiff.jacobian(f2_idft, t)
+            @test all(isapprox.(dy_dx_ifft, dy_dx_idft, atol=1e-13))
         end
     end
 end
@@ -189,7 +236,6 @@ end
                 dt = T/n
                 t = (0:n-1).*dt
                 p = f.(t)
-                # ap = AcousticPressure(p, dt)
                 ap = PressureTimeHistory(p, dt)
                 ps = PressureSpectrum(ap)
                 amp = amplitude(ps)
@@ -219,11 +265,11 @@ end
                 @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
                 @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
 
-                # # Make sure I can go from a PressureSpectrum to an AcousticPressure.
-                # ap_from_ps = AcousticPressure(ps)
-                # @test timestep(ap_from_ps) ≈ timestep(ap)
-                # @test starttime(ap_from_ps) ≈ starttime(ap)
-                # @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+                # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
+                ap_from_ps = PressureTimeHistory(ps)
+                @test timestep(ap_from_ps) ≈ timestep(ap)
+                @test starttime(ap_from_ps) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
             end
         end
         @testset "negative amplitudes" begin
@@ -233,7 +279,6 @@ end
                     dt = T/n
                     t = (0:n-1).*dt
                     p = f.(t)
-                    # ap = AcousticPressure(p, dt)
                     ap = PressureTimeHistory(p, dt)
                     ps = PressureSpectrum(ap)
                     freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -262,11 +307,11 @@ end
                     @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
                     @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
 
-                    # # Make sure I can go from a PressureSpectrum to an AcousticPressure.
-                    # ap_from_ps = AcousticPressure(ps)
-                    # @test timestep(ap_from_ps) ≈ timestep(ap)
-                    # @test starttime(ap_from_ps) ≈ starttime(ap)
-                    # @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+                    # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
+                    ap_from_ps = PressureTimeHistory(ps)
+                    @test timestep(ap_from_ps) ≈ timestep(ap)
+                    @test starttime(ap_from_ps) ≈ starttime(ap)
+                    @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
                 end
             end
         end
@@ -280,7 +325,6 @@ end
                 dt = T/n
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
-                # ap = AcousticPressure(p, dt, t0)
                 ap = PressureTimeHistory(p, dt, t0)
                 ps = PressureSpectrum(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -309,11 +353,11 @@ end
                 @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
                 @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
 
-                # # Make sure I can go from a PressureSpectrum to an AcousticPressure.
-                # ap_from_ps = AcousticPressure(ps)
-                # @test timestep(ap_from_ps) ≈ timestep(ap)
-                # @test starttime(ap_from_ps) ≈ starttime(ap)
-                # @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+                # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
+                ap_from_ps = PressureTimeHistory(ps)
+                @test timestep(ap_from_ps) ≈ timestep(ap)
+                @test starttime(ap_from_ps) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
             end
         end
     end

@@ -55,15 +55,9 @@ end
 
 function PressureSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
     p = pressure(pth)
-    # Copy over the pressure to the buffer.
-    hc .= p
 
     # Get the FFT of the acoustic pressure.
     rfft!(hc, p)
-
-    # Divide by the input length since FFTW computes an "unnormalized" FFT.
-    n = inputlength(pth)
-    hc ./= n
 
     return PressureSpectrum(hc, timestep(pth), starttime(pth))
 end
@@ -107,11 +101,11 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psa)
     if i == 1
-        return abs(psa.hc[i])
+        return abs(psa.hc[i])/m
     else
         hc_real = psa.hc[i]
         hc_imag = psa.hc[m-i+2]
-        return 2*sqrt(hc_real^2 + hc_imag^2)
+        return 2*sqrt(hc_real^2 + hc_imag^2)/m
     end
 end
 
@@ -120,11 +114,11 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psa)
     if i == 1 || i == n
-        return abs(psa.hc[i])
+        return abs(psa.hc[i])/m
     else
         hc_real = psa.hc[i]
         hc_imag = psa.hc[m-i+2]
-        return 2*sqrt(hc_real^2 + hc_imag^2)
+        return 2*sqrt(hc_real^2 + hc_imag^2)/m
     end
 end
 
@@ -180,6 +174,18 @@ end
 end
 
 @inline phase(ps::AbstractPressureSpectrum) = PressureSpectrumPhase(halfcomplex(ps), timestep(ps), starttime(ps))
+
+function PressureTimeHistory(ps::AbstractPressureSpectrum, p=similar(halfcomplex(ps)))
+    hc = halfcomplex(ps)
+
+    # Get the inverse FFT of the pressure spectrum.
+    irfft!(p, hc)
+
+    # Need to divide by the input length since FFTW computes an "unnormalized" FFT.
+    p ./= inputlength(ps)
+
+    return PressureTimeHistory(p, timestep(ps), starttime(ps))
+end
 
 #@inline inputlength(ps::AbstractPressureSpectrum) = length(halfcomplex(ps))
 #@inline timestep(ps::AbstractPressureSpectrum) = ps.dt

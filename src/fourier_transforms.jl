@@ -57,6 +57,64 @@ function dft_r2hc(x::AbstractVector)
     return y
 end
 
+"""
+    dft_hc2r(x::AbstractVector)
+
+Calculate the inverse discrete Fourier transform of a real-input DFT.
+
+This is the inverse of `dft_r2hc`, except for a factor of `N`, where `N` is the length of the input (and output), since FFTW computes an "unnormalized" FFT.
+
+See
+http://www.fftw.org/fftw3_doc/The-1d-Real_002ddata-DFT.html#The-1d-Real_002ddata-DFT
+and http://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html for
+details.
+
+Only use this for checking the derivatives of the FFT routines (should work fine, just slow).
+"""
+function dft_hc2r(x::AbstractVector)
+    n = length(x)
+    xo = OffsetArray(x, 0:n-1)
+
+    y = zero(x)
+    yo = OffsetArray(y, 0:n-1)
+
+    j = 0
+    for k in 0:n-1
+        yo[k] += xo[j]
+    end
+
+    # So, I need this loop to get r_1 to r_{n÷2} and i_{(n+1)÷2-1} to i_1.
+    # Let's say n is even.
+    # Maybe 8.
+    # So then n÷2 == 4 and (n+1)÷2-1 == 3.
+    # So x0 looks like this:
+    #
+    #   r_0, r_1, r_2, r_3, r_4, i_3, i_2, i_1
+    #
+    # If n is odd, say, 9, then n÷2 == 4 and (n+1)÷2-1 == 4, and x0 looks like this:
+    #
+    #   r_0, r_1, r_2, r_3, r_4, i_4, i_3, i_2, i_1
+    #
+    for j in 1:(n-1)÷2
+        rj = xo[j]
+        ij = xo[n-j]
+        for k in 0:n-1
+            yo[k] += 2*rj*cos(2*pi*j*k/n) - 2*ij*sin(2*pi*j*k/n)
+        end
+    end
+
+    if iseven(n)
+        # Handle the Nyquist frequency.
+        j = n÷2
+        rj = xo[j]
+        for k in 0:n-1
+            yo[k] += rj*cos(2*pi*j*k/n)
+        end
+    end
+
+    return y
+end
+
 @concrete struct RFFTCache
     val
     jac
@@ -124,6 +182,57 @@ end
 function rfft(x)
     y = similar(x)
     rfft!(y, x)
+    return y
+end
+
+"""
+    irfft!(y, x, cache=nothing)
+
+    Calculate the inverse FFT of `x` and store the result in in `y`, where `x` is in the half-complex format.
+
+    Just a wrapper of `FFTW.r2r!(y, FFTW.HC2R)`. The `cache` argument is
+    optional and not used, and is included to keep the function signiture the
+    same as the method that takes `Vector`s of `Dual`s.
+"""
+function irfft!(y, x, cache=nothing)
+    y .= x
+    r2r!(y, HC2R)
+    return nothing
+end
+
+function irfft!(dout::AbstractVector{ForwardDiff.Dual{T,V,N}}, d::AbstractVector{ForwardDiff.Dual{T,V,N}}, cache=RFFTCache(V,length(d),N)) where {T,V,N}
+    # N is the number of parameters we're taking the derivative wrt.
+    # M is the number of inputs to (and outputs of) the FFT.
+    M = length(d)
+    # I should check that dout and d are the same size.
+    ldout = length(dout)
+    M == ldout || throw(DimensionMismatch("dout and d should have the same length, but have $ldout and $M, resp."))
+
+    # But now I'd need to be able to pass that to the FFTW library. Will that
+    # work? No, because it's a dual number. Bummer. So I'll just have to have a
+    # working array, I guess.
+    cache.val .= ForwardDiff.value.(d)
+    r2r!(cache.val, HC2R)
+
+    # Now I want to do the Jacobian.
+    for i in 1:N
+        for j in 1:M
+            cache.jac[j, i] = ForwardDiff.partials(d[j], i)
+        end
+    end
+    r2r!(cache.jac, HC2R, 1)
+
+    # Now I should be able to set dout.
+    for j in 1:M
+        dout[j] = ForwardDiff.Dual{T}(cache.val[j], ForwardDiff.Partials(NTuple{N,V}(cache.jac[j,:])))
+    end
+
+    return nothing
+end
+
+function irfft(x)
+    y = similar(x)
+    irfft!(y, x)
     return y
 end
 
