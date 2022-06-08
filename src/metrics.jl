@@ -101,10 +101,10 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psa)
     if i == 1
-        return abs(psa.hc[i])/m
+        return @inbounds abs(psa.hc[i])/m
     else
-        hc_real = psa.hc[i]
-        hc_imag = psa.hc[m-i+2]
+        @inbounds hc_real = psa.hc[i]
+        @inbounds hc_imag = psa.hc[m-i+2]
         return 2*sqrt(hc_real^2 + hc_imag^2)/m
     end
 end
@@ -114,10 +114,10 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psa)
     if i == 1 || i == n
-        return abs(psa.hc[i])/m
+        return @inbounds abs(psa.hc[i])/m
     else
-        hc_real = psa.hc[i]
-        hc_imag = psa.hc[m-i+2]
+        @inbounds hc_real = psa.hc[i]
+        @inbounds hc_imag = psa.hc[m-i+2]
         return 2*sqrt(hc_real^2 + hc_imag^2)/m
     end
 end
@@ -146,12 +146,12 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psp)
     if i == 1
-        hc_real = psp.hc[i]
+        @inbounds hc_real = psp.hc[i]
         hc_imag = zero(eltype(halfcomplex(psp)))
         phase_t0 = atan(hc_imag, hc_real)
     else
-        hc_real = psp.hc[i]
-        hc_imag = psp.hc[m-i+2]
+        @inbounds hc_real = psp.hc[i]
+        @inbounds hc_imag = psp.hc[m-i+2]
         phase_t0 = atan(hc_imag, hc_real)
     end
     return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
@@ -162,12 +162,12 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psp)
     if i == 1 || i == n
-        hc_real = psp.hc[i]
+        @inbounds hc_real = psp.hc[i]
         hc_imag = zero(eltype(halfcomplex(psp)))
         phase_t0 = atan(hc_imag, hc_real)
     else
-        hc_real = psp.hc[i]
-        hc_imag = psp.hc[m-i+2]
+        @inbounds hc_real = psp.hc[i]
+        @inbounds hc_imag = psp.hc[m-i+2]
         phase_t0 = atan(hc_imag, hc_real)
     end
     return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
