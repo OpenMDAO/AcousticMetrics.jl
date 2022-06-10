@@ -27,7 +27,16 @@ end
     return starttime(ap) .+ (0:n-1) .* timestep(ap)
 end
 
-abstract type AbstractPressureSpectrum{IsEven} end
+abstract type AbstractSpectrum{IsEven} end
+
+@inline halfcomplex(s::AbstractSpectrum) = s.hc
+@inline timestep(s::AbstractSpectrum) = s.dt
+@inline starttime(s::AbstractSpectrum) = s.t0
+@inline inputlength(s::AbstractSpectrum) = length(halfcomplex(s))
+@inline samplerate(s::AbstractSpectrum) = 1/timestep(s)
+@inline frequency(s::AbstractSpectrum) = rfftfreq(inputlength(s), samplerate(s))
+
+abstract type AbstractPressureSpectrum{IsEven} <: AbstractSpectrum{IsEven} end
 
 struct PressureSpectrum{IsEven,Thc,Tdt,Tt0} <: AbstractPressureSpectrum{IsEven}
     hc::Thc
@@ -46,13 +55,6 @@ function PressureSpectrum(hc, dt, t0=zero(dt))
     return PressureSpectrum{iseven(n)}(hc, dt, t0)
 end
 
-@inline halfcomplex(ps::AbstractPressureSpectrum) = ps.hc
-@inline timestep(ps::AbstractPressureSpectrum) = ps.dt
-@inline starttime(ps::AbstractPressureSpectrum) = ps.t0
-@inline inputlength(ps::AbstractPressureSpectrum) = length(halfcomplex(ps))
-@inline samplerate(ps::AbstractPressureSpectrum) = 1/timestep(ps)
-@inline frequency(ps::AbstractPressureSpectrum) = rfftfreq(inputlength(ps), samplerate(ps))
-
 function PressureSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
     p = pressure(pth)
 
@@ -62,16 +64,16 @@ function PressureSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(
     return PressureSpectrum(hc, timestep(pth), starttime(pth))
 end
 
-abstract type PressureSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
+abstract type AbstractSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
 
-@inline halfcomplex(psa::PressureSpectrumMetric) = psa.hc
-@inline timestep(psa::PressureSpectrumMetric) = psa.dt
-@inline starttime(psa::PressureSpectrumMetric) = psa.t0
-@inline inputlength(psa::PressureSpectrumMetric) = length(halfcomplex(psa))
-@inline samplerate(psa::PressureSpectrumMetric) = 1/timestep(psa)
-@inline frequency(psa::PressureSpectrumMetric) = rfftfreq(inputlength(psa), samplerate(psa))
+@inline halfcomplex(sm::AbstractSpectrumMetric) = sm.hc
+@inline timestep(sm::AbstractSpectrumMetric) = sm.dt
+@inline starttime(sm::AbstractSpectrumMetric) = sm.t0
+@inline inputlength(sm::AbstractSpectrumMetric) = length(halfcomplex(sm))
+@inline samplerate(sm::AbstractSpectrumMetric) = 1/timestep(sm)
+@inline frequency(sm::AbstractSpectrumMetric) = rfftfreq(inputlength(sm), samplerate(sm))
 
-@inline function Base.size(psm::PressureSpectrumMetric)
+@inline function Base.size(psm::AbstractSpectrumMetric)
     # So, what's the maximum and minimum index?
     # Minimum is 1, aka 0 + 1.
     # Max is n/2 (rounded down) + 1
@@ -79,7 +81,7 @@ abstract type PressureSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
     return (n>>1 + 1,)
 end
 
-struct PressureSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: PressureSpectrumMetric{IsEven,Tel}
+struct PressureSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
@@ -101,11 +103,12 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psa)
     if i == 1
-        return @inbounds abs(psa.hc[i])/m
+        @inbounds hc_real = psa.hc[i]/m
+        return abs(hc_real)
     else
-        @inbounds hc_real = psa.hc[i]
-        @inbounds hc_imag = psa.hc[m-i+2]
-        return 2*sqrt(hc_real^2 + hc_imag^2)/m
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*sqrt(hc_real^2 + hc_imag^2)
     end
 end
 
@@ -114,17 +117,18 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psa)
     if i == 1 || i == n
-        return @inbounds abs(psa.hc[i])/m
+        @inbounds hc_real = psa.hc[i]/m
+        return abs(hc_real)
     else
-        @inbounds hc_real = psa.hc[i]
-        @inbounds hc_imag = psa.hc[m-i+2]
-        return 2*sqrt(hc_real^2 + hc_imag^2)/m
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*sqrt(hc_real^2 + hc_imag^2)
     end
 end
 
 @inline amplitude(ps::AbstractPressureSpectrum) = PressureSpectrumAmplitude(halfcomplex(ps), timestep(ps), starttime(ps))
 
-struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: PressureSpectrumMetric{IsEven,Tel}
+struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
@@ -146,12 +150,12 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psp)
     if i == 1
-        @inbounds hc_real = psp.hc[i]
+        @inbounds hc_real = psp.hc[i]/m
         hc_imag = zero(eltype(halfcomplex(psp)))
         phase_t0 = atan(hc_imag, hc_real)
     else
-        @inbounds hc_real = psp.hc[i]
-        @inbounds hc_imag = psp.hc[m-i+2]
+        @inbounds hc_real = psp.hc[i]/m
+        @inbounds hc_imag = psp.hc[m-i+2]/m
         phase_t0 = atan(hc_imag, hc_real)
     end
     return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
@@ -162,12 +166,12 @@ end
     @boundscheck 1 ≤ i ≤ n
     m = inputlength(psp)
     if i == 1 || i == n
-        @inbounds hc_real = psp.hc[i]
+        @inbounds hc_real = psp.hc[i]/m
         hc_imag = zero(eltype(halfcomplex(psp)))
         phase_t0 = atan(hc_imag, hc_real)
     else
-        @inbounds hc_real = psp.hc[i]
-        @inbounds hc_imag = psp.hc[m-i+2]
+        @inbounds hc_real = psp.hc[i]/m
+        @inbounds hc_imag = psp.hc[m-i+2]/m
         phase_t0 = atan(hc_imag, hc_real)
     end
     return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
@@ -186,6 +190,84 @@ function PressureTimeHistory(ps::AbstractPressureSpectrum, p=similar(halfcomplex
 
     return PressureTimeHistory(p, timestep(ps), starttime(ps))
 end
+
+abstract type AbstractNarrowbandSpectrum{IsEven} <: AbstractSpectrum{IsEven} end
+
+struct NarrowbandSpectrum{IsEven,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function NarrowbandSpectrum{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+function NarrowbandSpectrum(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return NarrowbandSpectrum{iseven(n)}(hc, dt, t0)
+end
+
+function NarrowbandSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return NarrowbandSpectrum(hc, timestep(pth), starttime(pth))
+end
+
+struct NarrowbandSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function NarrowbandSpectrumAmplitude{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+function NarrowbandSpectrumAmplitude(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return NarrowbandSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+@inline function Base.getindex(psa::NarrowbandSpectrumAmplitude{false}, i::Int)
+    n = length(psa)
+    @boundscheck 1 ≤ i ≤ n
+    m = inputlength(psa)
+    if i == 1
+        @inbounds hc_real = psa.hc[i]/m
+        return hc_real^2
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*(hc_real^2 + hc_imag^2)
+    end
+end
+
+@inline function Base.getindex(psa::NarrowbandSpectrumAmplitude{true}, i::Int)
+    n = length(psa)
+    @boundscheck 1 ≤ i ≤ n
+    m = inputlength(psa)
+    if i == 1 || i == n
+        @inbounds hc_real = psa.hc[i]/m
+        return hc_real^2
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*(hc_real^2 + hc_imag^2)
+    end
+end
+
+@inline amplitude(nbs::AbstractNarrowbandSpectrum) = NarrowbandSpectrumAmplitude(halfcomplex(nbs), timestep(nbs), starttime(nbs))
+@inline phase(nbs::AbstractNarrowbandSpectrum) = PressureSpectrumPhase(halfcomplex(nbs), timestep(nbs), starttime(nbs))
+@inline PressureSpectrum(nbs::AbstractNarrowbandSpectrum) = PressureSpectrum(halfcomplex(nbs), timestep(nbs), starttime(nbs))
+@inline PressureTimeHistory(nbs::AbstractNarrowbandSpectrum) = PressureTimeHistory(PressureSpectrum(nbs))
 
 #@inline inputlength(ps::AbstractPressureSpectrum) = length(halfcomplex(ps))
 #@inline timestep(ps::AbstractPressureSpectrum) = ps.dt
