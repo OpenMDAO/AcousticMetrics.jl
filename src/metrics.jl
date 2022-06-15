@@ -64,6 +64,8 @@ function PressureSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(
     return PressureSpectrum(hc, timestep(pth), starttime(pth))
 end
 
+PressureSpectrum(sp::AbstractSpectrum) = PressureSpectrum(halfcomplex(sp), timestep(sp), starttime(sp))
+
 abstract type AbstractSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
 
 @inline halfcomplex(sm::AbstractSpectrumMetric) = sm.hc
@@ -218,6 +220,8 @@ function NarrowbandSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressur
 
     return NarrowbandSpectrum(hc, timestep(pth), starttime(pth))
 end
+
+NarrowbandSpectrum(sp::AbstractSpectrum) = NarrowbandSpectrum(halfcomplex(sp), timestep(sp), starttime(sp))
 
 struct NarrowbandSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
     hc::Thc
@@ -767,16 +771,17 @@ end
 #    return AcousticPressure(ps)
 #end
 
-#function OASPL(ap::AbstractAcousticPressure)
-#    p = pressure(ap)
-#    n = length(p)
-#    p_mean = sum(p)/n
-#    msp = sum((p .- p_mean).^2)/n
-#    return 10*log10(msp/p_ref^2)
-#end
+function OASPL(ap::AbstractPressureTimeHistory)
+    p = pressure(ap)
+    n = inputlength(ap)
+    p_mean = sum(p)/n
+    msp = sum((p .- p_mean).^2)/n
+    return 10*log10(msp/p_ref^2)
+end
 
-#function OASPL(nbs::AbstractNarrowbandSpectrum)
-#    amp = amplitude(nbs)
-#    msp = sum(amp[begin+1:end])
-#    return 10*log10(msp/p_ref^2)
-#end
+function OASPL(sp::AbstractSpectrum)
+    # amp = amplitude(sp)
+    amp = amplitude(NarrowbandSpectrum(sp))
+    msp = sum(amp[begin+1:end])
+    return 10*log10(msp/p_ref^2)
+end
