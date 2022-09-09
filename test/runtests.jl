@@ -1,6 +1,6 @@
 using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
-using AcousticMetrics: PressureTimeHistory, PressureSpectrum, NarrowbandSpectrum
+using AcousticMetrics: PressureTimeHistory, PressureSpectrum, NarrowbandSpectrum, PowerSpectralDensity
 using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, halfcomplex, phase, OASPL
 using AcousticMetrics: W_A
 using ForwardDiff
@@ -519,6 +519,169 @@ end
                 # the phase by the amplitude to remove the problematic
                 # zero-amplitude components.
                 @test all(isapprox.(phase(nbs).*amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
+            end
+        end
+    end
+end
+
+@testset "Power Spectral Density" begin
+    @testset "t0 == 0" begin
+        for T in [1.0, 2.0]
+            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+            for n in [10, 11]
+                dt = T/n
+                df = 1/T
+                t = (0:n-1).*dt
+                p = f.(t)
+                ap = PressureTimeHistory(p, dt)
+                psd = PowerSpectralDensity(ap)
+                freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
+                amp_expected = similar(amplitude(psd))
+                amp_expected[1] = 6^2/df
+                amp_expected[2] = 0.5*8^2/df
+                amp_expected[3] = 0.5*2.5^2/df
+                amp_expected[4] = 0.5*9^2/df
+                amp_expected[5] = 0.5*0.5^2/df
+                phase_expected = similar(phase(psd))
+                phase_expected[1] = 0
+                phase_expected[2] = 0.2
+                phase_expected[3] = -3
+                phase_expected[4] = 3.1
+                phase_expected[5] = -1.1
+                # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                # Nyquist frequency for the odd input length case.
+                if n == 10
+                    amp_expected[6] = (3*cos(0.2))^2/df
+                    phase_expected[6] = 0
+                else
+                    amp_expected[6] = 0.5*3^2/df
+                    phase_expected[6] = 0.2
+                end
+                @test all(isapprox.(frequency(psd), freq_expected; atol=1e-12))
+                @test all(isapprox.(amplitude(psd), amp_expected; atol=1e-12))
+                @test all(isapprox.(phase(psd).*amplitude(psd), phase_expected.*amp_expected; atol=1e-12))
+
+                # Make sure I can convert a PSD to a pressure spectrum.
+                ps = PressureSpectrum(psd)
+                amp_expected = similar(amplitude(ps))
+                amp_expected[1] = 6
+                amp_expected[2] = 8
+                amp_expected[3] = 2.5
+                amp_expected[4] = 9
+                amp_expected[5] = 0.5
+                # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                # Nyquist frequency for the odd input length case.
+                if n == 10
+                    amp_expected[6] = 3*cos(0.2)
+                else
+                    amp_expected[6] = 3
+                end
+                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+                @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+
+                # Make sure I can convert a PSD to the acoustic pressure.
+                ap_from_psd = PressureTimeHistory(psd)
+                @test timestep(ap_from_psd) ≈ timestep(ap)
+                @test starttime(ap_from_psd) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_psd), pressure(ap)))
+            end
+        end
+    end
+
+    @testset "t0 !== 0" begin
+        for T in [1.0, 2.0]
+            t0 = 0.13
+            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+            for n in [10, 11]
+                dt = T/n
+                df = 1/T
+                t = t0 .+ (0:n-1).*dt
+                p = f.(t)
+                ap = PressureTimeHistory(p, dt, t0)
+                psd = PowerSpectralDensity(ap)
+                freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
+                amp_expected = similar(amplitude(psd))
+                amp_expected[1] = 6^2/df
+                amp_expected[2] = 0.5*8^2/df
+                amp_expected[3] = 0.5*2.5^2/df
+                amp_expected[4] = 0.5*9^2/df
+                amp_expected[5] = 0.5*0.5^2/df
+                phase_expected = similar(phase(psd))
+                phase_expected[1] = 0
+                phase_expected[2] = 0.2
+                phase_expected[3] = -3
+                phase_expected[4] = 3.1
+                phase_expected[5] = -1.1
+                # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                # Nyquist frequency for the odd input length case.
+                if n == 10
+                    # amp_expected[6] = (3*cos(5*2*pi/T*t0 + 0.2))^2
+                    # phase_expected[6] = rem2pi(-5*2*pi/T*t0, RoundNearest)
+                    amp_expected[6] = (3*cos(5*2*pi/T*t0 + 0.2))^2/df
+                    phase_expected[6] = rem2pi(pi - 5*2*pi/T*t0, RoundNearest)
+                else
+                    amp_expected[6] = 0.5*3^2/df
+                    phase_expected[6] = 0.2
+                end
+                @test all(isapprox.(frequency(psd), freq_expected; atol=1e-12))
+                @test all(isapprox.(amplitude(psd), amp_expected; atol=1e-12))
+                @test all(isapprox.(phase(psd), phase_expected; atol=1e-12))
+
+                # Make sure I can convert a PSD to a pressure spectrum.
+                ps = PressureSpectrum(psd)
+                amp_expected = similar(amplitude(ps))
+                amp_expected[1] = 6
+                amp_expected[2] = 8
+                amp_expected[3] = 2.5
+                amp_expected[4] = 9
+                amp_expected[5] = 0.5
+                # Handle the Nyquist frequency (kinda tricky). There isn't really a
+                # Nyquist frequency for the odd input length case.
+                if n == 10
+                    # The `t0` term pushes the cosine below zero, which messes
+                    # up the test. Hmm... what's the right thing to do here?
+                    # Well, what should the phase and amplitude be?
+                    # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
+                    amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
+                else
+                    amp_expected[6] = 3
+                end
+                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
+                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
+                @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
+
+                # Make sure I can convert a PSD to the acoustic pressure.
+                ap_from_psd = PressureTimeHistory(psd)
+                @test timestep(ap_from_psd) ≈ timestep(ap)
+                @test starttime(ap_from_psd) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_psd), pressure(ap)))
+            end
+        end
+    end
+
+    @testset "ANOPP2 comparison" begin
+        a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "psd.jld2"))
+        freq_a2 = a2_data["a2_psd_freq"]
+        psd_msp_a2 = a2_data["a2_psd_amp"]
+        psd_phase_a2 = a2_data["a2_psd_phase"]
+        for T in [1, 2]
+            for n in [19, 20]
+                dt = T/n
+                t = (0:n-1).*dt
+                p = apth_for_nbs.(t)
+                ap = PressureTimeHistory(p, dt)
+                psd = PowerSpectralDensity(ap)
+                @test all(isapprox.(frequency(psd), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(amplitude(psd), psd_msp_a2[(T,n)], atol=1e-12))
+                # Checking the phase is tricky, since it involves the ratio of
+                # the imaginary component to the real component of the MSP
+                # spectrum (definition is phase = atan(imag(fft(p)),
+                # real(fft(p)))). For the components of the spectrum that have
+                # zero amplitude that ratio ends up being very noisy. So scale
+                # the phase by the amplitude to remove the problematic
+                # zero-amplitude components.
+                @test all(isapprox.(phase(psd).*amplitude(psd), psd_phase_a2[T, n].*psd_msp_a2[T, n], atol=1e-12))
             end
         end
     end
