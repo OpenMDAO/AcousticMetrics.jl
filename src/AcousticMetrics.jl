@@ -10,6 +10,8 @@ include("fourier_transforms.jl")
 include("metrics.jl")
 export AbstractPressureTimeHistory, PressureTimeHistory
 
+include("proportional_bands.jl")
+
 include("weighting.jl")
 
 end # module

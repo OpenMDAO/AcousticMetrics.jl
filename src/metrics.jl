@@ -101,8 +101,7 @@ function PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
 end
 
 @inline function Base.getindex(psa::PressureSpectrumAmplitude{false}, i::Int)
-    n = length(psa)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
     if i == 1
         @inbounds hc_real = psa.hc[i]/m
@@ -115,10 +114,9 @@ end
 end
 
 @inline function Base.getindex(psa::PressureSpectrumAmplitude{true}, i::Int)
-    n = length(psa)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
-    if i == 1 || i == n
+    if i == 1 || i == length(psa)
         @inbounds hc_real = psa.hc[i]/m
         return abs(hc_real)
     else
@@ -148,8 +146,7 @@ function PressureSpectrumPhase(hc, dt, t0=zero(dt))
 end
 
 @inline function Base.getindex(psp::PressureSpectrumPhase{false}, i::Int)
-    n = length(psp)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psp, i)
     m = inputlength(psp)
     if i == 1
         @inbounds hc_real = psp.hc[i]/m
@@ -164,10 +161,9 @@ end
 end
 
 @inline function Base.getindex(psp::PressureSpectrumPhase{true}, i::Int)
-    n = length(psp)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psp, i)
     m = inputlength(psp)
-    if i == 1 || i == n
+    if i == 1 || i == length(psp)
         @inbounds hc_real = psp.hc[i]/m
         hc_imag = zero(eltype(halfcomplex(psp)))
         phase_t0 = atan(hc_imag, hc_real)
@@ -241,8 +237,7 @@ function NarrowbandSpectrumAmplitude(hc, dt, t0=zero(dt))
 end
 
 @inline function Base.getindex(psa::NarrowbandSpectrumAmplitude{false}, i::Int)
-    n = length(psa)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
     if i == 1
         @inbounds hc_real = psa.hc[i]/m
@@ -255,10 +250,9 @@ end
 end
 
 @inline function Base.getindex(psa::NarrowbandSpectrumAmplitude{true}, i::Int)
-    n = length(psa)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
-    if i == 1 || i == n
+    if i == 1 || i == length(psa)
         @inbounds hc_real = psa.hc[i]/m
         return hc_real^2
     else
@@ -321,8 +315,7 @@ function PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
 end
 
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{false}, i::Int)
-    n = length(psa)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
     df = 1/(timestep(psa)*m)
     if i == 1
@@ -336,11 +329,10 @@ end
 end
 
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{true}, i::Int)
-    n = length(psa)
-    @boundscheck 1 ≤ i ≤ n
+    @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
     df = 1/(timestep(psa)*m)
-    if i == 1 || i == n
+    if i == 1 || i == length(psa)
         @inbounds hc_real = psa.hc[i]/m
         return hc_real^2/df
     else

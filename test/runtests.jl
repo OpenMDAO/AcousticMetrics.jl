@@ -2,6 +2,8 @@ using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
 using AcousticMetrics: PressureTimeHistory, PressureSpectrum, NarrowbandSpectrum, PowerSpectralDensity
 using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, halfcomplex, phase, OASPL
+using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
+using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -684,6 +686,83 @@ end
                 @test all(isapprox.(phase(psd).*amplitude(psd), psd_phase_a2[T, n].*psd_msp_a2[T, n], atol=1e-12))
             end
         end
+    end
+end
+
+@testset "Proportional Band Spectrum" begin
+    @testset "octave" begin
+        bands = ExactOctaveCenterBands(6, 16)
+        bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
+        @test all(isapprox.(bands, bands_expected))
+
+        @test_throws BoundsError bands[0]
+        @test_throws BoundsError bands[12]
+
+        bands_9_to_11 = ExactOctaveCenterBands(9, 11)
+        @test all(isapprox.(bands_9_to_11, bands_expected[4:6]))
+
+        @test_throws BoundsError bands_9_to_11[0]
+        @test_throws BoundsError bands_9_to_11[4]
+
+        @test_throws ArgumentError ExactOctaveCenterBands(5, 4)
+
+        lbands = ExactOctaveLowerBands(6, 16)
+        @test all((log2.(bands) .- log2.(lbands)) .≈ 1/2)
+
+        ubands = ExactOctaveUpperBands(6, 16)
+        @test all((log2.(ubands) .- log2.(bands)) .≈ 1/2)
+
+        @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
+
+        cbands = ExactOctaveCenterBands(700.0, 22000.0)
+        @test cbands.bstart == 9
+        @test cbands.bend == 14
+
+        lbands = ExactOctaveLowerBands(700.0, 22000.0)
+        @test lbands.cbands.bstart == 9
+        @test lbands.cbands.bend == 14
+
+        ubands = ExactOctaveUpperBands(700.0, 22000.0)
+        @test ubands.cbands.bstart == 9
+        @test ubands.cbands.bend == 14
+    end
+
+    @testset "1/3-octave" begin
+        bands = ExactThirdOctaveCenterBands(17, 40)
+        # These are just from the ANOPP2 manual.
+        bands_expected_all = [49.61, 62.50, 78.75, 99.21, 125.00, 157.49, 198.43, 250.00, 314.98, 396.85, 500.00, 629.96, 793.70, 1000.0, 1259.92, 1587.40, 2000.00, 2519.84, 3174.80, 4000.00, 5039.68, 6349.60, 8000.00, 10079.37]
+        @test all(isapprox.(bands, bands_expected_all; atol=0.005))
+
+        @test_throws BoundsError bands[0]
+        @test_throws BoundsError bands[25]
+
+        bands_30_to_38 = ExactThirdOctaveCenterBands(30, 38)
+        @test all(isapprox.(bands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
+
+        @test_throws BoundsError bands_30_to_38[0]
+        @test_throws BoundsError bands_30_to_38[10]
+
+        @test_throws ArgumentError ExactThirdOctaveCenterBands(5, 4)
+
+        lbands = ExactThirdOctaveLowerBands(17, 40)
+        @test all((log2.(bands) .- log2.(lbands)) .≈ 1/(2*3))
+
+        ubands = ExactThirdOctaveUpperBands(17, 40)
+        @test all((log2.(ubands) .- log2.(bands)) .≈ 1/(2*3))
+
+        @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
+
+        cbands = ExactThirdOctaveCenterBands(332.0, 7150.0)
+        @test cbands.bstart == 25
+        @test cbands.bend == 39
+
+        lbands = ExactThirdOctaveLowerBands(332.0, 7150.0)
+        @test lbands.cbands.bstart == 25
+        @test lbands.cbands.bend == 39
+
+        ubands = ExactThirdOctaveUpperBands(332.0, 7150.0)
+        @test ubands.cbands.bstart == 25
+        @test ubands.cbands.bend == 39
     end
 end
 
