@@ -4,6 +4,8 @@ using AcousticMetrics: PressureTimeHistory, PressureSpectrum, NarrowbandSpectrum
 using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, halfcomplex, phase, OASPL
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
+using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
+using AcousticMetrics: ExactProportionalBandSpectrumNB
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -725,6 +727,32 @@ end
         ubands = ExactOctaveUpperBands(700.0, 22000.0)
         @test ubands.cbands.bstart == 9
         @test ubands.cbands.bend == 14
+
+        @testset "combined band struct" begin
+            bands = ExactProportionalBands{1}(6, 16)
+            lbands = lower_bands(bands)
+            cbands = center_bands(bands)
+            ubands = upper_bands(bands)
+
+            @test all(isapprox.(cbands, bands_expected))
+
+            cbands_9_to_11 = center_bands(ExactProportionalBands{1}(9, 11))
+            @test all(isapprox.(cbands_9_to_11, bands_expected[4:6]))
+
+            @test_throws BoundsError cbands_9_to_11[0]
+            @test_throws BoundsError cbands_9_to_11[4]
+
+            @test_throws ArgumentError ExactProportionalBands{1}(5, 4)
+
+            @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/2)
+            @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/2)
+            @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
+
+            bands = ExactProportionalBands{1}(700.0, 22000.0)
+            @test bands.bstart == 9
+            @test bands.bend == 14
+        end
+
     end
 
     @testset "1/3-octave" begin
@@ -763,6 +791,50 @@ end
         ubands = ExactThirdOctaveUpperBands(332.0, 7150.0)
         @test ubands.cbands.bstart == 25
         @test ubands.cbands.bend == 39
+
+        @testset "combined band struct" begin
+            bands = ExactProportionalBands{3}(17, 40)
+            lbands = lower_bands(bands)
+            cbands = center_bands(bands)
+            ubands = upper_bands(bands)
+
+            @test all(isapprox.(cbands, bands_expected_all; atol=0.005))
+
+            cbands_30_to_38 = center_bands(ExactProportionalBands{3}(30, 38))
+            @test all(isapprox.(cbands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
+
+            @test_throws BoundsError cbands_30_to_38[0]
+            @test_throws BoundsError cbands_30_to_38[10]
+
+            @test_throws ArgumentError ExactProportionalBands{3}(5, 4)
+
+            @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/(2*3))
+            @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/(2*3))
+            @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
+
+            bands = ExactProportionalBands{3}(332.0, 7150.0)
+            @test bands.bstart == 25
+            @test bands.bend == 39
+        end
+
+        @testset "Proportional band spectrum" begin
+            bands = ExactProportionalBands{3}(17, 40)
+            # @show lower_bands(bands) center_bands(bands) upper_bands(bands)
+            T = 1/1000.0
+            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+
+            n = 10
+            dt = T/n
+            df = 1/T
+            t = (0:n-1).*dt
+            p = f.(t)
+            ap = PressureTimeHistory(p, dt)
+            psd = PowerSpectralDensity(ap)
+            pbs = ExactProportionalBandSpectrumNB{3}(psd)
+            # So, this should have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz, 4000 Hz, 5000 Hz.
+            @show frequency(psd) amplitude(NarrowbandSpectrum(psd))
+            @show center_bands(pbs.bands) pbs
+        end
     end
 end
 
