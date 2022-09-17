@@ -817,17 +817,15 @@ end
             @test bands.bend == 39
         end
 
-        @testset "spectrum" begin
-            # bands = ExactProportionalBands{3}(17, 40)
-            # @show lower_bands(bands) center_bands(bands) upper_bands(bands)
+        @testset "not-so-narrow narrowband spectrum" begin
             T = 1/1000.0
-            # f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
-            f(t) = 0 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+            t0 = 0.13
+            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
 
             n = 10
             dt = T/n
             df = 1/T
-            t = (0:n-1).*dt
+            t = t0 .+ (0:n-1).*dt
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensity(ap)
@@ -860,8 +858,8 @@ end
             # 9: 2828.42712474619, 3563.594872561358
             # 10: 3563.594872561357, 4489.8481932374925
             # 11: 4489.8481932374925, 5656.85424949238
-            lbands = lower_bands(pbs.bands)
-            ubands = upper_bands(pbs.bands)
+            lbands = lower_bands(pbs)
+            ubands = upper_bands(pbs)
             @test pbs[1] ≈ 0.5*8^2/df*(ubands[1] - 500)
             @test pbs[2] ≈ 0.5*8^2/df*(ubands[2] - lbands[2])
             @test pbs[3] ≈ 0.5*8^2/df*(ubands[3] - lbands[3])
@@ -874,6 +872,45 @@ end
             @test pbs[10] ≈ 0.5*0.5^2/df*(ubands[10] - lbands[10])
             # Last one is wierd because of the Nyquist frequency.
             @test pbs[11] ≈ 0.5*0.5^2/df*(4500 - lbands[11]) + (3*cos(0.2))^2/df*(5500 - 4500)
+        end
+
+        @testset "narrowband spectrum" begin
+            freq0 = 1000.0
+            T = 20/freq0
+            t0 = 0.13
+            f(t) = 6 + 8*cos(1*2*pi*freq0*t + 0.2) + 2.5*cos(2*2*pi*freq0*t - 3.0) + 9*cos(3*2*pi*freq0*t + 3.1)
+
+            n = 128
+            dt = T/n
+            df = 1/T
+            t = t0 .+ (0:n-1).*dt
+            p = f.(t)
+            ap = PressureTimeHistory(p, dt)
+            psd = PowerSpectralDensity(ap)
+            pbs = ExactProportionalBandSpectrumNB{3}(psd)
+            lbands = lower_bands(pbs)
+            ubands = upper_bands(pbs)
+            psd_freq = frequency(psd)
+            psd_amp = amplitude(psd)
+            # for i in eachindex(psd_amp)
+            #     println("$i: freq = $(psd_freq[i]) psd_amp = $(psd_amp[i])")
+            # end
+            # for (i, (l, u)) in enumerate(zip(lbands, ubands))
+            #     println("$i: $l $u")
+            # end
+            @test psd_freq[21] ≈ freq0
+            @test pbs[17] ≈ psd_amp[21]*df
+            @test psd_freq[41] ≈ 2*freq0
+            @test pbs[20] ≈ psd_amp[41]*df
+            @test psd_freq[61] ≈ 3*freq0
+            @test pbs[22] ≈ psd_amp[61]*df
+            # Make sure all the other PBS entries are zero.
+            for (i, amp) in enumerate(pbs)
+                if i ∉ [17, 20, 22]
+                    @test isapprox(amp, 0.0; atol=1e-12)
+                end
+            end
+
         end
     end
 end

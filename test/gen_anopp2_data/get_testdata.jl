@@ -61,6 +61,13 @@ function gen_psd()
                 "a2_psd_phase"=>a2_psd_phase)
 end
 
+function gen_pbs()
+    # Need a PSD to pass to the routine.
+    # Hmm... sad.
+
+    return
+end
+
 function main()
     nbs_data = gen_nbs()
     save(joinpath(@__DIR__, "nbs-new.jld2"), nbs_data)

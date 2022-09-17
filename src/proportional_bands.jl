@@ -132,7 +132,7 @@ end
 function ExactProportionalBandSpectrumNB{NO}(psd::AbstractPowerSpectralDensity) where {NO}
     f = frequency(psd)
     # First frequency is always zero, and the frequencies are always evenly spaced, so the second frequency is the same as the spacing.
-    Δf = f[2]
+    Δf = f[begin+1]
     # We're thinking of each non-zero freqeuncy as being a bin with center
     # frequency `f` and width `Δf`. So to get the lowest non-zero frequency
     # we'll subtract 0.5*Δf from the lowest non-zero frequency center:
@@ -160,11 +160,11 @@ end
     # Now I need to find the starting and ending indices that are included in
     # this frequency band.
 
-    # Need the narrowband frequencies.
-    f_nb = frequency(pbs.psd)
+    # Need the narrowband frequencies, but skip the zero frequency.
+    f_nb = @view frequency(pbs.psd)[begin+1:end]
 
     # This is the narrowband frequency spacing.
-    Δf = f_nb[2]
+    Δf = f_nb[begin]
 
     # So, what is the first index we want?
     # It's the one that has f_nb[i] + 0.5*Δf >= fl.
@@ -188,9 +188,11 @@ end
     end
 
     # Need the psd amplitude relavent for this band.
-    # Not sure if I can do that.
+    # First, get all of the psd amplitudes.
     psd_amp = amplitude(pbs.psd)
-    psd_amp_v = @view psd_amp[istart:iend]
+    # Now get the amplitudes we actually want.
+    # Need the `istart+1` and `iend+1` to adjust for dropping the zero-frequency component.
+    psd_amp_v = @view psd_amp[istart+1:iend+1]
     f_nb_v = @view f_nb[istart:iend]
 
     # Get the contribution of the first band, which might not be a full band.
@@ -214,3 +216,7 @@ end
     # Get all the others and return them.
     return res_first_band + sum(psd_amp_v[2:end-1]*Δf) + res_last_band
 end
+
+lower_bands(pbs::ExactProportionalBandSpectrumNB) = lower_bands(pbs.bands)
+center_bands(pbs::ExactProportionalBandSpectrumNB) = center_bands(pbs.bands)
+upper_bands(pbs::ExactProportionalBandSpectrumNB) = upper_bands(pbs.bands)
