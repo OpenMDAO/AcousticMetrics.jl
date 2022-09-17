@@ -817,11 +817,12 @@ end
             @test bands.bend == 39
         end
 
-        @testset "Proportional band spectrum" begin
-            bands = ExactProportionalBands{3}(17, 40)
+        @testset "spectrum" begin
+            # bands = ExactProportionalBands{3}(17, 40)
             # @show lower_bands(bands) center_bands(bands) upper_bands(bands)
             T = 1/1000.0
-            f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+            # f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
+            f(t) = 0 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
 
             n = 10
             dt = T/n
@@ -832,8 +833,47 @@ end
             psd = PowerSpectralDensity(ap)
             pbs = ExactProportionalBandSpectrumNB{3}(psd)
             # So, this should have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz, 4000 Hz, 5000 Hz.
-            @show frequency(psd) amplitude(NarrowbandSpectrum(psd))
-            @show center_bands(pbs.bands) pbs
+            # And that means that, say, the 1000 Hz signal will exend from 500
+            # Hz to 1500 Hz.
+            # So then it will show up in a bunch of bands:
+            #
+            #   * 445 to 561
+            #   * 561 to 707
+            #   * 707 to 890
+            #   * 890 to 1122
+            #   * 1122 to 1414
+            #   * 1414 to 1781
+            # 
+            # And that means the signal at 2000 will also show up at that last frequency.
+            # So did I code this up properly?
+            # I think so.
+            # Here are all the bands that should be active:
+            #
+            # 1: 445.44935907016963, 561.2310241546866
+            # 2: 561.2310241546866, 707.1067811865476
+            # 3: 707.1067811865476, 890.8987181403395
+            # 4: 890.8987181403393, 1122.4620483093731
+            # 5: 1122.4620483093731, 1414.213562373095
+            # 6: 1414.2135623730949, 1781.7974362806785
+            # 7: 1781.7974362806785, 2244.9240966187463
+            # 8: 2244.9240966187463, 2828.42712474619
+            # 9: 2828.42712474619, 3563.594872561358
+            # 10: 3563.594872561357, 4489.8481932374925
+            # 11: 4489.8481932374925, 5656.85424949238
+            lbands = lower_bands(pbs.bands)
+            ubands = upper_bands(pbs.bands)
+            @test pbs[1] ≈ 0.5*8^2/df*(ubands[1] - 500)
+            @test pbs[2] ≈ 0.5*8^2/df*(ubands[2] - lbands[2])
+            @test pbs[3] ≈ 0.5*8^2/df*(ubands[3] - lbands[3])
+            @test pbs[4] ≈ 0.5*8^2/df*(ubands[4] - lbands[4])
+            @test pbs[5] ≈ 0.5*8^2/df*(ubands[5] - lbands[5])
+            @test pbs[6] ≈ 0.5*8^2/df*(1500 - lbands[6]) + 0.5*2.5^2/df*(ubands[6] - 1500)
+            @test pbs[7] ≈ 0.5*2.5^2/df*(ubands[7] - lbands[7])
+            @test pbs[8] ≈ 0.5*2.5^2/df*(2500 - lbands[8]) + 0.5*9^2/df*(ubands[8] - 2500)
+            @test pbs[9] ≈ 0.5*9^2/df*(3500 - lbands[9]) + 0.5*0.5^2/df*(ubands[9] - 3500)
+            @test pbs[10] ≈ 0.5*0.5^2/df*(ubands[10] - lbands[10])
+            # Last one is wierd because of the Nyquist frequency.
+            @test pbs[11] ≈ 0.5*0.5^2/df*(4500 - lbands[11]) + (3*cos(0.2))^2/df*(5500 - 4500)
         end
     end
 end

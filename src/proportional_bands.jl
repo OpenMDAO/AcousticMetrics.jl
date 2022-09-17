@@ -192,14 +192,24 @@ end
     psd_amp = amplitude(pbs.psd)
     psd_amp_v = @view psd_amp[istart:iend]
     f_nb_v = @view f_nb[istart:iend]
-    
+
     # Get the contribution of the first band, which might not be a full band.
     # So the band will start at fl, the lower edge of the proportional band, and
     # end at the narrowband center frequency + 0.5*Δf.
-    res_first_band = psd_amp_v[1]*(min((f_nb_v[1] + 0.5*Δf) - fl, Δf))
+    # This isn't right if the "narrowband" is actually wider than the
+    # proportional bands. If that's the case, then we need to clip it to the proportional band width.
+    band_lhs = max(f_nb_v[1] - 0.5*Δf, fl)
+    band_rhs = min(f_nb_v[1] + 0.5*Δf, fu)
+    res_first_band = psd_amp_v[1]*(band_rhs - band_lhs)
 
     # Get the contribution of the last band, which might not be a full band.
-    res_last_band = psd_amp_v[end]*(min(fu - (f_nb_v[end] - 0.5*Δf), Δf))
+    if length(psd_amp_v) > 1
+        band_lhs = max(f_nb_v[end] - 0.5*Δf, fl)
+        band_rhs = min(f_nb_v[end] + 0.5*Δf, fu)
+        res_last_band = psd_amp_v[end]*(band_rhs - band_lhs)
+    else
+        res_last_band = zero(eltype(pbs))
+    end
 
     # Get all the others and return them.
     return res_first_band + sum(psd_amp_v[2:end-1]*Δf) + res_last_band
