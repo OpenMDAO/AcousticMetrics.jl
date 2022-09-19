@@ -694,6 +694,7 @@ end
 @testset "Proportional Band Spectrum" begin
     @testset "octave" begin
         bands = ExactOctaveCenterBands(6, 16)
+        @show bands
         bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
         @test all(isapprox.(bands, bands_expected))
 
@@ -721,37 +722,37 @@ end
         @test cbands.bend == 14
 
         lbands = ExactOctaveLowerBands(700.0, 22000.0)
-        @test lbands.cbands.bstart == 9
-        @test lbands.cbands.bend == 14
+        @test lbands.bstart == 9
+        @test lbands.bend == 14
 
         ubands = ExactOctaveUpperBands(700.0, 22000.0)
-        @test ubands.cbands.bstart == 9
-        @test ubands.cbands.bend == 14
+        @test ubands.bstart == 9
+        @test ubands.bend == 14
 
-        @testset "combined band struct" begin
-            bands = ExactProportionalBands{1}(6, 16)
-            lbands = lower_bands(bands)
-            cbands = center_bands(bands)
-            ubands = upper_bands(bands)
+        # @testset "combined band struct" begin
+        #     bands = ExactProportionalBands{1}(6, 16)
+        #     lbands = lower_bands(bands)
+        #     cbands = center_bands(bands)
+        #     ubands = upper_bands(bands)
 
-            @test all(isapprox.(cbands, bands_expected))
+        #     @test all(isapprox.(cbands, bands_expected))
 
-            cbands_9_to_11 = center_bands(ExactProportionalBands{1}(9, 11))
-            @test all(isapprox.(cbands_9_to_11, bands_expected[4:6]))
+        #     cbands_9_to_11 = center_bands(ExactProportionalBands{1}(9, 11))
+        #     @test all(isapprox.(cbands_9_to_11, bands_expected[4:6]))
 
-            @test_throws BoundsError cbands_9_to_11[0]
-            @test_throws BoundsError cbands_9_to_11[4]
+        #     @test_throws BoundsError cbands_9_to_11[0]
+        #     @test_throws BoundsError cbands_9_to_11[4]
 
-            @test_throws ArgumentError ExactProportionalBands{1}(5, 4)
+        #     @test_throws ArgumentError ExactProportionalBands{1}(5, 4)
 
-            @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/2)
-            @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/2)
-            @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
+        #     @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/2)
+        #     @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/2)
+        #     @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
 
-            bands = ExactProportionalBands{1}(700.0, 22000.0)
-            @test bands.bstart == 9
-            @test bands.bend == 14
-        end
+        #     bands = ExactProportionalBands{1}(700.0, 22000.0)
+        #     @test bands.bstart == 9
+        #     @test bands.bend == 14
+        # end
 
     end
 
@@ -785,37 +786,37 @@ end
         @test cbands.bend == 39
 
         lbands = ExactThirdOctaveLowerBands(332.0, 7150.0)
-        @test lbands.cbands.bstart == 25
-        @test lbands.cbands.bend == 39
+        @test lbands.bstart == 25
+        @test lbands.bend == 39
 
         ubands = ExactThirdOctaveUpperBands(332.0, 7150.0)
-        @test ubands.cbands.bstart == 25
-        @test ubands.cbands.bend == 39
+        @test ubands.bstart == 25
+        @test ubands.bend == 39
 
-        @testset "combined band struct" begin
-            bands = ExactProportionalBands{3}(17, 40)
-            lbands = lower_bands(bands)
-            cbands = center_bands(bands)
-            ubands = upper_bands(bands)
+        # @testset "combined band struct" begin
+        #     bands = ExactProportionalBands{3}(17, 40)
+        #     lbands = lower_bands(bands)
+        #     cbands = center_bands(bands)
+        #     ubands = upper_bands(bands)
 
-            @test all(isapprox.(cbands, bands_expected_all; atol=0.005))
+        #     @test all(isapprox.(cbands, bands_expected_all; atol=0.005))
 
-            cbands_30_to_38 = center_bands(ExactProportionalBands{3}(30, 38))
-            @test all(isapprox.(cbands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
+        #     cbands_30_to_38 = center_bands(ExactProportionalBands{3}(30, 38))
+        #     @test all(isapprox.(cbands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
 
-            @test_throws BoundsError cbands_30_to_38[0]
-            @test_throws BoundsError cbands_30_to_38[10]
+        #     @test_throws BoundsError cbands_30_to_38[0]
+        #     @test_throws BoundsError cbands_30_to_38[10]
 
-            @test_throws ArgumentError ExactProportionalBands{3}(5, 4)
+        #     @test_throws ArgumentError ExactProportionalBands{3}(5, 4)
 
-            @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/(2*3))
-            @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/(2*3))
-            @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
+        #     @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/(2*3))
+        #     @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/(2*3))
+        #     @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
 
-            bands = ExactProportionalBands{3}(332.0, 7150.0)
-            @test bands.bstart == 25
-            @test bands.bend == 39
-        end
+        #     bands = ExactProportionalBands{3}(332.0, 7150.0)
+        #     @test bands.bstart == 25
+        #     @test bands.bend == 39
+        # end
 
         @testset "not-so-narrow narrowband spectrum" begin
             T = 1/1000.0
@@ -910,6 +911,12 @@ end
                     @test isapprox(amp, 0.0; atol=1e-12)
                 end
             end
+
+            a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "pbs-new.jld2"))
+            @show center_bands(pbs)
+            @show a2_data["a2_pbs_freq"]
+            @show @. 10*log10(pbs/p_ref^2)
+            @show a2_data["a2_pbs"]
 
         end
     end

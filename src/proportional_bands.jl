@@ -3,31 +3,32 @@ const f0_exact = 1000
 @inline band_exact_lower(NO, fl) = floor(Int, 1/2 + NO*log2(fl/f0_exact) + 10*NO)
 @inline band_exact_upper(NO, fu) = ceil(Int, -1/2 + NO*log2(fu/f0_exact) + 10*NO)
 
-struct ExactCenterBands{NO,TF} <: AbstractVector{TF}
+struct ExactProportionalBands{NO,LCU,TF} <: AbstractVector{TF}
     bstart::Int
     bend::Int
     f0::TF
-    function ExactCenterBands{NO,TF}(bstart::Int, bend::Int) where {NO,TF}
+    function ExactProportionalBands{NO,LCU,TF}(bstart::Int, bend::Int) where {NO,LCU,TF}
         NO > 0 || throw(ArgumentError("Octave band fraction NO = $NO should be greater than 0"))
+        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
         bend > bstart || throw(ArgumentError("bend $bend should be greater than bstart $bstart"))
-        return new{NO,TF}(bstart, bend, TF(f0_exact))
+        return new{NO,LCU,TF}(bstart, bend, TF(f0_exact))
     end
-    function ExactCenterBands{NO}(TF, bstart::Int, bend::Int) where {NO}
-        return ExactCenterBands{NO,TF}(bstart, bend)
+    function ExactProportionalBands{NO,LCU}(TF, bstart::Int, bend::Int) where {NO,LCU}
+        return ExactProportionalBands{NO,LCU,TF}(bstart, bend)
     end
 end
 
-ExactCenterBands{NO}(bstart::Int, bend::Int) where {NO} = ExactCenterBands{NO}(Float64, bstart, bend)
+ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int) where {NO,LCU} = ExactProportionalBands{NO,LCU}(Float64, bstart, bend)
 
 # Get the range of exact center bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
-ExactCenterBands{NO}(fstart::TF, fend::TF) where {NO,TF} = ExactCenterBands{NO,TF}(band_exact_lower(NO, fstart), band_exact_upper(NO, fend))
+ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(band_exact_lower(NO, fstart), band_exact_upper(NO, fend))
 
 
-@inline function Base.size(bands::ExactCenterBands)
+@inline function Base.size(bands::ExactProportionalBands)
     return (bands.bend - bands.bstart + 1,)
 end
 
-@inline function Base.getindex(bands::ExactCenterBands{NO}, i::Int) where {NO}
+@inline function Base.getindex(bands::ExactProportionalBands{NO,:center}, i::Int) where {NO}
     @boundscheck checkbounds(bands, i)
     # Now, how do I get the band?
     # This is the band number:
@@ -42,121 +43,76 @@ end
     return 2^((b - 10*NO)/NO)*bands.f0
 end
 
-const ExactOctaveCenterBands{TF} = ExactCenterBands{1,TF}
-const ExactThirdOctaveCenterBands{TF} = ExactCenterBands{3,TF}
-
-struct ExactLowerBands{NO,TF} <: AbstractVector{TF}
-    cbands::ExactCenterBands{NO,TF}
-    cband2lband::TF
-    function ExactLowerBands{NO,TF}(bstart::Int, bend::Int) where {NO,TF}
-        cband2lband = TF(2)^(TF(-1)/(2*NO)) # Don't know if this is necessary.
-        return new{NO,TF}(ExactCenterBands{NO,TF}(bstart, bend), cband2lband)
-    end
-    function ExactLowerBands{NO}(TF, bstart::Int, bend::Int) where {NO}
-        return ExactLowerBands{NO,TF}(bstart, bend)
-    end
+@inline function Base.getindex(bands::ExactProportionalBands{NO,:lower}, i::Int) where {NO}
+    @boundscheck checkbounds(bands, i)
+    b = bands.bstart + (i - 1)
+    # return 2^((b - 10*NO)/NO)*(2^(-1/(2*NO)))*bands.f0
+    # return 2^(2*(b - 10*NO)/(2*NO))*(2^(-1/(2*NO)))*bands.f0
+    return 2^((2*(b - 10*NO) - 1)/(2*NO))*bands.f0
 end
 
-ExactLowerBands{NO}(bstart::Int, bend::Int) where {NO} = ExactLowerBands{NO}(Float64, bstart, bend)
-
-# Get the range of exact lower bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
-ExactLowerBands{NO}(fstart::TF, fend::TF) where {NO,TF} = ExactLowerBands{NO,TF}(band_exact_lower(NO, fstart), band_exact_upper(NO, fend))
-
-
-@inline function Base.size(bands::ExactLowerBands)
-    return size(bands.cbands)
+@inline function Base.getindex(bands::ExactProportionalBands{NO,:upper}, i::Int) where {NO}
+    @boundscheck checkbounds(bands, i)
+    b = bands.bstart + (i - 1)
+    # return 2^((b - 10*NO)/NO)*(2^(1/(2*NO)))*bands.f0
+    # return 2^(2*(b - 10*NO)/(2*NO))*(2^(1/(2*NO)))*bands.f0
+    return 2^((2*(b - 10*NO) + 1)/(2*NO))*bands.f0
 end
 
-@inline function Base.getindex(bands::ExactLowerBands, i::Int)
-    @boundscheck checkbounds(bands.cbands, i)
-    return bands.cbands[i]*bands.cband2lband
-end
+const ExactOctaveCenterBands{TF} = ExactProportionalBands{1,:center,TF}
+const ExactThirdOctaveCenterBands{TF} = ExactProportionalBands{3,:center,TF}
+const ExactOctaveLowerBands{TF} = ExactProportionalBands{1,:lower,TF}
+const ExactThirdOctaveLowerBands{TF} = ExactProportionalBands{3,:lower,TF}
+const ExactOctaveUpperBands{TF} = ExactProportionalBands{1,:upper,TF}
+const ExactThirdOctaveUpperBands{TF} = ExactProportionalBands{3,:upper,TF}
 
-const ExactOctaveLowerBands{TF} = ExactLowerBands{1,TF}
-const ExactThirdOctaveLowerBands{TF} = ExactLowerBands{3,TF}
-
-struct ExactUpperBands{NO,TF} <: AbstractVector{TF}
-    cbands::ExactCenterBands{NO,TF}
-    cband2uband::TF
-    function ExactUpperBands{NO,TF}(bstart::Int, bend::Int) where {NO,TF}
-        cband2uband = TF(2)^(TF(1)/(2*NO)) # Don't know if all the `TF`s are necessary.
-        return new{NO,TF}(ExactCenterBands{NO,TF}(bstart, bend), cband2uband)
-    end
-    function ExactUpperBands{NO}(TF, bstart::Int, bend::Int) where {NO}
-        return ExactUpperBands{NO,TF}(bstart, bend)
-    end
-end
-
-ExactUpperBands{NO}(bstart::Int, bend::Int) where {NO} = ExactUpperBands{NO}(Float64, bstart, bend)
-
-# Get the range of third-octave upper bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
-ExactUpperBands{NO}(fstart::TF, fend::TF) where {NO,TF} = ExactUpperBands{NO,TF}(band_exact_lower(NO, fstart), band_exact_upper(NO, fend))
-
-@inline function Base.size(bands::ExactUpperBands)
-    return size(bands.cbands)
-end
-
-@inline function Base.getindex(bands::ExactUpperBands, i::Int)
-    @boundscheck checkbounds(bands.cbands, i)
-    return bands.cbands[i]*bands.cband2uband
-end
-
-const ExactOctaveUpperBands{TF} = ExactUpperBands{1,TF}
-const ExactThirdOctaveUpperBands{TF} = ExactUpperBands{3,TF}
-
-struct ExactProportionalBands{NO,TF}
-    bstart::Int
-    bend::Int
-    function ExactProportionalBands{NO,TF}(bstart::Int, bend::Int) where {NO,TF}
-        NO > 0 || throw(ArgumentError("Octave band fraction NO = $NO should be greater than 0"))
-        bend > bstart || throw(ArgumentError("bend $bend should be greater than bstart $bstart"))
-        return new{NO,TF}(bstart, bend)
-    end
-end
-
-ExactProportionalBands{NO}(TF, bstart::Int, bend::Int) where {NO} = ExactProportionalBands{NO,TF}(bstart, bend)
-ExactProportionalBands{NO}(bstart::Int, bend::Int) where {NO} = ExactProportionalBands{NO}(Float64, bstart, bend)
-
-# Get the range of exact center bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
-ExactProportionalBands{NO}(fstart::TF, fend::TF) where {NO,TF} = ExactProportionalBands{NO,TF}(band_exact_lower(NO, fstart), band_exact_upper(NO, fend))
-
-lower_bands(bands::ExactProportionalBands{NO,TF}) where {NO,TF} = ExactLowerBands{NO,TF}(bands.bstart, bands.bend)
-center_bands(bands::ExactProportionalBands{NO,TF}) where {NO,TF} = ExactCenterBands{NO,TF}(bands.bstart, bands.bend)
-upper_bands(bands::ExactProportionalBands{NO,TF}) where {NO,TF} = ExactUpperBands{NO,TF}(bands.bstart, bands.bend)
+lower_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(bands.bstart, bands.bend)
+center_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(bands.bstart, bands.bend)
+upper_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(bands.bstart, bands.bend)
 
 struct ExactProportionalBandSpectrumNB{NO,TF,Tpsd<:AbstractPowerSpectralDensity} <: AbstractVector{TF}
-    bands::ExactProportionalBands{NO,TF}
+    lbands::ExactProportionalBands{NO,:lower,TF}
+    cbands::ExactProportionalBands{NO,:center,TF}
+    ubands::ExactProportionalBands{NO,:upper,TF}
     psd::Tpsd
-end
 
-function ExactProportionalBandSpectrumNB{NO}(psd::AbstractPowerSpectralDensity) where {NO}
-    f = frequency(psd)
-    # First frequency is always zero, and the frequencies are always evenly spaced, so the second frequency is the same as the spacing.
-    Δf = f[begin+1]
-    # We're thinking of each non-zero freqeuncy as being a bin with center
-    # frequency `f` and width `Δf`. So to get the lowest non-zero frequency
-    # we'll subtract 0.5*Δf from the lowest non-zero frequency center:
-    #   fstart = f[2] - 0.5*Δf = f[2] - 0.5(f[2]) = 0.5*f[2] = 0.5*Δf
-    fstart = 0.5*Δf
-    fend = last(f) + Δf
+    function ExactProportionalBandSpectrumNB{NO}(psd::AbstractPowerSpectralDensity) where {NO}
+        f = frequency(psd)
+        # First frequency is always zero, and the frequencies are always evenly spaced, so the second frequency is the same as the spacing.
+        Δf = f[begin+1]
+        # We're thinking of each non-zero freqeuncy as being a bin with center
+        # frequency `f` and width `Δf`. So to get the lowest non-zero frequency
+        # we'll subtract 0.5*Δf from the lowest non-zero frequency center:
+        #   fstart = f[2] - 0.5*Δf = f[2] - 0.5(f[2]) = 0.5*f[2] = 0.5*Δf
+        fstart = 0.5*Δf
+        fend = last(f) + Δf
 
-    bands = ExactProportionalBands{NO}(fstart, fend)
+        lbands = ExactProportionalBands{NO,:lower}(fstart, fend)
+        cbands = ExactProportionalBands{NO,:center}(lbands.bstart, lbands.bend)
+        ubands = ExactProportionalBands{NO,:upper}(lbands.bstart, lbands.bend)
 
-    return ExactProportionalBandSpectrumNB(bands, psd)
+        TF = promote_type(eltype(f), eltype(amplitude(psd)))
+
+        return new{NO,TF,typeof(psd)}(lbands, cbands, ubands, psd)
+    end
 end
 
 @inline function Base.size(pbs::ExactProportionalBandSpectrumNB)
-    return (pbs.bands.bend - pbs.bands.bstart + 1,)
+    return (pbs.lbands.bend - pbs.lbands.bstart + 1,)
 end
 
 @inline Base.eltype(::Type{ExactProportionalBandSpectrumNB{NO,TF}}) where {NO,TF}= TF
+
+@inline lower_bands(pbs::ExactProportionalBandSpectrumNB) = pbs.lbands
+@inline center_bands(pbs::ExactProportionalBandSpectrumNB) = pbs.cbands
+@inline upper_bands(pbs::ExactProportionalBandSpectrumNB) = pbs.ubands
 
 @inline function Base.getindex(pbs::ExactProportionalBandSpectrumNB, i::Int)
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.
-    fl = lower_bands(pbs.bands)[i]
-    fu = upper_bands(pbs.bands)[i]
+    fl = lower_bands(pbs)[i]
+    fu = upper_bands(pbs)[i]
     # Now I need to find the starting and ending indices that are included in
     # this frequency band.
 
@@ -216,7 +172,3 @@ end
     # Get all the others and return them.
     return res_first_band + sum(psd_amp_v[2:end-1]*Δf) + res_last_band
 end
-
-lower_bands(pbs::ExactProportionalBandSpectrumNB) = lower_bands(pbs.bands)
-center_bands(pbs::ExactProportionalBandSpectrumNB) = center_bands(pbs.bands)
-upper_bands(pbs::ExactProportionalBandSpectrumNB) = upper_bands(pbs.bands)
