@@ -10,7 +10,7 @@ struct ExactProportionalBands{NO,LCU,TF} <: AbstractVector{TF}
     function ExactProportionalBands{NO,LCU,TF}(bstart::Int, bend::Int) where {NO,LCU,TF}
         NO > 0 || throw(ArgumentError("Octave band fraction NO = $NO should be greater than 0"))
         LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
-        bend > bstart || throw(ArgumentError("bend $bend should be greater than bstart $bstart"))
+        bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
         return new{NO,LCU,TF}(bstart, bend, TF(f0_exact))
     end
     function ExactProportionalBands{NO,LCU}(TF, bstart::Int, bend::Int) where {NO,LCU}
@@ -70,44 +70,58 @@ lower_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactP
 center_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(bands.bstart, bands.bend)
 upper_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(bands.bstart, bands.bend)
 
-struct ExactProportionalBandSpectrumNB{NO,TF,Tpsd<:AbstractPowerSpectralDensity} <: AbstractVector{TF}
+struct ExactProportionalBandSpectrum{NO,TF,TAmp} <: AbstractVector{TF}
     lbands::ExactProportionalBands{NO,:lower,TF}
     cbands::ExactProportionalBands{NO,:center,TF}
     ubands::ExactProportionalBands{NO,:upper,TF}
-    psd::Tpsd
+    f1_nb::TF
+    df_nb::TF
+    psd_amp::TAmp
 
-    function ExactProportionalBandSpectrumNB{NO}(psd::AbstractPowerSpectralDensity) where {NO}
-        f = frequency(psd)
+    function ExactProportionalBandSpectrum{NO}(f1_nb, df_nb, psd_amp) where {NO}
+        f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
         # First frequency is always zero, and the frequencies are always evenly spaced, so the second frequency is the same as the spacing.
-        Δf = f[begin+1]
+        # Δf = psd_freq[begin+1]
         # We're thinking of each non-zero freqeuncy as being a bin with center
-        # frequency `f` and width `Δf`. So to get the lowest non-zero frequency
-        # we'll subtract 0.5*Δf from the lowest non-zero frequency center:
-        #   fstart = f[2] - 0.5*Δf = f[2] - 0.5(f[2]) = 0.5*f[2] = 0.5*Δf
-        fstart = 0.5*Δf
-        fend = last(f) + Δf
+        # frequency `f` and width `df_nb`. So to get the lowest non-zero frequency
+        # we'll subtract 0.5*df_nb from the lowest non-zero frequency center:
+        #   fstart = f[2] - 0.5*df_nb = f[2] - 0.5(f[2]) = 0.5*f[2] = 0.5*df_nb
+        fstart = f1_nb - 0.5*df_nb
+        # fend = last(psd_freq) + Δf
+        fend = f1_nb + (length(psd_amp)-1)*df_nb + 0.5*df_nb
 
         lbands = ExactProportionalBands{NO,:lower}(fstart, fend)
         cbands = ExactProportionalBands{NO,:center}(lbands.bstart, lbands.bend)
         ubands = ExactProportionalBands{NO,:upper}(lbands.bstart, lbands.bend)
 
-        TF = promote_type(eltype(f), eltype(amplitude(psd)))
+        TF = promote_type(typeof(f1_nb), typeof(df_nb), eltype(psd_amp))
 
-        return new{NO,TF,typeof(psd)}(lbands, cbands, ubands, psd)
+        return new{NO,TF,typeof(psd_amp)}(lbands, cbands, ubands, f1_nb, df_nb, psd_amp)
     end
 end
 
-@inline function Base.size(pbs::ExactProportionalBandSpectrumNB)
+frequency_nb(pbs::ExactProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
+
+function ExactProportionalBandSpectrum{NO}(psd::AbstractPowerSpectralDensity) where {NO}
+    freq = frequency(psd)
+    f1_nb = freq[begin+1]
+    df_nb = step(freq)
+    # Skip the zero frequency.
+    psd_amp = @view amplitude(psd)[begin+1:end]
+    return ExactProportionalBandSpectrum{NO}(f1_nb, df_nb, psd_amp)
+end
+
+@inline function Base.size(pbs::ExactProportionalBandSpectrum)
     return (pbs.lbands.bend - pbs.lbands.bstart + 1,)
 end
 
-@inline Base.eltype(::Type{ExactProportionalBandSpectrumNB{NO,TF}}) where {NO,TF}= TF
+@inline Base.eltype(::Type{ExactProportionalBandSpectrum{NO,TF}}) where {NO,TF}= TF
 
-@inline lower_bands(pbs::ExactProportionalBandSpectrumNB) = pbs.lbands
-@inline center_bands(pbs::ExactProportionalBandSpectrumNB) = pbs.cbands
-@inline upper_bands(pbs::ExactProportionalBandSpectrumNB) = pbs.ubands
+@inline lower_bands(pbs::ExactProportionalBandSpectrum) = pbs.lbands
+@inline center_bands(pbs::ExactProportionalBandSpectrum) = pbs.cbands
+@inline upper_bands(pbs::ExactProportionalBandSpectrum) = pbs.ubands
 
-@inline function Base.getindex(pbs::ExactProportionalBandSpectrumNB, i::Int)
+@inline function Base.getindex(pbs::ExactProportionalBandSpectrum, i::Int)
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.
@@ -117,10 +131,12 @@ end
     # this frequency band.
 
     # Need the narrowband frequencies, but skip the zero frequency.
-    f_nb = @view frequency(pbs.psd)[begin+1:end]
+    # f_nb = @view pbs.psd_freq[begin+1:end]
+    f_nb = frequency_nb(pbs)
 
     # This is the narrowband frequency spacing.
-    Δf = f_nb[begin]
+    # Δf = f_nb[begin]
+    Δf = pbs.df_nb
 
     # So, what is the first index we want?
     # It's the one that has f_nb[i] + 0.5*Δf >= fl.
@@ -145,10 +161,11 @@ end
 
     # Need the psd amplitude relavent for this band.
     # First, get all of the psd amplitudes.
-    psd_amp = amplitude(pbs.psd)
+    psd_amp = pbs.psd_amp
     # Now get the amplitudes we actually want.
     # Need the `istart+1` and `iend+1` to adjust for dropping the zero-frequency component.
-    psd_amp_v = @view psd_amp[istart+1:iend+1]
+    # psd_amp_v = @view psd_amp[istart+1:iend+1]
+    psd_amp_v = @view psd_amp[istart:iend]
     f_nb_v = @view f_nb[istart:iend]
 
     # Get the contribution of the first band, which might not be a full band.

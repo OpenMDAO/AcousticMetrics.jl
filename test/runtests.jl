@@ -5,10 +5,11 @@ using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, half
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
-using AcousticMetrics: ExactProportionalBandSpectrumNB
+using AcousticMetrics: ExactProportionalBandSpectrum
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
+using Polynomials: Polynomials
 using Random
 using Test
 
@@ -694,7 +695,6 @@ end
 @testset "Proportional Band Spectrum" begin
     @testset "octave" begin
         bands = ExactOctaveCenterBands(6, 16)
-        @show bands
         bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
         @test all(isapprox.(bands, bands_expected))
 
@@ -728,31 +728,6 @@ end
         ubands = ExactOctaveUpperBands(700.0, 22000.0)
         @test ubands.bstart == 9
         @test ubands.bend == 14
-
-        # @testset "combined band struct" begin
-        #     bands = ExactProportionalBands{1}(6, 16)
-        #     lbands = lower_bands(bands)
-        #     cbands = center_bands(bands)
-        #     ubands = upper_bands(bands)
-
-        #     @test all(isapprox.(cbands, bands_expected))
-
-        #     cbands_9_to_11 = center_bands(ExactProportionalBands{1}(9, 11))
-        #     @test all(isapprox.(cbands_9_to_11, bands_expected[4:6]))
-
-        #     @test_throws BoundsError cbands_9_to_11[0]
-        #     @test_throws BoundsError cbands_9_to_11[4]
-
-        #     @test_throws ArgumentError ExactProportionalBands{1}(5, 4)
-
-        #     @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/2)
-        #     @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/2)
-        #     @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
-
-        #     bands = ExactProportionalBands{1}(700.0, 22000.0)
-        #     @test bands.bstart == 9
-        #     @test bands.bend == 14
-        # end
 
     end
 
@@ -793,31 +768,6 @@ end
         @test ubands.bstart == 25
         @test ubands.bend == 39
 
-        # @testset "combined band struct" begin
-        #     bands = ExactProportionalBands{3}(17, 40)
-        #     lbands = lower_bands(bands)
-        #     cbands = center_bands(bands)
-        #     ubands = upper_bands(bands)
-
-        #     @test all(isapprox.(cbands, bands_expected_all; atol=0.005))
-
-        #     cbands_30_to_38 = center_bands(ExactProportionalBands{3}(30, 38))
-        #     @test all(isapprox.(cbands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
-
-        #     @test_throws BoundsError cbands_30_to_38[0]
-        #     @test_throws BoundsError cbands_30_to_38[10]
-
-        #     @test_throws ArgumentError ExactProportionalBands{3}(5, 4)
-
-        #     @test all((log2.(cbands) .- log2.(lbands)) .≈ 1/(2*3))
-        #     @test all((log2.(ubands) .- log2.(cbands)) .≈ 1/(2*3))
-        #     @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
-
-        #     bands = ExactProportionalBands{3}(332.0, 7150.0)
-        #     @test bands.bstart == 25
-        #     @test bands.bend == 39
-        # end
-
         @testset "not-so-narrow narrowband spectrum" begin
             T = 1/1000.0
             t0 = 0.13
@@ -830,7 +780,7 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensity(ap)
-            pbs = ExactProportionalBandSpectrumNB{3}(psd)
+            pbs = ExactProportionalBandSpectrum{3}(psd)
             # So, this should have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz, 4000 Hz, 5000 Hz.
             # And that means that, say, the 1000 Hz signal will exend from 500
             # Hz to 1500 Hz.
@@ -888,11 +838,13 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensity(ap)
-            pbs = ExactProportionalBandSpectrumNB{3}(psd)
+            pbs = ExactProportionalBandSpectrum{3}(psd)
             lbands = lower_bands(pbs)
             ubands = upper_bands(pbs)
             psd_freq = frequency(psd)
+            # @show psd_freq
             psd_amp = amplitude(psd)
+            # @show psd_amp
             # for i in eachindex(psd_amp)
             #     println("$i: freq = $(psd_freq[i]) psd_amp = $(psd_amp[i])")
             # end
@@ -912,12 +864,97 @@ end
                 end
             end
 
-            a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "pbs-new.jld2"))
-            @show center_bands(pbs)
-            @show a2_data["a2_pbs_freq"]
-            @show @. 10*log10(pbs/p_ref^2)
-            @show a2_data["a2_pbs"]
+            a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "pbs.jld2"))
+            # @show lower_bands(pbs) center_bands(pbs) upper_bands(pbs)
+            a2_freq = a2_data["a2_pbs_freq"]
+            a2_pbs = a2_data["a2_pbs"]
+            pbs_level = @. 10*log10(pbs/p_ref^2)
+            # For some reason ANOPP2 doesn't give me the first four proportional
+            # bands that I'd expect, but they're all zero anyway, so maybe
+            # that's not important. But it also doesn't give me the last band I
+            # expect, which is not zero. :-( The rest look good, though.
+            for i in 1:length(a2_freq)
+                @test center_bands(pbs)[i + 4] ≈ a2_freq[i]
+                if a2_pbs[i] > 0
+                    @test pbs_level[i + 4] ≈ a2_pbs[i]
+                end
+            end
 
+        end
+
+        # @testset "ANOPP2 docs example" begin
+        #     n_freq = 2232
+        #     psd_freq = 45.0 .+ 5 .* (0:n_freq-1)
+        #     df = psd_freq[2] - psd_freq[1]
+        #     msp_amp = 20 .+ 10 .* (1:n_freq)./n_freq
+        #     psd_amp = msp_amp ./ df
+        #     pbs = ExactProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
+        #     cbands = center_bands(pbs)
+        #     lbands = lower_bands(pbs)
+        #     ubands = upper_bands(pbs)
+
+        #     pbs_level = @. 10*log10(pbs/p_ref^2)
+        #     # @show cbands pbs_level
+        #     # @show length(cbands) length(pbs_level)
+        # end
+
+        @testset "convergence test" begin
+            psd_func(freq) = 3*freq/1e3 + (4e-1)*(freq/1e3)^2 + (5e-2)*(freq/1e3)^3 + (6e-3)*(freq/1e3)^4
+            psd_func_int(freq_l, freq_r) = (((1/2)*3*(freq_r/1e3)^2 + (1/3)*(4e-1)*(freq_r/1e3)^3 + (1/4)*(5e-2)*(freq_r/1e3)^4 + (1/5)*(6e-3)*(freq_r/1e3)^5) - ((1/2)*3*(freq_l/1e3)^2 + (1/3)*(4e-1)*(freq_l/1e3)^3 + (1/4)*(5e-2)*(freq_l/1e3)^4 + (1/5)*(6e-3)*(freq_l/1e3)^5))*1e3
+
+            freq_min, freq_max = 50.0, 2000.0
+            lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
+            cbands = ExactThirdOctaveCenterBands(freq_min, freq_max)
+            ubands = ExactThirdOctaveUpperBands(freq_min, freq_max)
+            for b in 1:length(cbands)
+                pbs_b_exact = psd_func_int(lbands[b], ubands[b])
+                errs = Vector{Float64}()
+                nfreqs = Vector{Int}()
+                for nfreq in 200:350
+                    # df_nb = (freq_max - freq_min)/(nfreq - 1)
+                    # f = freq_min .+ (0:nfreq-1).*df_nb
+                    df_nb = (ubands[b] - lbands[b])/nfreq
+                    f0 = lbands[b] + 0.5*df_nb
+                    f1 = ubands[b] - 0.5*df_nb
+                    f = f0 .+ (0:nfreq-1).*df_nb
+                    psd = psd_func.(f)
+                    pbs = ExactProportionalBandSpectrum{3}(f0, df_nb, psd)
+                    if length(pbs) > 1
+                        # We tried above to construct the narrowand frequencies
+                        # to only cover the current 1/3-octave proportional
+                        # band, i.e., the one that starts at lbands[b] and ends
+                        # at ubands[b]. But because of floating point errors, we
+                        # might end up with a tiny bit of the narrowband in the
+                        # next proportional band. But only in the next one, so
+                        # check that we only have two:
+                        @test length(pbs) == 2
+                        # And the amount of energy we have in the next band
+                        # should be very small.
+                        @test isapprox(pbs[2], 0; atol=1e-10)
+                    end
+                    @test center_bands(pbs)[1] ≈ cbands[b]
+                    push!(nfreqs, nfreq)
+                    push!(errs, abs(pbs[1] - pbs_b_exact))
+                end
+                # So here we're assuming that 
+                #
+                #       err ≈ 1/(nfreq^p)
+                #
+                # We want to find `p`.
+                # If we take the error for two different values of `nfreq` and find their ratio:
+                #
+                #       err2/err1 = nfreq1^p/nfreq2^p
+                #       log(err2/err1) = p*log(nfreq1/nfreq2)
+                #       p = log(err2/err1)/log(nfreq1/nfreq2)
+                #
+                # p = log.(errs[2:end]./errs[1:end-1])./log.(nfreqs[1:end-1]./nfreqs[2:end])
+                # 
+                # But here we'll just use the Polynomials package to fit a line though the error as a function of nfreq on a log-log plot.
+                l = Polynomials.fit(log.(nfreqs), log.(errs), 1)
+                # @show errs p l.coeffs[2]
+                @test isapprox(l.coeffs[2], -2; atol=1e-3)
+
+            end
         end
     end
 end
