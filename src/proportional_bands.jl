@@ -1,4 +1,5 @@
 const f0_exact = 1000
+const fmin_exact = 1
 
 @inline band_exact_lower(NO, fl) = floor(Int, 1/2 + NO*log2(fl/f0_exact) + 10*NO)
 @inline band_exact_upper(NO, fu) = ceil(Int, -1/2 + NO*log2(fu/f0_exact) + 10*NO)
@@ -86,7 +87,7 @@ struct ExactProportionalBandSpectrum{NO,TF,TAmp} <: AbstractVector{TF}
         # frequency `f` and width `df_nb`. So to get the lowest non-zero frequency
         # we'll subtract 0.5*df_nb from the lowest non-zero frequency center:
         #   fstart = f[2] - 0.5*df_nb = f[2] - 0.5(f[2]) = 0.5*f[2] = 0.5*df_nb
-        fstart = f1_nb - 0.5*df_nb
+        fstart = max(f1_nb - 0.5*df_nb, fmin_exact)
         # fend = last(psd_freq) + Δf
         fend = f1_nb + (length(psd_amp)-1)*df_nb + 0.5*df_nb
 

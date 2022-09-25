@@ -79,8 +79,6 @@ function gen_pbs()
     end
 
     freq_a2, psd_msp_a2, psd_phase_a2 = ANOPP2.a2jl_aa_psd(ANOPP2.a2_aa_pa, ANOPP2.a2_aa_pa, t_a2, p_a2)
-    @show freq_a2
-    @show psd_msp_a2
 
     pbs_freq, pbs = ANOPP2.a2jl_aa_pbs(ANOPP2.a2_aa_psd, ANOPP2.a2_aa_msp, freq_a2, psd_msp_a2, 3.0, ANOPP2.a2_aa_exact)
 
@@ -128,6 +126,21 @@ function gen_pbs2()
     return Dict("a2_pbs_freq"=>pbs_freq, "a2_pbs"=>pbs)
 end
 
+function gen_pbs3()
+    nfreq = 800
+    freq_min_nb = 55.0
+    freq_max_nb = 1950.0
+    df = (freq_max_nb - freq_min_nb)/(nfreq - 1)
+    psd_freq = freq_min_nb .+ (0:nfreq-1).*df
+    psd_amp = psd_func.(psd_freq)
+    freq_a2 = psd_freq |> collect
+    psd_amp_a2 = psd_amp |> collect
+
+    pbs_freq, pbs = ANOPP2.a2jl_aa_pbs(ANOPP2.a2_aa_psd, ANOPP2.a2_aa_msp, freq_a2, psd_amp_a2, 3.0, ANOPP2.a2_aa_exact)
+
+    return Dict("a2_pbs_freq"=>pbs_freq, "a2_pbs"=>pbs)
+end
+
 function main()
     nbs_data = gen_nbs()
     save(joinpath(@__DIR__, "nbs-new.jld2"), nbs_data)
@@ -135,6 +148,8 @@ function main()
     save(joinpath(@__DIR__, "psd-new.jld2"), psd_data)
     pbs_data = gen_pbs()
     save(joinpath(@__DIR__, "pbs-new.jld2"), pbs_data)
+    pbs3_data = gen_pbs3()
+    save(joinpath(@__DIR__, "pbs3-new.jld2"), pbs3_data)
     return nothing
 end
 

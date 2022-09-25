@@ -825,7 +825,7 @@ end
             @test pbs[11] ≈ 0.5*0.5^2/df*(4500 - lbands[11]) + (3*cos(0.2))^2/df*(5500 - 4500)
         end
 
-        @testset "narrowband spectrum" begin
+        @testset "narrowband spectrum, one narrowband per proportional band" begin
             freq0 = 1000.0
             T = 20/freq0
             t0 = 0.13
@@ -882,6 +882,33 @@ end
 
         end
 
+        @testset "narrowband spectrum, many narrowbands per proportional band" begin
+            # freq_min, freq_max = 50.0, 2000.0
+            # lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
+            # cbands = ExactThirdOctaveCenterBands(freq_min, freq_max)
+            # ubands = ExactThirdOctaveUpperBands(freq_min, freq_max)
+            nfreq_nb = 800
+            freq_min_nb = 55.0
+            freq_max_nb = 1950.0
+            df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
+            f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
+            psd = psd_func.(f_nb)
+            pbs = ExactProportionalBandSpectrum{3}(freq_min_nb, df_nb, psd)
+            cbands = center_bands(pbs)
+            pbs_level = @. 10*log10(pbs/p_ref^2)
+
+            a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "pbs3.jld2"))
+            a2_pbs_freq = a2_data["a2_pbs_freq"]
+            a2_pbs = a2_data["a2_pbs"]
+            for i in 1:length(a2_pbs)
+                # I'm not sure why ANOPP2 doesn't include all of the proportional bands I think it should.
+                j = i + 1
+                @test cbands[j] ≈ a2_pbs_freq[i]
+                @test isapprox(pbs_level[j], a2_pbs[i]; atol=1e-2)
+            end
+
+        end
+
         # @testset "ANOPP2 docs example" begin
         #     n_freq = 2232
         #     psd_freq = 45.0 .+ 5 .* (0:n_freq-1)
@@ -899,8 +926,6 @@ end
         # end
 
         @testset "convergence test" begin
-            psd_func(freq) = 3*freq/1e3 + (4e-1)*(freq/1e3)^2 + (5e-2)*(freq/1e3)^3 + (6e-3)*(freq/1e3)^4
-            psd_func_int(freq_l, freq_r) = (((1/2)*3*(freq_r/1e3)^2 + (1/3)*(4e-1)*(freq_r/1e3)^3 + (1/4)*(5e-2)*(freq_r/1e3)^4 + (1/5)*(6e-3)*(freq_r/1e3)^5) - ((1/2)*3*(freq_l/1e3)^2 + (1/3)*(4e-1)*(freq_l/1e3)^3 + (1/4)*(5e-2)*(freq_l/1e3)^4 + (1/5)*(6e-3)*(freq_l/1e3)^5))*1e3
 
             freq_min, freq_max = 50.0, 2000.0
             lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
