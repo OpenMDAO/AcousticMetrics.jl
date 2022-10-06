@@ -973,6 +973,7 @@ end
                 #       p = log(err2/err1)/log(nfreq1/nfreq2)
                 #
                 # p = log.(errs[2:end]./errs[1:end-1])./log.(nfreqs[1:end-1]./nfreqs[2:end])
+                # @show errs p
                 # 
                 # But here we'll just use the Polynomials package to fit a line though the error as a function of nfreq on a log-log plot.
                 l = Polynomials.fit(log.(nfreqs), log.(errs), 1)
