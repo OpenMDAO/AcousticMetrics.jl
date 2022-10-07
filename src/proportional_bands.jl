@@ -101,6 +101,9 @@ struct ExactProportionalBandSpectrum{NO,TF,TAmp} <: AbstractVector{TF}
     end
 end
 
+const ExactOctaveSpectrum{TF,TAmp} = ExactProportionalBandSpectrum{1,TF,TAmp}
+const ExactThirdOctaveSpectrum{TF,TAmp} = ExactProportionalBandSpectrum{3,TF,TAmp}
+
 frequency_nb(pbs::ExactProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
 
 function ExactProportionalBandSpectrum{NO}(psd::AbstractPowerSpectralDensity) where {NO}

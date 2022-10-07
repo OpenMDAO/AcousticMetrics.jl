@@ -5,7 +5,7 @@ using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, half
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
-using AcousticMetrics: ExactProportionalBandSpectrum
+using AcousticMetrics: ExactProportionalBandSpectrum, ExactThirdOctaveSpectrum
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -944,7 +944,8 @@ end
                         f1 = ubands[b] - 0.5*df_nb
                         f = f0 .+ (0:nfreq-1).*df_nb
                         psd = psd_func.(f)
-                        pbs = ExactProportionalBandSpectrum{3}(f0, df_nb, psd)
+                        # pbs = ExactProportionalBandSpectrum{3}(f0, df_nb, psd)
+                        pbs = ExactThirdOctaveSpectrum(f0, df_nb, psd)
                         if length(pbs) > 1
                             # We tried above to construct the narrowand frequencies
                             # to only cover the current 1/3-octave proportional
@@ -1013,7 +1014,8 @@ end
                         psd = psd_func.(f)
 
                         # And the PBS
-                        pbs = ExactProportionalBandSpectrum{3}(f[1], df_nb, psd)
+                        # pbs = ExactProportionalBandSpectrum{3}(f[1], df_nb, psd)
+                        pbs = ExactThirdOctaveSpectrum(f[1], df_nb, psd)
 
                         # We created a narrowband range that should cover from freq_min to freq_max, so the sizes should be the same.
                         @test length(pbs) == length(cbands)
