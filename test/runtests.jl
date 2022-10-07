@@ -927,59 +927,121 @@ end
 
         @testset "convergence test" begin
 
-            freq_min, freq_max = 50.0, 2000.0
-            lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
-            cbands = ExactThirdOctaveCenterBands(freq_min, freq_max)
-            ubands = ExactThirdOctaveUpperBands(freq_min, freq_max)
-            for b in 1:length(cbands)
-                pbs_b_exact = psd_func_int(lbands[b], ubands[b])
-                errs = Vector{Float64}()
-                nfreqs = Vector{Int}()
-                for nfreq in 200:350
-                    # df_nb = (freq_max - freq_min)/(nfreq - 1)
-                    # f = freq_min .+ (0:nfreq-1).*df_nb
-                    df_nb = (ubands[b] - lbands[b])/nfreq
-                    f0 = lbands[b] + 0.5*df_nb
-                    f1 = ubands[b] - 0.5*df_nb
-                    f = f0 .+ (0:nfreq-1).*df_nb
-                    psd = psd_func.(f)
-                    pbs = ExactProportionalBandSpectrum{3}(f0, df_nb, psd)
-                    if length(pbs) > 1
-                        # We tried above to construct the narrowand frequencies
-                        # to only cover the current 1/3-octave proportional
-                        # band, i.e., the one that starts at lbands[b] and ends
-                        # at ubands[b]. But because of floating point errors, we
-                        # might end up with a tiny bit of the narrowband in the
-                        # next proportional band. But only in the next one, so
-                        # check that we only have two:
-                        @test length(pbs) == 2
-                        # And the amount of energy we have in the next band
-                        # should be very small.
-                        @test isapprox(pbs[2], 0; atol=1e-10)
+            @testset "one band" begin
+                freq_min, freq_max = 50.0, 2000.0
+                lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
+                cbands = ExactThirdOctaveCenterBands(freq_min, freq_max)
+                ubands = ExactThirdOctaveUpperBands(freq_min, freq_max)
+                for b in 1:length(cbands)
+                    pbs_b_exact = psd_func_int(lbands[b], ubands[b])
+                    errs = Vector{Float64}()
+                    nfreqs = Vector{Int}()
+                    for nfreq in 200:10:300
+                        # df_nb = (freq_max - freq_min)/(nfreq - 1)
+                        # f = freq_min .+ (0:nfreq-1).*df_nb
+                        df_nb = (ubands[b] - lbands[b])/nfreq
+                        f0 = lbands[b] + 0.5*df_nb
+                        f1 = ubands[b] - 0.5*df_nb
+                        f = f0 .+ (0:nfreq-1).*df_nb
+                        psd = psd_func.(f)
+                        pbs = ExactProportionalBandSpectrum{3}(f0, df_nb, psd)
+                        if length(pbs) > 1
+                            # We tried above to construct the narrowand frequencies
+                            # to only cover the current 1/3-octave proportional
+                            # band, i.e., the one that starts at lbands[b] and ends
+                            # at ubands[b]. But because of floating point errors, we
+                            # might end up with a tiny bit of the narrowband in the
+                            # next proportional band. But only in the next one, so
+                            # check that we only have two:
+                            @test length(pbs) == 2
+                            # And the amount of energy we have in the next band
+                            # should be very small.
+                            @test isapprox(pbs[2], 0; atol=1e-10)
+                        end
+                        @test center_bands(pbs)[1] ≈ cbands[b]
+                        push!(nfreqs, nfreq)
+                        push!(errs, abs(pbs[1] - pbs_b_exact))
                     end
-                    @test center_bands(pbs)[1] ≈ cbands[b]
-                    push!(nfreqs, nfreq)
-                    push!(errs, abs(pbs[1] - pbs_b_exact))
+                    # So here we're assuming that 
+                    #
+                    #       err ≈ 1/(nfreq^p)
+                    #
+                    # We want to find `p`.
+                    # If we take the error for two different values of `nfreq` and find their ratio:
+                    #
+                    #       err2/err1 = nfreq1^p/nfreq2^p
+                    #       log(err2/err1) = p*log(nfreq1/nfreq2)
+                    #       p = log(err2/err1)/log(nfreq1/nfreq2)
+                    #
+                    # p = log.(errs[2:end]./errs[1:end-1])./log.(nfreqs[1:end-1]./nfreqs[2:end])
+                    # @show b errs p
+                    # 
+                    # But here we'll just use the Polynomials package to fit a line though the error as a function of nfreq on a log-log plot.
+                    l = Polynomials.fit(log.(nfreqs), log.(errs), 1)
+                    # @show l.coeffs[2]
+                    @test isapprox(l.coeffs[2], -2; atol=1e-5)
                 end
-                # So here we're assuming that 
-                #
-                #       err ≈ 1/(nfreq^p)
-                #
-                # We want to find `p`.
-                # If we take the error for two different values of `nfreq` and find their ratio:
-                #
-                #       err2/err1 = nfreq1^p/nfreq2^p
-                #       log(err2/err1) = p*log(nfreq1/nfreq2)
-                #       p = log(err2/err1)/log(nfreq1/nfreq2)
-                #
-                # p = log.(errs[2:end]./errs[1:end-1])./log.(nfreqs[1:end-1]./nfreqs[2:end])
-                # @show errs p
-                # 
-                # But here we'll just use the Polynomials package to fit a line though the error as a function of nfreq on a log-log plot.
-                l = Polynomials.fit(log.(nfreqs), log.(errs), 1)
-                # @show errs p l.coeffs[2]
-                @test isapprox(l.coeffs[2], -2; atol=1e-3)
+            end
 
+            @testset "many bands" begin
+                freq_min, freq_max = 50.0, 2000.0
+                lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
+                cbands = ExactThirdOctaveCenterBands(freq_min, freq_max)
+                ubands = ExactThirdOctaveUpperBands(freq_min, freq_max)
+                for b in 1:length(cbands)
+                    pbs_b_exact = psd_func_int(lbands[b], ubands[b])
+                    errs = Vector{Float64}()
+                    nfreqs_b = Vector{Int}()
+                    for nfreq_b in 200:10:300
+                        # OK, I want to decide on a frequency spacing that will
+                        # fit nicely in the current band.
+                        df_nb = (ubands[b] - lbands[b])/nfreq_b
+
+                        # This is where I want the narrowband frequencies to start in the current band `b`.
+                        f0 = lbands[b] + 0.5*df_nb
+                        f1 = ubands[b] - 0.5*df_nb
+
+                        # But now I want the actual narrowband frequency to cover freq_min and freq_max.
+                        # So I need to figure out how many bins I need before f0 and after f1.
+                        n_before_f0 = Int(floor((f0 - (lbands[1] + 0.5*df_nb)) / df_nb))
+                        n_after_f1 = Int(floor(((ubands[end] - 0.5*df_nb) - f1) / df_nb))
+
+                        # So now I should be able to get the narrowband frequencies.
+                        f = f0 .+ (-n_before_f0 : (nfreq_b-1)+n_after_f1).*df_nb
+
+                        # Now the PSD for the entire narrowband range.
+                        psd = psd_func.(f)
+
+                        # And the PBS
+                        pbs = ExactProportionalBandSpectrum{3}(f[1], df_nb, psd)
+
+                        # We created a narrowband range that should cover from freq_min to freq_max, so the sizes should be the same.
+                        @test length(pbs) == length(cbands)
+                        @test pbs.cbands.bstart == cbands.bstart
+                        @test pbs.cbands.bend == cbands.bend
+                        push!(nfreqs_b, nfreq_b)
+                        # We only want to check the error for the current band.
+                        push!(errs, abs(pbs[b] - pbs_b_exact))
+                    end
+                    # So here we're assuming that 
+                    #
+                    #       err ≈ 1/(nfreq^p)
+                    #
+                    # We want to find `p`.
+                    # If we take the error for two different values of `nfreq` and find their ratio:
+                    #
+                    #       err2/err1 = nfreq1^p/nfreq2^p
+                    #       log(err2/err1) = p*log(nfreq1/nfreq2)
+                    #       p = log(err2/err1)/log(nfreq1/nfreq2)
+                    #
+                    # p = log.(errs[2:end]./errs[1:end-1])./log.(nfreqs_b[1:end-1]./nfreqs_b[2:end])
+                    # @show b errs p
+                    # 
+                    # But here we'll just use the Polynomials package to fit a line though the error as a function of nfreq on a log-log plot.
+                    l = Polynomials.fit(log.(nfreqs_b), log.(errs), 1)
+                    # @show l.coeffs[2]
+                    @test isapprox(l.coeffs[2], -2; atol=1e-5)
+                end
             end
         end
     end
