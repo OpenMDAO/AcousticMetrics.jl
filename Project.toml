@@ -1,7 +1,7 @@
 name = "AcousticMetrics"
 uuid = "046f749b-9c1e-43ca-86bc-6902340f753e"
 authors = ["Ingraham, Daniel James (GRC-LTV0) <daniel.j.ingraham@nasa.gov>"]
-version = "0.4.0"
+version = "0.5.0"
 
 [deps]
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
