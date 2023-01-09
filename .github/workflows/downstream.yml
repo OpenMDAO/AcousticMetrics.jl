@@ -56,3 +56,5 @@ jobs:
             @info "Not compatible with this release. No problem." exception=err
             exit(0)  # Exit immediately, as a success
           end
+        env:
+              JULIA_PKG_USE_CLI_GIT: 'true'
