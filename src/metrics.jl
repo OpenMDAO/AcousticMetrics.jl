@@ -24,7 +24,7 @@ end
 @inline starttime(pth::AbstractPressureTimeHistory) = pth.t0
 @inline function time(pth::AbstractPressureTimeHistory)
     n = inputlength(pth)
-    return starttime(ap) .+ (0:n-1) .* timestep(ap)
+    return starttime(pth) .+ (0:n-1) .* timestep(pth)
 end
 
 abstract type AbstractSpectrum{IsEven} end

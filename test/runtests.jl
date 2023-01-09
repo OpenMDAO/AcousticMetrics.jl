@@ -1,7 +1,7 @@
 using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
 using AcousticMetrics: PressureTimeHistory, PressureSpectrum, NarrowbandSpectrum, PowerSpectralDensity
-using AcousticMetrics: starttime, timestep, pressure, frequency, amplitude, halfcomplex, phase, OASPL
+using AcousticMetrics: starttime, timestep, time, pressure, frequency, amplitude, halfcomplex, phase, OASPL
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
@@ -242,6 +242,9 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
+                @test all(isapprox.(time(ap), t))
+                @test timestep(ap) ≈ dt
+                @test starttime(ap) ≈ 0.0
                 ps = PressureSpectrum(ap)
                 amp = amplitude(ps)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -331,6 +334,9 @@ end
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt, t0)
+                @test all(isapprox.(time(ap), t))
+                @test timestep(ap) ≈ dt
+                @test starttime(ap) ≈ t0
                 ps = PressureSpectrum(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
                 amp_expected = similar(amplitude(ps))
