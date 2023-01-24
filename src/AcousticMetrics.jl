@@ -7,7 +7,7 @@ using OffsetArrays: OffsetArray
 
 include("constants.jl")
 include("fourier_transforms.jl")
-include("metrics.jl")
+include("narrowband.jl")
 export AbstractPressureTimeHistory, PressureTimeHistory
 
 include("proportional_bands.jl")

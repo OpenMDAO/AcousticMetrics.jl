@@ -1,7 +1,7 @@
 using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
-using AcousticMetrics: PressureTimeHistory  #, PressureSpectrum, NarrowbandSpectrum, PowerSpectralDensity
-using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, NarrowbandSpectrumAmplitude, NarrowbandSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
+using AcousticMetrics: PressureTimeHistory
+using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
 using AcousticMetrics: starttime, timestep, time, pressure, frequency, halfcomplex, OASPL
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
@@ -318,7 +318,7 @@ end
     end
 end
 
-@testset "Narrowband Spectrum" begin
+@testset "Mean-squared Pressure Spectrum" begin
     @testset "t0 == 0" begin
         for T in [1.0, 2.0]
             f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
@@ -327,8 +327,8 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                amp = NarrowbandSpectrumAmplitude(ap)
-                phase = NarrowbandSpectrumPhase(ap)
+                amp = MSPSpectrumAmplitude(ap)
+                phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
                 amp_expected = similar(amp)
                 amp_expected[1] = 6^2
@@ -356,7 +356,7 @@ end
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to a pressure spectrum.
+                # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
                 amp_expected = similar(amp)
                 amp_expected[1] = 6
@@ -374,11 +374,11 @@ end
                 @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
                 @test all(isapprox.(psamp, amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to the acoustic pressure.
-                ap_from_nbs = PressureTimeHistory(amp)
-                @test timestep(ap_from_nbs) ≈ timestep(ap)
-                @test starttime(ap_from_nbs) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
+                # Make sure I can convert a mean-squared pressure to the acoustic pressure.
+                ap_from_msp = PressureTimeHistory(amp)
+                @test timestep(ap_from_msp) ≈ timestep(ap)
+                @test starttime(ap_from_msp) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_msp), pressure(ap)))
             end
         end
     end
@@ -392,8 +392,8 @@ end
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt, t0)
-                amp = NarrowbandSpectrumAmplitude(ap)
-                phase = NarrowbandSpectrumPhase(ap)
+                amp = MSPSpectrumAmplitude(ap)
+                phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
                 amp_expected = similar(amp)
                 amp_expected[1] = 6^2
@@ -423,7 +423,7 @@ end
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to a pressure spectrum.
+                # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
                 amp_expected = similar(psamp)
                 amp_expected[1] = 6
@@ -445,11 +445,11 @@ end
                 @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
                 @test all(isapprox.(psamp, amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to the acoustic pressure.
-                ap_from_nbs = PressureTimeHistory(amp)
-                @test timestep(ap_from_nbs) ≈ timestep(ap)
-                @test starttime(ap_from_nbs) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
+                # Make sure I can convert a mean-squared pressure to the acoustic pressure.
+                ap_from_msp = PressureTimeHistory(amp)
+                @test timestep(ap_from_msp) ≈ timestep(ap)
+                @test starttime(ap_from_msp) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_msp), pressure(ap)))
             end
         end
     end
@@ -465,8 +465,8 @@ end
                 t = (0:n-1).*dt
                 p = apth_for_nbs.(t)
                 ap = PressureTimeHistory(p, dt)
-                amp = NarrowbandSpectrumAmplitude(ap)
-                phase = NarrowbandSpectrumPhase(ap)
+                amp = MSPSpectrumAmplitude(ap)
+                phase = MSPSpectrumPhase(ap)
                 @test all(isapprox.(frequency(amp), freq_a2[(T,n)], atol=1e-12))
                 @test all(isapprox.(frequency(phase), freq_a2[(T,n)], atol=1e-12))
                 @test all(isapprox.(amp, nbs_msp_a2[(T,n)], atol=1e-12))
@@ -1018,7 +1018,7 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                amp = NarrowbandSpectrumAmplitude(ap)
+                amp = MSPSpectrumAmplitude(ap)
                 oaspl_time_domain = OASPL(ap)
                 oaspl_freq_domain = OASPL(amp)
                 @test oaspl_freq_domain ≈ oaspl_time_domain
@@ -1040,7 +1040,7 @@ end
                 msp_expected = 4^2/2
                 oaspl_expected = 10*log10(msp_expected/p_ref^2)
                 ap = PressureTimeHistory(p, dt)
-                amp = NarrowbandSpectrumAmplitude(ap)
+                amp = MSPSpectrumAmplitude(ap)
                 oaspl_time_domain = OASPL(ap)
                 oaspl_freq_domain = OASPL(amp)
                 @test oaspl_time_domain ≈ oaspl_expected
@@ -1083,7 +1083,7 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrumAmplitude(ap)
+                nbs = MSPSpectrumAmplitude(ap)
                 # nbs_A = W_A(nbs)
                 # amp_A = W_A(nbs)
                 amp_A = W_A.(frequency(nbs)).*nbs
@@ -1108,7 +1108,7 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrumAmplitude(ap)
+                nbs = MSPSpectrumAmplitude(ap)
                 # amp = amplitude(nbs)
                 # nbs_A = W_A(nbs)
                 # amp_A = W_A(nbs)

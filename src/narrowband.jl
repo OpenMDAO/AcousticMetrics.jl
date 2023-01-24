@@ -1,0 +1,516 @@
+"""
+    AbstractPressureTimeHistory{IsEven}
+
+Supertype for a pressure time history, i.e., pressure as a function of time defined on evenly-spaced time samples.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the pressure time history is even or not.
+"""
+abstract type AbstractPressureTimeHistory{IsEven} end
+
+"""
+    PressureTimeHistory{IsEven} <: AbstractPressureTimeHistory{IsEven}
+
+Pressure as a function of time defined on evenly-spaced time samples.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the pressure time history is even or not.
+"""
+struct PressureTimeHistory{IsEven,Tp,Tdt,Tt0} <: AbstractPressureTimeHistory{IsEven}
+    p::Tp
+    dt::Tdt
+    t0::Tt0
+
+    function PressureTimeHistory{IsEven}(p, dt, t0) where {IsEven}
+        n = length(p)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(p) = $n"))
+        return new{IsEven, typeof(p), typeof(dt), typeof(t0)}(p, dt, t0)
+    end
+end
+
+"""
+    PressureTimeHistory(p, dt, t0=zero(dt))
+
+Construct a `PressureTimeHistory` from a vector of pressures `p`, time spacing `dt`, and initial time `t0`.
+"""
+function PressureTimeHistory(p, dt, t0=zero(dt))
+    # TODO: it would be nice to have a constructor that allows for a default value of t0 and explicitly set the value of the `IsEven` parameter.
+    n = length(p)
+    return PressureTimeHistory{iseven(n)}(p, dt, t0)
+end
+
+"""
+    pressure(pth::AbstractPressureTimeHistory)
+
+Return a vector of pressures associated with a pressure time history.
+"""
+@inline pressure(pth::AbstractPressureTimeHistory) = pth.p
+
+"""
+    inputlength(pth::AbstractPressureTimeHistory)
+
+Return a number of pressure samples associated with a pressure time history.
+"""
+@inline inputlength(pth::AbstractPressureTimeHistory) = length(pressure(pth))
+
+"""
+    timestep(pth::AbstractPressureTimeHistory)
+
+Return the time step size `dt` associated with a pressure time history.
+"""
+@inline timestep(pth::AbstractPressureTimeHistory) = pth.dt
+
+"""
+    starttime(pth::AbstractPressureTimeHistory)
+
+Return the initial time `t0` associated with a pressure time history.
+"""
+@inline starttime(pth::AbstractPressureTimeHistory) = pth.t0
+
+"""
+    time(pth::AbstractPressureTimeHistory)
+
+Return a vector of times associated with a pressure time history.
+"""
+@inline function time(pth::AbstractPressureTimeHistory)
+    n = inputlength(pth)
+    return starttime(pth) .+ (0:n-1) .* timestep(pth)
+end
+
+"""
+    AbstractNarrowbandSpectrum{IsEven,Tel} <: AbstractVector{Tel}
+
+Supertype for a generic narrowband acoustic metric which will behave as an immutable `AbstractVector` of element type `Tel`.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+"""
+abstract type AbstractNarrowbandSpectrum{IsEven,Tel} <: AbstractVector{Tel} end
+
+"""
+    halfcomplex(sm::AbstractNarrowbandSpectrum)
+
+Return a vector of the discrete Fourier transform of the pressure time history in half-complex format.
+
+See the FFTW docs for the definition of the [halfcomplex format](https://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html).
+"""
+@inline halfcomplex(sm::AbstractNarrowbandSpectrum) = sm.hc
+
+"""
+    timestep(sm::AbstractNarrowbandSpectrum)
+
+Return the time step size `dt` associated with a narrowband spectrum.
+"""
+@inline timestep(sm::AbstractNarrowbandSpectrum) = sm.dt
+
+"""
+    starttime(sm::AbstractNarrowbandSpectrum)
+
+Return the initial time `t0` associated with a pressure time history.
+"""
+@inline starttime(sm::AbstractNarrowbandSpectrum) = sm.t0
+
+"""
+    inputlength(sm::AbstractNarrowbandSpectrum)
+
+Return a number of pressure time samples associated with a narrowband spectrum.
+
+This is also the length of the discrete Fourier transform associated with the spectrum in [half-complex format](https://www.fftw.org/fftw3_doc/The-Halfcomplex_002dformat-DFT.html).
+"""
+@inline inputlength(sm::AbstractNarrowbandSpectrum) = length(halfcomplex(sm))
+
+"""
+    samplerate(sm::AbstractNarrowbandSpectrum)
+
+Return the sample rate (aka the inverse of the time step size) associated with a narrowband spectrum.
+"""
+@inline samplerate(sm::AbstractNarrowbandSpectrum) = 1/timestep(sm)
+
+"""
+    frequency(sm::AbstractNarrowbandSpectrum)
+
+Return a vector of frequencies associated with the narrowband spectrum.
+
+The frequencies are calculated using the `rfftfreq` function in the FFTW.jl package.
+"""
+@inline frequency(sm::AbstractNarrowbandSpectrum) = rfftfreq(inputlength(sm), samplerate(sm))
+
+"""
+    PressureTimeHistory(sm::AbstractNarrowbandSpectrum, p=similar(halfcomplex(sm)))
+
+Construct a pressure time history from a narrowband spectrum `sm`.
+
+The optional `p` argument will be used to store the pressure vector of the pressure time history, and should have length `inputlength(sm)`.
+"""
+function PressureTimeHistory(sm::AbstractNarrowbandSpectrum, p=similar(halfcomplex(sm)))
+    hc = halfcomplex(sm)
+
+    # Get the inverse FFT of the pressure spectrum.
+    irfft!(p, hc)
+
+    # Need to divide by the input length since FFTW computes an "unnormalized" FFT.
+    p ./= inputlength(sm)
+
+    return PressureTimeHistory(p, timestep(sm), starttime(sm))
+end
+
+@inline function Base.size(sm::AbstractNarrowbandSpectrum)
+    # So, what's the maximum and minimum index?
+    # Minimum is 1, aka 0 + 1.
+    # Max is n/2 (rounded down) + 1
+    n = inputlength(sm)
+    return (n>>1 + 1,)
+end
+
+"""
+    PressureSpectrumAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+
+Representation of acoustic pressure amplitude as a function of narrowband frequency.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+"""
+struct PressureSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function PressureSpectrumAmplitude{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+""""
+    PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
+
+Construct a narrowband spectrum of the pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
+"""
+function PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return PressureSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+""""
+    PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
+
+Construct a narrowband spectrum of the pressure amplitude from another narrowband spectrum.
+"""
+PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum) = PressureSpectrumAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+
+"""
+    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+
+Construct a narrowband spectrum of the pressure amplitude from a pressure time history.
+
+The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+"""
+function PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return PressureSpectrumAmplitude(hc, timestep(pth), starttime(pth))
+end
+
+@inline function Base.getindex(psa::PressureSpectrumAmplitude{false}, i::Int)
+    @boundscheck checkbounds(psa, i)
+    m = inputlength(psa)
+    if i == 1
+        @inbounds hc_real = psa.hc[i]/m
+        return abs(hc_real)
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*sqrt(hc_real^2 + hc_imag^2)
+    end
+end
+
+@inline function Base.getindex(psa::PressureSpectrumAmplitude{true}, i::Int)
+    @boundscheck checkbounds(psa, i)
+    m = inputlength(psa)
+    if i == 1 || i == length(psa)
+        @inbounds hc_real = psa.hc[i]/m
+        return abs(hc_real)
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*sqrt(hc_real^2 + hc_imag^2)
+    end
+end
+
+"""
+    PressureSpectrumPhase{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+
+Representation of acoustic pressure phase as a function of narrowband frequency.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+"""
+struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function PressureSpectrumPhase{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+""""
+    PressureSpectrumPhase(hc, dt, t0=zero(dt))
+
+Construct a narrowband spectrum of the pressure phase from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
+"""
+function PressureSpectrumPhase(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return PressureSpectrumPhase{iseven(n)}(hc, dt, t0)
+end
+
+""""
+    PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum)
+
+Construct a narrowband spectrum of the pressure phase from another narrowband spectrum.
+"""
+PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum) = PressureSpectrumPhase(halfcomplex(sm), timestep(sm), starttime(sm))
+
+"""
+    PressureSpectrumPhase(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+
+Construct a narrowband spectrum of the pressure phase from a pressure time history.
+
+The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+"""
+function PressureSpectrumPhase(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return PressureSpectrumPhase(hc, timestep(pth), starttime(pth))
+end
+
+@inline function Base.getindex(psp::PressureSpectrumPhase{false}, i::Int)
+    @boundscheck checkbounds(psp, i)
+    m = inputlength(psp)
+    if i == 1
+        @inbounds hc_real = psp.hc[i]/m
+        hc_imag = zero(eltype(halfcomplex(psp)))
+        phase_t0 = atan(hc_imag, hc_real)
+    else
+        @inbounds hc_real = psp.hc[i]/m
+        @inbounds hc_imag = psp.hc[m-i+2]/m
+        phase_t0 = atan(hc_imag, hc_real)
+    end
+    return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
+end
+
+@inline function Base.getindex(psp::PressureSpectrumPhase{true}, i::Int)
+    @boundscheck checkbounds(psp, i)
+    m = inputlength(psp)
+    if i == 1 || i == length(psp)
+        @inbounds hc_real = psp.hc[i]/m
+        hc_imag = zero(eltype(halfcomplex(psp)))
+        phase_t0 = atan(hc_imag, hc_real)
+    else
+        @inbounds hc_real = psp.hc[i]/m
+        @inbounds hc_imag = psp.hc[m-i+2]/m
+        phase_t0 = atan(hc_imag, hc_real)
+    end
+    return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
+end
+
+"""
+    MSPSpectrumAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+
+Representation of mean-squared pressure amplitude as a function of narrowband frequency.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+"""
+struct MSPSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function MSPSpectrumAmplitude{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+""""
+    MSPSpectrumAmplitude(hc, dt, t0=zero(dt))
+
+Construct a narrowband spectrum of the mean-squared pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
+"""
+function MSPSpectrumAmplitude(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return MSPSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+""""
+    MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
+
+Construct a narrowband spectrum of the mean-squared pressure amplitude from another narrowband spectrum.
+"""
+MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum) = MSPSpectrumAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+
+"""
+    MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+
+Construct a narrowband spectrum of the mean-squared pressure amplitude from a pressure time history.
+
+The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+"""
+function MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return MSPSpectrumAmplitude(hc, timestep(pth), starttime(pth))
+end
+
+@inline function Base.getindex(psa::MSPSpectrumAmplitude{false}, i::Int)
+    @boundscheck checkbounds(psa, i)
+    m = inputlength(psa)
+    if i == 1
+        @inbounds hc_real = psa.hc[i]/m
+        return hc_real^2
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*(hc_real^2 + hc_imag^2)
+    end
+end
+
+@inline function Base.getindex(psa::MSPSpectrumAmplitude{true}, i::Int)
+    @boundscheck checkbounds(psa, i)
+    m = inputlength(psa)
+    if i == 1 || i == length(psa)
+        @inbounds hc_real = psa.hc[i]/m
+        return hc_real^2
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*(hc_real^2 + hc_imag^2)
+    end
+end
+
+"""
+    MSPSpectrumPhase
+
+Alias for `PressureSpectrumPhase`.
+"""
+const MSPSpectrumPhase = PressureSpectrumPhase
+
+"""
+    PowerSpectralDensityAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+
+Representation of acoustic power spectral density amplitude as a function of narrowband frequency.
+
+The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+"""
+struct PowerSpectralDensityAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    hc::Thc
+    dt::Tdt
+    t0::Tt0
+
+    function PowerSpectralDensityAmplitude{IsEven}(hc, dt, t0) where {IsEven}
+        n = length(hc)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+    end
+end
+
+""""
+    PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
+
+Construct a narrowband spectrum of the power spectral density amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
+"""
+function PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
+    n = length(hc)
+    return PowerSpectralDensityAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+""""
+    PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
+
+Construct a narrowband spectrum of the power spectral density amplitude from another narrowband spectrum.
+"""
+PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum) = PowerSpectralDensityAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+
+"""
+    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+
+Construct a narrowband spectrum of the power spectral density amplitude from a pressure time history.
+
+The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+"""
+function PowerSpectralDensityAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return PowerSpectralDensityAmplitude(hc, timestep(pth), starttime(pth))
+end
+
+@inline function Base.getindex(psa::PowerSpectralDensityAmplitude{false}, i::Int)
+    @boundscheck checkbounds(psa, i)
+    m = inputlength(psa)
+    df = 1/(timestep(psa)*m)
+    if i == 1
+        @inbounds hc_real = psa.hc[i]/m
+        return hc_real^2/df
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*(hc_real^2 + hc_imag^2)/df
+    end
+end
+
+@inline function Base.getindex(psa::PowerSpectralDensityAmplitude{true}, i::Int)
+    @boundscheck checkbounds(psa, i)
+    m = inputlength(psa)
+    df = 1/(timestep(psa)*m)
+    if i == 1 || i == length(psa)
+        @inbounds hc_real = psa.hc[i]/m
+        return hc_real^2/df
+    else
+        @inbounds hc_real = psa.hc[i]/m
+        @inbounds hc_imag = psa.hc[m-i+2]/m
+        return 2*(hc_real^2 + hc_imag^2)/df
+    end
+end
+
+"""
+    PowerSpectralDensityPhase
+
+Alias for `PressureSpectrumPhase`.
+"""
+const PowerSpectralDensityPhase = PressureSpectrumPhase
+
+"""
+    OASPL(ap::AbstractPressureTimeHistory)
+
+Return the overall sound pressure level of a pressure time history.
+"""
+function OASPL(ap::AbstractPressureTimeHistory)
+    p = pressure(ap)
+    n = inputlength(ap)
+    p_mean = sum(p)/n
+    msp = sum((p .- p_mean).^2)/n
+    return 10*log10(msp/p_ref^2)
+end
+
+"""
+    OASPL(ap::AbstractNarrowbandSpectrum)
+
+Return the overall sound pressure level of a narrowband spectrum.
+"""
+function OASPL(sp::AbstractNarrowbandSpectrum)
+    amp = MSPSpectrumAmplitude(sp)
+    msp = sum(@view amp[begin+1:end])
+    return 10*log10(msp/p_ref^2)
+end
