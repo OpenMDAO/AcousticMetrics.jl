@@ -106,12 +106,13 @@ const ExactThirdOctaveSpectrum{TF,TAmp} = ExactProportionalBandSpectrum{3,TF,TAm
 
 frequency_nb(pbs::ExactProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
 
-function ExactProportionalBandSpectrum{NO}(psd::AbstractPowerSpectralDensity) where {NO}
+function ExactProportionalBandSpectrum{NO}(sm::AbstractSpectrumMetric) where {NO}
+    psd = PowerSpectralDensityAmplitude(sm)
     freq = frequency(psd)
     f1_nb = freq[begin+1]
     df_nb = step(freq)
     # Skip the zero frequency.
-    psd_amp = @view amplitude(psd)[begin+1:end]
+    psd_amp = @view psd[begin+1:end]
     return ExactProportionalBandSpectrum{NO}(f1_nb, df_nb, psd_amp)
 end
 

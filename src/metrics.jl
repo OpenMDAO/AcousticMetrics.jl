@@ -27,45 +27,6 @@ end
     return starttime(pth) .+ (0:n-1) .* timestep(pth)
 end
 
-abstract type AbstractSpectrum{IsEven} end
-
-@inline halfcomplex(s::AbstractSpectrum) = s.hc
-@inline timestep(s::AbstractSpectrum) = s.dt
-@inline starttime(s::AbstractSpectrum) = s.t0
-@inline inputlength(s::AbstractSpectrum) = length(halfcomplex(s))
-@inline samplerate(s::AbstractSpectrum) = 1/timestep(s)
-@inline frequency(s::AbstractSpectrum) = rfftfreq(inputlength(s), samplerate(s))
-
-abstract type AbstractPressureSpectrum{IsEven} <: AbstractSpectrum{IsEven} end
-
-struct PressureSpectrum{IsEven,Thc,Tdt,Tt0} <: AbstractPressureSpectrum{IsEven}
-    hc::Thc
-    dt::Tdt
-    t0::Tt0
-
-    function PressureSpectrum{IsEven}(hc, dt, t0) where {IsEven}
-        n = length(hc)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
-    end
-end
-
-function PressureSpectrum(hc, dt, t0=zero(dt))
-    n = length(hc)
-    return PressureSpectrum{iseven(n)}(hc, dt, t0)
-end
-
-function PressureSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
-    p = pressure(pth)
-
-    # Get the FFT of the acoustic pressure.
-    rfft!(hc, p)
-
-    return PressureSpectrum(hc, timestep(pth), starttime(pth))
-end
-
-PressureSpectrum(sp::AbstractSpectrum) = PressureSpectrum(halfcomplex(sp), timestep(sp), starttime(sp))
-
 abstract type AbstractSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
 
 @inline halfcomplex(sm::AbstractSpectrumMetric) = sm.hc
@@ -75,11 +36,23 @@ abstract type AbstractSpectrumMetric{IsEven,Tel} <: AbstractVector{Tel} end
 @inline samplerate(sm::AbstractSpectrumMetric) = 1/timestep(sm)
 @inline frequency(sm::AbstractSpectrumMetric) = rfftfreq(inputlength(sm), samplerate(sm))
 
-@inline function Base.size(psm::AbstractSpectrumMetric)
+function PressureTimeHistory(sm::AbstractSpectrumMetric, p=similar(halfcomplex(sm)))
+    hc = halfcomplex(sm)
+
+    # Get the inverse FFT of the pressure spectrum.
+    irfft!(p, hc)
+
+    # Need to divide by the input length since FFTW computes an "unnormalized" FFT.
+    p ./= inputlength(sm)
+
+    return PressureTimeHistory(p, timestep(sm), starttime(sm))
+end
+
+@inline function Base.size(sm::AbstractSpectrumMetric)
     # So, what's the maximum and minimum index?
     # Minimum is 1, aka 0 + 1.
     # Max is n/2 (rounded down) + 1
-    n = inputlength(psm)
+    n = inputlength(sm)
     return (n>>1 + 1,)
 end
 
@@ -98,6 +71,17 @@ end
 function PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
     n = length(hc)
     return PressureSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+PressureSpectrumAmplitude(sm::AbstractSpectrumMetric) = PressureSpectrumAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+
+function PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return PressureSpectrumAmplitude(hc, timestep(pth), starttime(pth))
 end
 
 @inline function Base.getindex(psa::PressureSpectrumAmplitude{false}, i::Int)
@@ -126,8 +110,6 @@ end
     end
 end
 
-@inline amplitude(ps::AbstractPressureSpectrum) = PressureSpectrumAmplitude(halfcomplex(ps), timestep(ps), starttime(ps))
-
 struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
     hc::Thc
     dt::Tdt
@@ -143,6 +125,17 @@ end
 function PressureSpectrumPhase(hc, dt, t0=zero(dt))
     n = length(hc)
     return PressureSpectrumPhase{iseven(n)}(hc, dt, t0)
+end
+
+PressureSpectrumPhase(sm::AbstractSpectrumMetric) = PressureSpectrumPhase(halfcomplex(sm), timestep(sm), starttime(sm))
+
+function PressureSpectrumPhase(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return PressureSpectrumPhase(hc, timestep(pth), starttime(pth))
 end
 
 @inline function Base.getindex(psp::PressureSpectrumPhase{false}, i::Int)
@@ -175,50 +168,6 @@ end
     return rem2pi(phase_t0 - 2*pi*frequency(psp)[i]*starttime(psp), RoundNearest)
 end
 
-@inline phase(ps::AbstractPressureSpectrum) = PressureSpectrumPhase(halfcomplex(ps), timestep(ps), starttime(ps))
-
-function PressureTimeHistory(ps::AbstractPressureSpectrum, p=similar(halfcomplex(ps)))
-    hc = halfcomplex(ps)
-
-    # Get the inverse FFT of the pressure spectrum.
-    irfft!(p, hc)
-
-    # Need to divide by the input length since FFTW computes an "unnormalized" FFT.
-    p ./= inputlength(ps)
-
-    return PressureTimeHistory(p, timestep(ps), starttime(ps))
-end
-
-abstract type AbstractNarrowbandSpectrum{IsEven} <: AbstractSpectrum{IsEven} end
-
-struct NarrowbandSpectrum{IsEven,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven}
-    hc::Thc
-    dt::Tdt
-    t0::Tt0
-
-    function NarrowbandSpectrum{IsEven}(hc, dt, t0) where {IsEven}
-        n = length(hc)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
-    end
-end
-
-function NarrowbandSpectrum(hc, dt, t0=zero(dt))
-    n = length(hc)
-    return NarrowbandSpectrum{iseven(n)}(hc, dt, t0)
-end
-
-function NarrowbandSpectrum(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
-    p = pressure(pth)
-
-    # Get the FFT of the acoustic pressure.
-    rfft!(hc, p)
-
-    return NarrowbandSpectrum(hc, timestep(pth), starttime(pth))
-end
-
-NarrowbandSpectrum(sp::AbstractSpectrum) = NarrowbandSpectrum(halfcomplex(sp), timestep(sp), starttime(sp))
-
 struct NarrowbandSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
     hc::Thc
     dt::Tdt
@@ -234,6 +183,17 @@ end
 function NarrowbandSpectrumAmplitude(hc, dt, t0=zero(dt))
     n = length(hc)
     return NarrowbandSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+NarrowbandSpectrumAmplitude(sm::AbstractSpectrumMetric) = NarrowbandSpectrumAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+
+function NarrowbandSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return NarrowbandSpectrumAmplitude(hc, timestep(pth), starttime(pth))
 end
 
 @inline function Base.getindex(psa::NarrowbandSpectrumAmplitude{false}, i::Int)
@@ -262,40 +222,7 @@ end
     end
 end
 
-@inline amplitude(nbs::AbstractNarrowbandSpectrum) = NarrowbandSpectrumAmplitude(halfcomplex(nbs), timestep(nbs), starttime(nbs))
-@inline phase(nbs::AbstractNarrowbandSpectrum) = PressureSpectrumPhase(halfcomplex(nbs), timestep(nbs), starttime(nbs))
-@inline PressureSpectrum(nbs::AbstractNarrowbandSpectrum) = PressureSpectrum(halfcomplex(nbs), timestep(nbs), starttime(nbs))
-@inline PressureTimeHistory(nbs::AbstractNarrowbandSpectrum) = PressureTimeHistory(PressureSpectrum(nbs))
-
-abstract type AbstractPowerSpectralDensity{IsEven} <: AbstractSpectrum{IsEven} end
-
-struct PowerSpectralDensity{IsEven,Thc,Tdt,Tt0} <: AbstractPowerSpectralDensity{IsEven}
-    hc::Thc
-    dt::Tdt
-    t0::Tt0
-
-    function PowerSpectralDensity{IsEven}(hc, dt, t0) where {IsEven}
-        n = length(hc)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
-    end
-end
-
-function PowerSpectralDensity(hc, dt, t0=zero(dt))
-    n = length(hc)
-    return PowerSpectralDensity{iseven(n)}(hc, dt, t0)
-end
-
-function PowerSpectralDensity(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
-    p = pressure(pth)
-
-    # Get the FFT of the acoustic pressure.
-    rfft!(hc, p)
-
-    return PowerSpectralDensity(hc, timestep(pth), starttime(pth))
-end
-
-PowerSpectralDensity(sp::AbstractSpectrum) = PowerSpectralDensity(halfcomplex(sp), timestep(sp), starttime(sp))
+const NarrowbandSpectrumPhase = PressureSpectrumPhase
 
 struct PowerSpectralDensityAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractSpectrumMetric{IsEven,Tel}
     hc::Thc
@@ -312,6 +239,17 @@ end
 function PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
     n = length(hc)
     return PowerSpectralDensityAmplitude{iseven(n)}(hc, dt, t0)
+end
+
+PowerSpectralDensityAmplitude(sm::AbstractSpectrumMetric) = PowerSpectralDensityAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+
+function PowerSpectralDensityAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    p = pressure(pth)
+
+    # Get the FFT of the acoustic pressure.
+    rfft!(hc, p)
+
+    return PowerSpectralDensityAmplitude(hc, timestep(pth), starttime(pth))
 end
 
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{false}, i::Int)
@@ -342,10 +280,7 @@ end
     end
 end
 
-@inline amplitude(nbs::AbstractPowerSpectralDensity) = PowerSpectralDensityAmplitude(halfcomplex(nbs), timestep(nbs), starttime(nbs))
-@inline phase(nbs::AbstractPowerSpectralDensity) = PressureSpectrumPhase(halfcomplex(nbs), timestep(nbs), starttime(nbs))
-@inline PressureSpectrum(nbs::AbstractPowerSpectralDensity) = PressureSpectrum(halfcomplex(nbs), timestep(nbs), starttime(nbs))
-@inline PressureTimeHistory(nbs::AbstractPowerSpectralDensity) = PressureTimeHistory(PressureSpectrum(nbs))
+const PowerSpectralDensityPhase = PressureSpectrumPhase
 
 function OASPL(ap::AbstractPressureTimeHistory)
     p = pressure(ap)
@@ -355,9 +290,8 @@ function OASPL(ap::AbstractPressureTimeHistory)
     return 10*log10(msp/p_ref^2)
 end
 
-function OASPL(sp::AbstractSpectrum)
-    # amp = amplitude(sp)
-    amp = amplitude(NarrowbandSpectrum(sp))
-    msp = sum(amp[begin+1:end])
+function OASPL(sp::AbstractSpectrumMetric)
+    amp = NarrowbandSpectrumAmplitude(sp)
+    msp = sum(@view amp[begin+1:end])
     return 10*log10(msp/p_ref^2)
 end
