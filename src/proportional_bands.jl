@@ -192,5 +192,148 @@ end
     end
 
     # Get all the others and return them.
-    return res_first_band + sum(psd_amp_v[2:end-1]*Δf) + res_last_band
+    psd_amp_v2 = @view psd_amp_v[2:end-1]
+    return res_first_band + sum(psd_amp_v2*Δf) + res_last_band
 end
+
+const approx_3rd_octave_cbands_pattern = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0]
+const approx_3rd_octave_lbands_pattern = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1]
+const approx_3rd_octave_ubands_pattern = [1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 9.0]
+
+struct ApproximateThirdOctaveBands{LCU,TF} <: AbstractVector{TF}
+    bstart::Int
+    bend::Int
+
+    function ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int) where {LCU, TF}
+        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
+        bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
+        return new{LCU,TF}(bstart, bend)
+    end
+end
+
+ApproximateThirdOctaveBands{LCU}(bstart::Int, bend::Int) where {LCU} = ApproximateThirdOctaveBands{LCU,Float64}(bstart, bend)
+
+@inline function Base.size(bands::ApproximateThirdOctaveBands)
+    return (bands.bend - bands.bstart + 1,)
+end
+
+@inline function Base.getindex(bands::ApproximateThirdOctaveBands{:center,TF}, i::Int) where {TF}
+    @boundscheck checkbounds(bands, i)
+    j = bands.bstart + i - 1
+    factor10, b0 = divrem(j, 10, RoundDown)
+    b = b0 + 1
+    return approx_3rd_octave_cbands_pattern[b]*TF(10)^factor10
+end
+
+@inline function Base.getindex(bands::ApproximateThirdOctaveBands{:lower,TF}, i::Int) where {TF}
+    @boundscheck checkbounds(bands, i)
+    j = bands.bstart + i - 1
+    factor10, b0 = divrem(j, 10, RoundDown)
+    b = b0 + 1
+    return approx_3rd_octave_lbands_pattern[b]*TF(10)^factor10
+end
+
+@inline function Base.getindex(bands::ApproximateThirdOctaveBands{:upper,TF}, i::Int) where {TF}
+    @boundscheck checkbounds(bands, i)
+    j = bands.bstart + i - 1
+    factor10, b0 = divrem(j, 10, RoundDown)
+    b = b0 + 1
+    return approx_3rd_octave_ubands_pattern[b]*TF(10)^factor10
+end
+
+@inline function band_approx_3rd_octave_lower(fl::TF) where {TF}
+    factor10 = floor(Int, log10(fl/approx_3rd_octave_lbands_pattern[1]))
+    i = searchsortedfirst(approx_3rd_octave_lbands_pattern, fl; lt=(lband, f)->isless(lband*TF(10)^factor10, f))
+    # - 2 because
+    #
+    #   * -1 for searchsortedfirst giving us the first index in approx_3rd_octave_lbands_pattern that is greater than fl, and we want the band before that
+    #   * -1 because the array approx_3rd_octave_lbands_pattern is 1-based, but the third-octave band pattern band numbers are 0-based (centerband 1.0 Hz is band number 0, etc..)
+    return (i - 2) + factor10*10
+end
+
+@inline function band_approx_3rd_octave_upper(fu::TF) where {TF}
+    factor10 = floor(Int, log10(fu/approx_3rd_octave_lbands_pattern[1]))
+    i = searchsortedfirst(approx_3rd_octave_ubands_pattern, fu; lt=(uband, f)->isless(uband*TF(10)^factor10, f))
+    # - 1 because
+    #
+    #   * -1 because the array approx_3rd_octave_lbands_pattern is 1-based, but the third-octave band pattern band numbers are 0-based (centerband 1.0 Hz is band number 0, etc..)
+    return (i - 1) + factor10*10
+end
+
+# Get the range of approximate third-octave bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
+ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(band_approx_3rd_octave_lower(fstart), band_approx_3rd_octave_upper(fend))
+
+const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:center,TF}
+const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,TF}
+const ApproximateThirdOctaveUpperBands{TF} = ApproximateThirdOctaveBands{:upper,TF}
+
+const approx_octave_cbands_pattern = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63.0, 125.0, 250.0, 500.0]
+const approx_octave_lbands_pattern = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0]
+const approx_octave_ubands_pattern = [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 710.0]
+
+struct ApproximateOctaveBands{LCU,TF} <: AbstractVector{TF}
+    bstart::Int
+    bend::Int
+
+    function ApproximateOctaveBands{LCU,TF}(bstart::Int, bend::Int) where {LCU, TF}
+        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
+        bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
+        return new{LCU,TF}(bstart, bend)
+    end
+end
+
+ApproximateOctaveBands{LCU}(bstart::Int, bend::Int) where {LCU} = ApproximateOctaveBands{LCU,Float64}(bstart, bend)
+
+@inline function Base.size(bands::ApproximateOctaveBands)
+    return (bands.bend - bands.bstart + 1,)
+end
+
+@inline function Base.getindex(bands::ApproximateOctaveBands{:center,TF}, i::Int) where {TF}
+    @boundscheck checkbounds(bands, i)
+    j = bands.bstart + i - 1
+    factor1000, b0 = divrem(j, 10, RoundDown)
+    b = b0 + 1
+    return approx_octave_cbands_pattern[b]*TF(1000)^factor1000
+end
+
+@inline function Base.getindex(bands::ApproximateOctaveBands{:lower,TF}, i::Int) where {TF}
+    @boundscheck checkbounds(bands, i)
+    j = bands.bstart + i - 1
+    factor1000, b0 = divrem(j, 10, RoundDown)
+    b = b0 + 1
+    return approx_octave_lbands_pattern[b]*TF(1000)^factor1000
+end
+
+@inline function Base.getindex(bands::ApproximateOctaveBands{:upper,TF}, i::Int) where {TF}
+    @boundscheck checkbounds(bands, i)
+    j = bands.bstart + i - 1
+    factor1000, b0 = divrem(j, 10, RoundDown)
+    b = b0 + 1
+    return approx_octave_ubands_pattern[b]*TF(1000)^factor1000
+end
+
+@inline function band_approx_octave_lower(fl::TF) where {TF}
+    factor1000 = floor(Int, log10(fl/approx_octave_lbands_pattern[1])/3)
+    i = searchsortedfirst(approx_octave_lbands_pattern, fl; lt=(lband, f)->isless(lband*TF(10)^(3*factor1000), f))
+    # - 2 because
+    #
+    #   * -1 for searchsortedfirst giving us the first index in approx_octave_lbands_pattern that is greater than fl, and we want the band before that
+    #   * -1 because the array approx_octave_lbands_pattern is 1-based, but the octave band pattern band numbers are 0-based (centerband 1.0 Hz is band number 0, etc..)
+    return (i - 2) + factor1000*10
+end
+
+@inline function band_approx_octave_upper(fu::TF) where {TF}
+    factor1000 = floor(Int, log10(fu/approx_octave_lbands_pattern[1])/3)
+    i = searchsortedfirst(approx_octave_ubands_pattern, fu; lt=(lband, f)->isless(lband*TF(10)^(3*factor1000), f))
+    # - 1 because
+    #
+    #   * -1 because the array approx_octave_lbands_pattern is 1-based, but the octave band pattern band numbers are 0-based (centerband 1.0 Hz is band number 0, etc..)
+    return (i - 1) + factor1000*10
+end
+
+# Get the range of approximate octave bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
+ApproximateOctaveBands{LCU}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(band_approx_octave_lower(fstart), band_approx_octave_upper(fend))
+
+const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
+const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
+const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
