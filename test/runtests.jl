@@ -3,12 +3,13 @@ using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2
 using AcousticMetrics: PressureTimeHistory
 using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
 using AcousticMetrics: starttime, timestep, time, pressure, frequency, halfcomplex, OASPL
+using AcousticMetrics: band_start, band_end
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
-using AcousticMetrics: ExactProportionalBandSpectrum, ExactThirdOctaveSpectrum
-using AcousticMetrics: ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
-using AcousticMetrics: ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
+using AcousticMetrics: ProportionalBandSpectrum, ExactThirdOctaveSpectrum
+using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
+using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -740,7 +741,7 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensityAmplitude(ap)
-            pbs = ExactProportionalBandSpectrum{3}(psd)
+            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, psd)
             # So, this should have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz, 4000 Hz, 5000 Hz.
             # And that means that, say, the 1000 Hz signal will exend from 500
             # Hz to 1500 Hz.
@@ -798,7 +799,8 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensityAmplitude(ap)
-            pbs = ExactProportionalBandSpectrum{3}(psd)
+            # pbs = ExactProportionalBandSpectrum{3}(psd)
+            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, psd)
             lbands = lower_bands(pbs)
             ubands = upper_bands(pbs)
             psd_freq = frequency(psd)
@@ -853,7 +855,8 @@ end
             df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
             f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
             psd = psd_func.(f_nb)
-            pbs = ExactProportionalBandSpectrum{3}(freq_min_nb, df_nb, psd)
+            # pbs = ExactProportionalBandSpectrum{3}(freq_min_nb, df_nb, psd)
+            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
             cbands = center_bands(pbs)
             pbs_level = @. 10*log10(pbs/p_ref^2)
 
@@ -875,7 +878,8 @@ end
         #     df = psd_freq[2] - psd_freq[1]
         #     msp_amp = 20 .+ 10 .* (1:n_freq)./n_freq
         #     psd_amp = msp_amp ./ df
-        #     pbs = ExactProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
+        #     # pbs = ExactProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
+        #     pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, first(psd_freq), df, psd_amp)
         #     cbands = center_bands(pbs)
         #     lbands = lower_bands(pbs)
         #     ubands = upper_bands(pbs)
@@ -1056,6 +1060,40 @@ end
         ubands = ApproximateOctaveUpperBands(23.0e-6, 2.8e-3)
         @test ubands.bstart == -15
         @test ubands.bend == -9
+
+        @testset "spectrum" begin
+            freq_min_nb = 55.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 55 - 0.5*2 = 54 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 6 to 11.
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+            # Now, let's add up what each band's answer should be.
+            # Do I need to worry about the min and max stuff?
+            # I know that I've picked bands that fully cover the input PSD frequency.
+            # But, say, for the first band, it is possible that the lower edge of the first band is much lower than the lower edge of the first proportional band.
+            # So I do need to do that.
+            # Similar for the last band.
+            # But I don't think it's necessary for the inner ones.
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
     end
 
     @testset "approximate 1/3rd octave" begin
@@ -1082,6 +1120,123 @@ end
         ubands = ApproximateThirdOctaveUpperBands(-30, 0)
         ubands_expected = [1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9, 1.12]
         @test all(ubands .≈ ubands_expected)
+
+        @testset "spectrum, normal case" begin
+            freq_min_nb = 50.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 50 - 0.5*2 = 49 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 17 to 33.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, lowest narrowband on a right edge" begin
+            freq_min_nb = 55.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 50 - 0.5*2 = 49 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 17 to 33.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            # Now, let's add up what each band's answer should be.
+            # Do I need to worry about the min and max stuff?
+            # I know that I've picked bands that fully cover the input PSD frequency.
+            # But, say, for the first band, it is possible that the lower edge of the first band is much lower than the lower edge of the first proportional band.
+            # So I do need to do that.
+            # Similar for the last band.
+            # But I don't think it's necessary for the inner ones.
+            #
+            # Hmm... first PBS band isn't passing.
+            # The first PBS band goes from 45 Hz to 56 Hz.
+            # This PSD would have just one band there, centered on 55 Hz, extending from 54 to 56 Hz.
+            # So, that bin width should be 2 Hz.
+            # Looks like that's what I'm doing.
+            # Oh, wait.
+            # Maybe I'm adding it twice here?
+            # Let's see...
+            # `f_nb .+ 0.5*df_nb = [56, 57, 58, 59...]`
+            # And the upper band edge for the first PBS is 56.
+            # So is `iend` here 1, or 2?
+            # `iend == 1`, same as `istart`.
+            # So I bet that has something to do with it.
+            # Yeah, looks like I'm adding this band twice, right?
+            # Yep, so need to deal with that.
+            # Fixed it.
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+        @testset "spectrum, lowest narrowband on a left edge" begin
+            freq_min_nb = 57.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 57 - 0.5*2 = 56 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 18 to 33.
+            # But, actually, because of numerical roundoff stuff, the code picks 17.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
     end
 end
 
