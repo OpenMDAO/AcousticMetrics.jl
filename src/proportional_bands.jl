@@ -1,3 +1,14 @@
+"""
+    AbstractProportionalBands{NO,LCU,TF} <: AbstractVector{TF}
+
+Abstract type representing the exact proportional frequency bands with band fraction `NO` and `eltype` `TF`.
+
+The `LCU` parameter can take one of three values:
+
+* `:lower`: The `struct` returns the lower edges of each frequency band.
+* `:center`: The `struct` returns the center of each frequency band.
+* `:upper`: The `struct` returns the upper edges of each frequency band.
+"""
 abstract type AbstractProportionalBands{NO,LCU,TF} <: AbstractVector{TF} end
 
 octave_fraction(::Type{<:AbstractProportionalBands{NO}}) where {NO} = NO
@@ -6,13 +17,31 @@ lower_center_upper(::Type{<:AbstractProportionalBands{NO,LCU,TF}}) where {NO,LCU
 const f0_exact = 1000
 const fmin_exact = 1
 
+"""
+    ExactProportionalBands{NO,LCU,TF} <: AbstractProportionalBands{NO,LCU,TF}
+
+Representation of the exact proportional frequency bands with band fraction `NO` and `eltype` `TF`.
+
+The `LCU` parameter can take one of three values:
+
+* `:lower`: The `struct` returns the lower edges of each frequency band.
+* `:center`: The `struct` returns the center of each frequency band.
+* `:upper`: The `struct` returns the upper edges of each frequency band.
+"""
+ExactProportionalBands
+
+"""
+    ExactProportionalBands{NO,LCU}(TF=Float64, bstart::Int, bend::Int)
+
+Construct an `ExactProportionalBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
+"""
 struct ExactProportionalBands{NO,LCU,TF} <: AbstractProportionalBands{NO,LCU,TF}
     bstart::Int
     bend::Int
     f0::TF
     function ExactProportionalBands{NO,LCU,TF}(bstart::Int, bend::Int) where {NO,LCU,TF}
         NO > 0 || throw(ArgumentError("Octave band fraction NO = $NO should be greater than 0"))
-        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
+        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU must be one of :lower, :center, :upper"))
         bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
         return new{NO,LCU,TF}(bstart, bend, TF(f0_exact))
     end
@@ -44,9 +73,20 @@ ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int) where {NO,LCU} = ExactPro
 @inline band_exact_lower_limit(NO, fl) = floor(Int, 1/2 + NO*log2(fl/f0_exact) + 10*NO)
 @inline band_exact_upper_limit(NO, fu) = ceil(Int, -1/2 + NO*log2(fu/f0_exact) + 10*NO)
 
-# Get the range of exact center bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
+"""
+    ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF)
+
+Construct an `ExactProportionalBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
+"""
 ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(fstart, fend)
 ExactProportionalBands{NO,LCU,TF}(fstart::TF, fend::TF) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(band_exact_lower_limit(NO, fstart), band_exact_upper_limit(NO, fend))
+
+"""
+    Base.getindex(bands::ExactProportionalBands{NO,LCU}, i::Int) where {NO,LCU}
+
+Return the lower, center, or upper frequency (depending on the value of `LCU`) associated with the `i`-th proportional band frequency covered by `bands`.
+"""
+Base.getindex(bands::ExactProportionalBands, i::Int)
 
 @inline function Base.getindex(bands::ExactProportionalBands{NO,:center}, i::Int) where {NO}
     @boundscheck checkbounds(bands, i)
@@ -79,11 +119,46 @@ end
     return 2^((2*(b - 10*NO) + 1)/(2*NO))*bands.f0
 end
 
+"""
+    ExactOctaveCenterBands{TF}
+
+Alias for ExactProportionalBands{1,:center,TF}
+"""
 const ExactOctaveCenterBands{TF} = ExactProportionalBands{1,:center,TF}
+
+"""
+    ExactThirdOctaveCenterBands{TF}
+
+Alias for ExactProportionalBands{3,:center,TF}
+"""
 const ExactThirdOctaveCenterBands{TF} = ExactProportionalBands{3,:center,TF}
+
+"""
+    ExactOctaveLowerBands{TF}
+
+Alias for ExactProportionalBands{1,:lower,TF}
+"""
 const ExactOctaveLowerBands{TF} = ExactProportionalBands{1,:lower,TF}
+
+"""
+    ExactThirdOctaveLowerBands{TF}
+
+Alias for ExactProportionalBands{3,:lower,TF}
+"""
 const ExactThirdOctaveLowerBands{TF} = ExactProportionalBands{3,:lower,TF}
+
+"""
+    ExactOctaveUpperBands{TF}
+
+Alias for ExactProportionalBands{1,:upper,TF}
+"""
 const ExactOctaveUpperBands{TF} = ExactProportionalBands{1,:upper,TF}
+
+"""
+    ExactThirdOctaveUpperBands{TF}
+
+Alias for ExactProportionalBands{3,:upper,TF}
+"""
 const ExactThirdOctaveUpperBands{TF} = ExactProportionalBands{3,:upper,TF}
 
 lower_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(bands.bstart, bands.bend)
@@ -94,12 +169,23 @@ const approx_3rd_octave_cbands_pattern = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5
 const approx_3rd_octave_lbands_pattern = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1]
 const approx_3rd_octave_ubands_pattern = [1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 9.0]
 
+"""
+    ApproximateThirdOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF}
+
+Representation of the approximate third-octave proportional frequency bands with `eltype` `TF`.
+
+The `LCU` parameter can take one of three values:
+
+* `:lower`: The `struct` returns the lower edges of each frequency band.
+* `:center`: The `struct` returns the center of each frequency band.
+* `:upper`: The `struct` returns the upper edges of each frequency band.
+"""
 struct ApproximateThirdOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF}
     bstart::Int
     bend::Int
 
     function ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int) where {LCU, TF}
-        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
+        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU must be one of :lower, :center, :upper"))
         bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
         return new{LCU,TF}(bstart, bend)
     end
@@ -108,7 +194,21 @@ struct ApproximateThirdOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF
     end
 end
 
+"""
+    ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int)
+
+Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
+
+`TF` defaults to `Float64`.
+"""
 ApproximateThirdOctaveBands{LCU}(bstart::Int, bend::Int) where {LCU} = ApproximateThirdOctaveBands{LCU,Float64}(bstart, bend)
+
+"""
+    Base.getindex(bands::ApproximateThirdOctaveBands{LCU}, i::Int) where {LCU}
+
+Return the lower, center, or upper frequency (depending on the value of `LCU`) associated with the `i`-th proportional band frequency covered by `bands`.
+"""
+Base.getindex(bands::ApproximateThirdOctaveBands, i::Int)
 
 @inline function Base.getindex(bands::ApproximateThirdOctaveBands{:center,TF}, i::Int) where {TF}
     @boundscheck checkbounds(bands, i)
@@ -153,7 +253,11 @@ end
     return (i - 1) + factor10*10
 end
 
-# Get the range of approximate third-octave bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
+"""
+    ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF)
+
+Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
+"""
 ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(fstart, fend)
 ApproximateThirdOctaveBands{LCU,TF}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(band_approx_3rd_octave_lower_limit(fstart), band_approx_3rd_octave_upper_limit(fend))
 
@@ -165,12 +269,23 @@ const approx_octave_cbands_pattern = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63.0, 125.
 const approx_octave_lbands_pattern = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0]
 const approx_octave_ubands_pattern = [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 710.0]
 
+"""
+    ApproximateOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF}
+
+Representation of the approximate octave proportional frequency bands with `eltype` `TF`.
+
+The `LCU` parameter can take one of three values:
+
+* `:lower`: The `struct` returns the lower edges of each frequency band.
+* `:center`: The `struct` returns the center of each frequency band.
+* `:upper`: The `struct` returns the upper edges of each frequency band.
+"""
 struct ApproximateOctaveBands{LCU,TF} <: AbstractProportionalBands{1,LCU,TF}
     bstart::Int
     bend::Int
 
     function ApproximateOctaveBands{LCU,TF}(bstart::Int, bend::Int) where {LCU, TF}
-        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU type must be one of :lower, :center, :upper"))
+        LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU must be one of :lower, :center, :upper"))
         bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
         return new{LCU,TF}(bstart, bend)
     end
@@ -179,7 +294,21 @@ struct ApproximateOctaveBands{LCU,TF} <: AbstractProportionalBands{1,LCU,TF}
     end
 end
 
+"""
+    ApproximateOctaveBands{LCU,TF}(bstart::Int, bend::Int)
+
+Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
+
+`TF` defaults to `Float64`.
+"""
 ApproximateOctaveBands{LCU}(bstart::Int, bend::Int) where {LCU} = ApproximateOctaveBands{LCU,Float64}(bstart, bend)
+
+"""
+    Base.getindex(bands::ApproximateOctaveBands{LCU}, i::Int) where {LCU}
+
+Return the lower, center, or upper frequency (depending on the value of `LCU`) associated with the `i`-th proportional band frequency covered by `bands`.
+"""
+Base.getindex(bands::ApproximateOctaveBands, i::Int)
 
 @inline function Base.getindex(bands::ApproximateOctaveBands{:center,TF}, i::Int) where {TF}
     @boundscheck checkbounds(bands, i)
@@ -224,13 +353,24 @@ end
     return (i - 1) + factor1000*10
 end
 
-# Get the range of approximate octave bands necessary to completely extend over a range of frequencies from `fstart` to `fend`.
+"""
+    ApproximateOctaveBands{LCU}(fstart::TF, fend::TF)
+
+Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
+"""
 ApproximateOctaveBands{LCU}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(fstart, fend)
 ApproximateOctaveBands{LCU,TF}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(band_approx_octave_lower_limit(fstart), band_approx_octave_upper_limit(fend))
 
 const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
 const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
 const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
+
+
+"""
+    ProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
+
+Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
+"""
 struct ProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractVector{TF}
     f1_nb::TF
     df_nb::TF
@@ -286,6 +426,11 @@ ApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = ProportionalBan
 
 frequency_nb(pbs::ProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
 
+"""
+    ProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+
+Construct a `ProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`.
+"""
 function ProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
     psd = PowerSpectralDensityAmplitude(sm)
     freq = frequency(psd)
@@ -302,9 +447,11 @@ end
 
 @inline Base.size(pbs::ProportionalBandSpectrum) = size(center_bands(pbs))
 
-# Don't need this, right?
-# @inline Base.eltype(::Type{ProportionalBandSpectrum{NO,TF}}) where {NO,TF}= TF
+"""
+    Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
 
+Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
+"""
 @inline function Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.

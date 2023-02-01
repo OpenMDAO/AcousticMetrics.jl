@@ -178,7 +178,7 @@ struct PressureSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSp
     end
 end
 
-""""
+"""
     PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
 
 Construct a narrowband spectrum of the pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
@@ -188,7 +188,7 @@ function PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
     return PressureSpectrumAmplitude{iseven(n)}(hc, dt, t0)
 end
 
-""""
+"""
     PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
 
 Construct a narrowband spectrum of the pressure amplitude from another narrowband spectrum.
@@ -256,7 +256,7 @@ struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectr
     end
 end
 
-""""
+"""
     PressureSpectrumPhase(hc, dt, t0=zero(dt))
 
 Construct a narrowband spectrum of the pressure phase from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
@@ -266,7 +266,7 @@ function PressureSpectrumPhase(hc, dt, t0=zero(dt))
     return PressureSpectrumPhase{iseven(n)}(hc, dt, t0)
 end
 
-""""
+"""
     PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum)
 
 Construct a narrowband spectrum of the pressure phase from another narrowband spectrum.
@@ -338,7 +338,7 @@ struct MSPSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectru
     end
 end
 
-""""
+"""
     MSPSpectrumAmplitude(hc, dt, t0=zero(dt))
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
@@ -348,7 +348,7 @@ function MSPSpectrumAmplitude(hc, dt, t0=zero(dt))
     return MSPSpectrumAmplitude{iseven(n)}(hc, dt, t0)
 end
 
-""""
+"""
     MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from another narrowband spectrum.
@@ -423,7 +423,7 @@ struct PowerSpectralDensityAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowba
     end
 end
 
-""""
+"""
     PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
 
 Construct a narrowband spectrum of the power spectral density amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
@@ -433,7 +433,7 @@ function PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
     return PowerSpectralDensityAmplitude{iseven(n)}(hc, dt, t0)
 end
 
-""""
+"""
     PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
 
 Construct a narrowband spectrum of the power spectral density amplitude from another narrowband spectrum.
