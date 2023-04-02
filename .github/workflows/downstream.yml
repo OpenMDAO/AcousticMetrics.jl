@@ -19,7 +19,7 @@ jobs:
         julia-version: [1]
         os: [ubuntu-latest]
         package:
-          - {user: dingraha, repo: AcousticAnalogies.jl}
+          - {user: OpenMDAO, repo: AcousticAnalogies.jl}
 
     steps:
       - uses: actions/checkout@v2

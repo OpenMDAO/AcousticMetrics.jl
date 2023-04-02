@@ -12,7 +12,7 @@ function main()
                     "Software Quality Assurance"=>"sqa.md"])
 
     if IN_CI
-        deploydocs(repo="github.com/dingraha/AcousticMetrics.jl.git", devbranch="main")
+        deploydocs(repo="github.com/OpenMDAO/AcousticMetrics.jl.git", devbranch="main")
     end
 end
 
