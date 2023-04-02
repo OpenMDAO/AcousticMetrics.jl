@@ -1,11 +1,15 @@
 using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
-using AcousticMetrics: PressureTimeHistory, PressureSpectrum, NarrowbandSpectrum, PowerSpectralDensity
-using AcousticMetrics: starttime, timestep, time, pressure, frequency, amplitude, halfcomplex, phase, OASPL
+using AcousticMetrics: PressureTimeHistory
+using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
+using AcousticMetrics: starttime, timestep, time, pressure, frequency, halfcomplex, OASPL
+using AcousticMetrics: band_start, band_end
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
-using AcousticMetrics: ExactProportionalBandSpectrum, ExactThirdOctaveSpectrum
+using AcousticMetrics: ProportionalBandSpectrum, ExactThirdOctaveSpectrum
+using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
+using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -167,72 +171,6 @@ include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
     end
 end
 
-#@testset "Narrowband Spectrum" begin
-#    f(t) = 2.0*sin(1*2*pi*t) + 4*sin(2*2*pi*t) + 6*sin(3*2*pi*t) + 8*sin(4*2*pi*t) #+ 10*sin(5*2*pi*t) #+ 12*sin(6*2*pi*t)
-#    # So, what do we expect the narrow-band spectrum is for this? Well, first we
-#    # need to know what the Fourier transform is. Well,
-#    #
-#    #   a*sin(k*2*pi*t) = a*(0 - 0.5*i)*exp(i*k*2*pi*t) + a*(0 + 0.5*i)*exp(-i*k*2*pi*t)
-#    #
-#    # Then I would expect, for the function above, only imaginary parts of the
-#    # spectrum would be non-zero, right? Right. And the R2HC only keeps the
-#    # positive frequencies, so I'd expect -0.5*a, but in reverse order. So
-#    # that'd be [0.0, 0.0, 0.0, ..., -5, -4, -3, -2, -1]. Great, that's exactly
-#    # what I see. Wait, are these amplitudes at the right frequencies? Yep,
-#    # looks good. Great. So, now, what do I expect the nbs to be? Well,
-#    # according to the ANOPP2 docs, the NBS is the squared amplitude of the FFT
-#    # components. Great. But after finding that, I need to multiply the non-zero
-#    # parts by 2 to get the other half of the spectrum. And since the real parts
-#    # of my test function are all zero, I'd expect the answer to be
-#    #
-#    # [0.0, 2*(-1)^2, 2*(-2)^2, 2*(-3)^2, 2*(-4)^2, 2*(-5)^2, 0.0, 0.0, ...]
-#    # [0.0, 2, 8, 18, 32, 50, 0.0, 0.0, ...]
-#    #
-#    # Nice, that's what I'm getting, with both ANOPP2 and my stuff. But when the
-#    # input length is even, I have to evaluate the pressure on a different time
-#    # grid then what I pass in to ANOPP2, which is really strange. But, really,
-#    # the NBS calculation doesn't depend on the time grid—the frequency and NBS
-#    # are actually two entirely seperate calculations. So it seems that, when
-#    # passing an *odd*-length input to `a2_aa_nbs`, ANOPP2 ignores the last
-#    # entry of the pressure input, and passes the rest to the FFT. OK, I guess
-#    # that's OK. But at least I know what the answer is.
-#    for T in [1.0, 2.0]
-#        for n in [19, 20]
-#            dt = T/n
-#            t = (0:n-1).*dt
-#            # t = collect(t)
-#            p = f.(t)
-#            p_fft = rfft(p)./n
-#            # freq_half = r2rfftfreq(n, dt)
-#            # freq_fft = zeros(n)
-#            # freq_fft[1] = freq_half[1]
-#            # freq_fft[2:floor(Int, n/2)+1] = freq_half[2:end]
-#            # freq_fft[end:-1:floor(Int, n/2)+2] = freq_half[2:end]
-#            freq_fft = r2rfftfreq(n, dt)
-#            # p = rand(n)
-#            # freq, nbs = nbs_from_apth(t, p)
-#            freq, nbs = nbs_from_apth(p, dt)
-#            freq = collect(freq)
-#            t_a2 = range(0, T, length=n) |> collect # This needs to be an array, since we'll eventually be passing it to C/Fortran via ccall.
-#            if mod(n, 2) == 0
-#                p_a2 = p
-#            else
-#                p_a2 = f.(t_a2)
-#            end
-#            # t_a2 = t |> collect
-#            freq_a2, nbs_msp_a2, nbs_phase_a2 = ANOPP2.a2_aa_nbs(ANOPP2.a2_aa_pa, ANOPP2.a2_aa_pa, t_a2, p_a2)
-#            @show T n
-#            @show freq_fft p_fft
-#            @show freq nbs
-#            @show freq_a2 nbs_msp_a2
-#            # @show freq freq_a2
-#            # @show nbs .- nbs_msp_a2
-#            # @show nbs nbs_msp_a2
-#        end
-#    end
-
-# end
-
 @testset "Pressure Spectrum" begin
     @testset "t0 == 0" begin
         for T in [1.0, 2.0]
@@ -245,16 +183,18 @@ end
                 @test all(isapprox.(time(ap), t))
                 @test timestep(ap) ≈ dt
                 @test starttime(ap) ≈ 0.0
-                ps = PressureSpectrum(ap)
-                amp = amplitude(ps)
+                # ps = PressureSpectrum(ap)
+                # amp = amplitude(ps)
+                amp = PressureSpectrumAmplitude(ap)
+                phase = PressureSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(ps))
+                amp_expected = similar(amp)
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
                 amp_expected[4] = 9
                 amp_expected[5] = 0.5
-                phase_expected = similar(phase(ps))
+                phase_expected = similar(phase)
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -269,12 +209,13 @@ end
                     amp_expected[6] = 3
                     phase_expected[6] = 0.2
                 end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+                @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
 
                 # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
-                ap_from_ps = PressureTimeHistory(ps)
+                ap_from_ps = PressureTimeHistory(amp)
                 @test timestep(ap_from_ps) ≈ timestep(ap)
                 @test starttime(ap_from_ps) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
@@ -288,15 +229,17 @@ end
                     t = (0:n-1).*dt
                     p = f.(t)
                     ap = PressureTimeHistory(p, dt)
-                    ps = PressureSpectrum(ap)
+                    # ps = PressureSpectrum(ap)
+                    amp = PressureSpectrumAmplitude(ap)
+                    phase = PressureSpectrumPhase(ap)
                     freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                    amp_expected = similar(amplitude(ps))
+                    amp_expected = similar(amp)
                     amp_expected[1] = 6
                     amp_expected[2] = 8
                     amp_expected[3] = 2.5
                     amp_expected[4] = 9
                     amp_expected[5] = 0.5
-                    phase_expected = similar(phase(ps))
+                    phase_expected = similar(phase)
                     phase_expected[1] = pi
                     phase_expected[2] = -pi + 0.2
                     phase_expected[3] = pi - 3
@@ -311,12 +254,13 @@ end
                         amp_expected[6] = 3
                         phase_expected[6] = 0.2
                     end
-                    @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                    @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                    @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+                    @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                    @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                    @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                    @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
 
                     # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
-                    ap_from_ps = PressureTimeHistory(ps)
+                    ap_from_ps = PressureTimeHistory(amp)
                     @test timestep(ap_from_ps) ≈ timestep(ap)
                     @test starttime(ap_from_ps) ≈ starttime(ap)
                     @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
@@ -337,15 +281,17 @@ end
                 @test all(isapprox.(time(ap), t))
                 @test timestep(ap) ≈ dt
                 @test starttime(ap) ≈ t0
-                ps = PressureSpectrum(ap)
+                # ps = PressureSpectrum(ap)
+                amp = PressureSpectrumAmplitude(ap)
+                phase = PressureSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(ps))
+                amp_expected = similar(amp)
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
                 amp_expected[4] = 9
                 amp_expected[5] = 0.5
-                phase_expected = similar(phase(ps))
+                phase_expected = similar(phase)
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -360,12 +306,13 @@ end
                     amp_expected[6] = 3
                     phase_expected[6] = 0.2
                 end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
+                @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase, phase_expected; atol=1e-12))
 
                 # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
-                ap_from_ps = PressureTimeHistory(ps)
+                ap_from_ps = PressureTimeHistory(amp)
                 @test timestep(ap_from_ps) ≈ timestep(ap)
                 @test starttime(ap_from_ps) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
@@ -374,7 +321,7 @@ end
     end
 end
 
-@testset "Narrowband Spectrum" begin
+@testset "Mean-squared Pressure Spectrum" begin
     @testset "t0 == 0" begin
         for T in [1.0, 2.0]
             f(t) = 6 + 8*cos(1*2*pi/T*t + 0.2) + 2.5*cos(2*2*pi/T*t - 3.0) + 9*cos(3*2*pi/T*t + 3.1) + 0.5*cos(4*2*pi/T*t - 1.1) + 3*cos(5*2*pi/T*t + 0.2)
@@ -383,15 +330,16 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrum(ap)
+                amp = MSPSpectrumAmplitude(ap)
+                phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(nbs))
+                amp_expected = similar(amp)
                 amp_expected[1] = 6^2
                 amp_expected[2] = 0.5*8^2
                 amp_expected[3] = 0.5*2.5^2
                 amp_expected[4] = 0.5*9^2
                 amp_expected[5] = 0.5*0.5^2
-                phase_expected = similar(phase(nbs))
+                phase_expected = similar(phase)
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -406,13 +354,14 @@ end
                     amp_expected[6] = 0.5*3^2
                     phase_expected[6] = 0.2
                 end
-                @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(nbs).*amplitude(nbs), phase_expected.*amp_expected; atol=1e-12))
+                @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to a pressure spectrum.
-                ps = PressureSpectrum(nbs)
-                amp_expected = similar(amplitude(ps))
+                # Make sure I can convert a mean-squared pressure to a pressure spectrum.
+                psamp = PressureSpectrumAmplitude(amp)
+                amp_expected = similar(amp)
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
@@ -425,15 +374,14 @@ end
                 else
                     amp_expected[6] = 3
                 end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+                @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
+                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to the acoustic pressure.
-                ap_from_nbs = PressureTimeHistory(nbs)
-                @test timestep(ap_from_nbs) ≈ timestep(ap)
-                @test starttime(ap_from_nbs) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
+                # Make sure I can convert a mean-squared pressure to the acoustic pressure.
+                ap_from_msp = PressureTimeHistory(amp)
+                @test timestep(ap_from_msp) ≈ timestep(ap)
+                @test starttime(ap_from_msp) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_msp), pressure(ap)))
             end
         end
     end
@@ -447,15 +395,16 @@ end
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt, t0)
-                nbs = NarrowbandSpectrum(ap)
+                amp = MSPSpectrumAmplitude(ap)
+                phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(nbs))
+                amp_expected = similar(amp)
                 amp_expected[1] = 6^2
                 amp_expected[2] = 0.5*8^2
                 amp_expected[3] = 0.5*2.5^2
                 amp_expected[4] = 0.5*9^2
                 amp_expected[5] = 0.5*0.5^2
-                phase_expected = similar(phase(nbs))
+                phase_expected = similar(phase)
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -472,13 +421,14 @@ end
                     amp_expected[6] = 0.5*3^2
                     phase_expected[6] = 0.2
                 end
-                @test all(isapprox.(frequency(nbs), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(nbs), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(nbs), phase_expected; atol=1e-12))
+                @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase, phase_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to a pressure spectrum.
-                ps = PressureSpectrum(nbs)
-                amp_expected = similar(amplitude(ps))
+                # Make sure I can convert a mean-squared pressure to a pressure spectrum.
+                psamp = PressureSpectrumAmplitude(amp)
+                amp_expected = similar(psamp)
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
@@ -495,15 +445,14 @@ end
                 else
                     amp_expected[6] = 3
                 end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
+                @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
+                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
 
-                # Make sure I can convert a NBS to the acoustic pressure.
-                ap_from_nbs = PressureTimeHistory(nbs)
-                @test timestep(ap_from_nbs) ≈ timestep(ap)
-                @test starttime(ap_from_nbs) ≈ starttime(ap)
-                @test all(isapprox.(pressure(ap_from_nbs), pressure(ap)))
+                # Make sure I can convert a mean-squared pressure to the acoustic pressure.
+                ap_from_msp = PressureTimeHistory(amp)
+                @test timestep(ap_from_msp) ≈ timestep(ap)
+                @test starttime(ap_from_msp) ≈ starttime(ap)
+                @test all(isapprox.(pressure(ap_from_msp), pressure(ap)))
             end
         end
     end
@@ -519,9 +468,11 @@ end
                 t = (0:n-1).*dt
                 p = apth_for_nbs.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                @test all(isapprox.(frequency(nbs), freq_a2[(T,n)], atol=1e-12))
-                @test all(isapprox.(amplitude(nbs), nbs_msp_a2[(T,n)], atol=1e-12))
+                amp = MSPSpectrumAmplitude(ap)
+                phase = MSPSpectrumPhase(ap)
+                @test all(isapprox.(frequency(amp), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(amp, nbs_msp_a2[(T,n)], atol=1e-12))
                 # Checking the phase is tricky, since it involves the ratio of
                 # the imaginary component to the real component of the MSP
                 # spectrum (definition is phase = atan(imag(fft(p)),
@@ -529,7 +480,7 @@ end
                 # zero amplitude that ratio ends up being very noisy. So scale
                 # the phase by the amplitude to remove the problematic
                 # zero-amplitude components.
-                @test all(isapprox.(phase(nbs).*amplitude(nbs), nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
+                @test all(isapprox.(phase.*amp, nbs_phase_a2[T, n].*nbs_msp_a2[T, n], atol=1e-12))
             end
         end
     end
@@ -545,15 +496,16 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                psd = PowerSpectralDensity(ap)
+                amp = PowerSpectralDensityAmplitude(ap)
+                phase = PowerSpectralDensityPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(psd))
+                amp_expected = similar(amp)
                 amp_expected[1] = 6^2/df
                 amp_expected[2] = 0.5*8^2/df
                 amp_expected[3] = 0.5*2.5^2/df
                 amp_expected[4] = 0.5*9^2/df
                 amp_expected[5] = 0.5*0.5^2/df
-                phase_expected = similar(phase(psd))
+                phase_expected = similar(phase)
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -568,13 +520,14 @@ end
                     amp_expected[6] = 0.5*3^2/df
                     phase_expected[6] = 0.2
                 end
-                @test all(isapprox.(frequency(psd), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(psd), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(psd).*amplitude(psd), phase_expected.*amp_expected; atol=1e-12))
+                @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
 
                 # Make sure I can convert a PSD to a pressure spectrum.
-                ps = PressureSpectrum(psd)
-                amp_expected = similar(amplitude(ps))
+                psamp = PressureSpectrumAmplitude(amp)
+                amp_expected = similar(psamp)
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
@@ -587,12 +540,11 @@ end
                 else
                     amp_expected[6] = 3
                 end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps).*amplitude(ps), phase_expected.*amp_expected; atol=1e-12))
+                @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
+                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
 
                 # Make sure I can convert a PSD to the acoustic pressure.
-                ap_from_psd = PressureTimeHistory(psd)
+                ap_from_psd = PressureTimeHistory(amp)
                 @test timestep(ap_from_psd) ≈ timestep(ap)
                 @test starttime(ap_from_psd) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_psd), pressure(ap)))
@@ -610,15 +562,16 @@ end
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt, t0)
-                psd = PowerSpectralDensity(ap)
+                amp = PowerSpectralDensityAmplitude(ap)
+                phase = PowerSpectralDensityPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amplitude(psd))
+                amp_expected = similar(amp)
                 amp_expected[1] = 6^2/df
                 amp_expected[2] = 0.5*8^2/df
                 amp_expected[3] = 0.5*2.5^2/df
                 amp_expected[4] = 0.5*9^2/df
                 amp_expected[5] = 0.5*0.5^2/df
-                phase_expected = similar(phase(psd))
+                phase_expected = similar(phase)
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -635,13 +588,14 @@ end
                     amp_expected[6] = 0.5*3^2/df
                     phase_expected[6] = 0.2
                 end
-                @test all(isapprox.(frequency(psd), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(psd), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(psd), phase_expected; atol=1e-12))
+                @test all(isapprox.(frequency(amp), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase, phase_expected; atol=1e-12))
 
                 # Make sure I can convert a PSD to a pressure spectrum.
-                ps = PressureSpectrum(psd)
-                amp_expected = similar(amplitude(ps))
+                psamp = PressureSpectrumAmplitude(amp)
+                amp_expected = similar(psamp)
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
@@ -658,12 +612,11 @@ end
                 else
                     amp_expected[6] = 3
                 end
-                @test all(isapprox.(frequency(ps), freq_expected; atol=1e-12))
-                @test all(isapprox.(amplitude(ps), amp_expected; atol=1e-12))
-                @test all(isapprox.(phase(ps), phase_expected; atol=1e-12))
+                @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
+                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
 
                 # Make sure I can convert a PSD to the acoustic pressure.
-                ap_from_psd = PressureTimeHistory(psd)
+                ap_from_psd = PressureTimeHistory(amp)
                 @test timestep(ap_from_psd) ≈ timestep(ap)
                 @test starttime(ap_from_psd) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_psd), pressure(ap)))
@@ -682,9 +635,11 @@ end
                 t = (0:n-1).*dt
                 p = apth_for_nbs.(t)
                 ap = PressureTimeHistory(p, dt)
-                psd = PowerSpectralDensity(ap)
-                @test all(isapprox.(frequency(psd), freq_a2[(T,n)], atol=1e-12))
-                @test all(isapprox.(amplitude(psd), psd_msp_a2[(T,n)], atol=1e-12))
+                amp = PowerSpectralDensityAmplitude(ap)
+                phase = PowerSpectralDensityPhase(ap)
+                @test all(isapprox.(frequency(amp), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(frequency(phase), freq_a2[(T,n)], atol=1e-12))
+                @test all(isapprox.(amp, psd_msp_a2[(T,n)], atol=1e-12))
                 # Checking the phase is tricky, since it involves the ratio of
                 # the imaginary component to the real component of the MSP
                 # spectrum (definition is phase = atan(imag(fft(p)),
@@ -692,14 +647,14 @@ end
                 # zero amplitude that ratio ends up being very noisy. So scale
                 # the phase by the amplitude to remove the problematic
                 # zero-amplitude components.
-                @test all(isapprox.(phase(psd).*amplitude(psd), psd_phase_a2[T, n].*psd_msp_a2[T, n], atol=1e-12))
+                @test all(isapprox.(phase.*amp, psd_phase_a2[T, n].*psd_msp_a2[T, n], atol=1e-12))
             end
         end
     end
 end
 
 @testset "Proportional Band Spectrum" begin
-    @testset "octave" begin
+    @testset "exact octave" begin
         bands = ExactOctaveCenterBands(6, 16)
         bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
         @test all(isapprox.(bands, bands_expected))
@@ -737,7 +692,7 @@ end
 
     end
 
-    @testset "1/3-octave" begin
+    @testset "exact 1/3-octave" begin
         bands = ExactThirdOctaveCenterBands(17, 40)
         # These are just from the ANOPP2 manual.
         bands_expected_all = [49.61, 62.50, 78.75, 99.21, 125.00, 157.49, 198.43, 250.00, 314.98, 396.85, 500.00, 629.96, 793.70, 1000.0, 1259.92, 1587.40, 2000.00, 2519.84, 3174.80, 4000.00, 5039.68, 6349.60, 8000.00, 10079.37]
@@ -785,8 +740,8 @@ end
             t = t0 .+ (0:n-1).*dt
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
-            psd = PowerSpectralDensity(ap)
-            pbs = ExactProportionalBandSpectrum{3}(psd)
+            psd = PowerSpectralDensityAmplitude(ap)
+            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, psd)
             # So, this should have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz, 4000 Hz, 5000 Hz.
             # And that means that, say, the 1000 Hz signal will exend from 500
             # Hz to 1500 Hz.
@@ -843,26 +798,17 @@ end
             t = t0 .+ (0:n-1).*dt
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
-            psd = PowerSpectralDensity(ap)
-            pbs = ExactProportionalBandSpectrum{3}(psd)
+            psd = PowerSpectralDensityAmplitude(ap)
+            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, psd)
             lbands = lower_bands(pbs)
             ubands = upper_bands(pbs)
             psd_freq = frequency(psd)
-            # @show psd_freq
-            psd_amp = amplitude(psd)
-            # @show psd_amp
-            # for i in eachindex(psd_amp)
-            #     println("$i: freq = $(psd_freq[i]) psd_amp = $(psd_amp[i])")
-            # end
-            # for (i, (l, u)) in enumerate(zip(lbands, ubands))
-            #     println("$i: $l $u")
-            # end
             @test psd_freq[21] ≈ freq0
-            @test pbs[17] ≈ psd_amp[21]*df
+            @test pbs[17] ≈ psd[21]*df
             @test psd_freq[41] ≈ 2*freq0
-            @test pbs[20] ≈ psd_amp[41]*df
+            @test pbs[20] ≈ psd[41]*df
             @test psd_freq[61] ≈ 3*freq0
-            @test pbs[22] ≈ psd_amp[61]*df
+            @test pbs[22] ≈ psd[61]*df
             # Make sure all the other PBS entries are zero.
             for (i, amp) in enumerate(pbs)
                 if i ∉ [17, 20, 22]
@@ -871,7 +817,6 @@ end
             end
 
             a2_data = load(joinpath(@__DIR__, "gen_anopp2_data", "pbs.jld2"))
-            # @show lower_bands(pbs) center_bands(pbs) upper_bands(pbs)
             a2_freq = a2_data["a2_pbs_freq"]
             a2_pbs = a2_data["a2_pbs"]
             pbs_level = @. 10*log10(pbs/p_ref^2)
@@ -889,17 +834,13 @@ end
         end
 
         @testset "narrowband spectrum, many narrowbands per proportional band" begin
-            # freq_min, freq_max = 50.0, 2000.0
-            # lbands = ExactThirdOctaveLowerBands(freq_min, freq_max)
-            # cbands = ExactThirdOctaveCenterBands(freq_min, freq_max)
-            # ubands = ExactThirdOctaveUpperBands(freq_min, freq_max)
             nfreq_nb = 800
             freq_min_nb = 55.0
             freq_max_nb = 1950.0
             df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
             f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
             psd = psd_func.(f_nb)
-            pbs = ExactProportionalBandSpectrum{3}(freq_min_nb, df_nb, psd)
+            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
             cbands = center_bands(pbs)
             pbs_level = @. 10*log10(pbs/p_ref^2)
 
@@ -921,7 +862,8 @@ end
         #     df = psd_freq[2] - psd_freq[1]
         #     msp_amp = 20 .+ 10 .* (1:n_freq)./n_freq
         #     psd_amp = msp_amp ./ df
-        #     pbs = ExactProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
+        #     # pbs = ExactProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
+        #     pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, first(psd_freq), df, psd_amp)
         #     cbands = center_bands(pbs)
         #     lbands = lower_bands(pbs)
         #     ubands = upper_bands(pbs)
@@ -950,7 +892,6 @@ end
                         f1 = ubands[b] - 0.5*df_nb
                         f = f0 .+ (0:nfreq-1).*df_nb
                         psd = psd_func.(f)
-                        # pbs = ExactProportionalBandSpectrum{3}(f0, df_nb, psd)
                         pbs = ExactThirdOctaveSpectrum(f0, df_nb, psd)
                         if length(pbs) > 1
                             # We tried above to construct the narrowand frequencies
@@ -1053,6 +994,448 @@ end
             end
         end
     end
+
+    @testset "approximate octave" begin
+        cbands = ApproximateOctaveCenterBands(0, 20)
+        cbands_expected = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16e3, 31.5e3, 63e3, 125e3, 250e3, 500e3, 1000e3]
+        @test all(cbands .≈ cbands_expected)
+
+        lbands = ApproximateOctaveLowerBands(0, 20)
+        lbands_expected = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6]
+        @test all(lbands .≈ lbands_expected)
+
+        ubands = ApproximateOctaveUpperBands(0, 20)
+        ubands_expected = [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6, 1.42e6]
+        @test all(ubands .≈ ubands_expected)
+
+        cbands = ApproximateOctaveCenterBands(-20, 0)
+        cbands_expected = [1.0e-6, 2.0e-6, 4.0e-6, 8.0e-6, 16.0e-6, 31.5e-6, 63e-6, 125.0e-6, 250.0e-6, 500.0e-6, 1000.0e-6, 2000.0e-6, 4000.0e-6, 8000.0e-6, 16e-3, 31.5e-3, 63e-3, 125e-3, 250e-3, 500e-3, 1000e-3]
+        @test all(cbands .≈ cbands_expected)
+
+        lbands = ApproximateOctaveLowerBands(-20, 0)
+        lbands_expected = [0.71e-6, 1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71]
+        @test all(lbands .≈ lbands_expected)
+
+        ubands = ApproximateOctaveUpperBands(-20, 0)
+        ubands_expected = [1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71, 1.42]
+        @test all(ubands .≈ ubands_expected)
+
+        cbands = ApproximateOctaveCenterBands(2.2, 30.5e3)
+        @test cbands.bstart == 1
+        @test cbands.bend == 15
+
+        lbands = ApproximateOctaveLowerBands(2.2, 30.5e3)
+        @test lbands.bstart == 1
+        @test lbands.bend == 15
+
+        ubands = ApproximateOctaveUpperBands(2.2, 30.5e3)
+        @test ubands.bstart == 1
+        @test ubands.bend == 15
+
+        cbands = ApproximateOctaveCenterBands(23.0e-6, 2.8e-3)
+        @test cbands.bstart == -15
+        @test cbands.bend == -9
+
+        lbands = ApproximateOctaveLowerBands(23.0e-6, 2.8e-3)
+        @test lbands.bstart == -15
+        @test lbands.bend == -9
+
+        ubands = ApproximateOctaveUpperBands(23.0e-6, 2.8e-3)
+        @test ubands.bstart == -15
+        @test ubands.bend == -9
+
+        @testset "spectrum, normal case" begin
+            freq_min_nb = 55.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 55 - 0.5*2 = 54 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 6 to 11.
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+            # Now, let's add up what each band's answer should be.
+            # Do I need to worry about the min and max stuff?
+            # I know that I've picked bands that fully cover the input PSD frequency.
+            # But, say, for the first band, it is possible that the lower edge of the first band is much lower than the lower edge of the first proportional band.
+            # So I do need to do that.
+            # Similar for the last band.
+            # But I don't think it's necessary for the inner ones.
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, lowest narrowband on a right edge" begin
+            freq_min_nb = 87.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 87 - 0.5*2 = 86 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 6 to 11.
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+            @test ubands[1] ≈ freq_min_nb + 0.5*df_nb
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, lowest narrowband on a left edge" begin
+            freq_min_nb = 89.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 89 - 0.5*2 = 88 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 7 to 11.
+            # But because of floating point roundoff, the code actually picks 6 as the starting band.
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+            @test lbands[2] ≈ freq_min_nb - 0.5*df_nb
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, highest narrowband on a left edge" begin
+            freq_min_nb = 55.0
+            freq_max_nb = 1421.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 55 - 0.5*2 = 54 to 1421.0 + 0.5*2 = 1422.0
+            # So we should be using bands 6 to 11.
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+            @test lbands[end] ≈ freq_max_nb - 0.5*df_nb
+            # Now, let's add up what each band's answer should be.
+            # Do I need to worry about the min and max stuff?
+            # I know that I've picked bands that fully cover the input PSD frequency.
+            # But, say, for the first band, it is possible that the lower edge of the first band is much lower than the lower edge of the first proportional band.
+            # So I do need to do that.
+            # Similar for the last band.
+            # But I don't think it's necessary for the inner ones.
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, highest narrowband on a right edge" begin
+            freq_min_nb = 55.0
+            freq_max_nb = 1419.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 55 - 0.5*2 = 54 to 1419.0 + 0.5*2 = 1420.0
+            # So we should be using bands 6 to 10.
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 10
+            @test ubands[end] ≈ freq_max_nb + 0.5*df_nb
+            # Now, let's add up what each band's answer should be.
+            # Do I need to worry about the min and max stuff?
+            # I know that I've picked bands that fully cover the input PSD frequency.
+            # But, say, for the first band, it is possible that the lower edge of the first band is much lower than the lower edge of the first proportional band.
+            # So I do need to do that.
+            # Similar for the last band.
+            # But I don't think it's necessary for the inner ones.
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+    end
+
+    @testset "approximate 1/3rd octave" begin
+        cbands = ApproximateThirdOctaveCenterBands(0, 30)
+        cbands_expected = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0, 1.0e1, 1.25e1, 1.6e1, 2.0e1, 2.5e1, 3.15e1, 4.0e1, 5.0e1, 6.3e1, 8.0e1, 1.0e2, 1.25e2, 1.6e2, 2.0e2, 2.5e2, 3.15e2, 4.0e2, 5.0e2, 6.3e2, 8.0e2, 1.0e3]
+        @test all(cbands .≈ cbands_expected)
+
+        lbands = ApproximateThirdOctaveLowerBands(0, 30)
+        lbands_expected = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3]
+        @test all(lbands .≈ lbands_expected)
+
+        ubands = ApproximateThirdOctaveUpperBands(0, 30)
+        ubands_expected = [1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3, 1.12e3]
+        @test all(ubands .≈ ubands_expected)
+
+        cbands = ApproximateThirdOctaveCenterBands(-30, 0)
+        cbands_expected = [1.0e-3, 1.25e-3, 1.6e-3, 2.0e-3, 2.5e-3, 3.15e-3, 4.0e-3, 5.0e-3, 6.3e-3, 8.0e-3, 1.0e-2, 1.25e-2, 1.6e-2, 2.0e-2, 2.5e-2, 3.15e-2, 4.0e-2, 5.0e-2, 6.3e-2, 8.0e-2, 1.0e-1, 1.25e-1, 1.6e-1, 2.0e-1, 2.5e-1, 3.15e-1, 4.0e-1, 5.0e-1, 6.3e-1, 8.0e-1, 1.0]
+        @test all(cbands .≈ cbands_expected)
+
+        lbands = ApproximateThirdOctaveLowerBands(-30, 0)
+        lbands_expected = [0.9e-3, 1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9]
+        @test all(lbands .≈ lbands_expected)
+
+        ubands = ApproximateThirdOctaveUpperBands(-30, 0)
+        ubands_expected = [1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9, 1.12]
+        @test all(ubands .≈ ubands_expected)
+
+        @testset "spectrum, normal case" begin
+            freq_min_nb = 50.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 50 - 0.5*2 = 49 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 17 to 33.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, lowest narrowband on a right edge" begin
+            freq_min_nb = 55.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 50 - 0.5*2 = 49 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 17 to 33.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            @test ubands[1] ≈ freq_min_nb + 0.5*df_nb
+            # Now, let's add up what each band's answer should be.
+            # Do I need to worry about the min and max stuff?
+            # I know that I've picked bands that fully cover the input PSD frequency.
+            # But, say, for the first band, it is possible that the lower edge of the first band is much lower than the lower edge of the first proportional band.
+            # So I do need to do that.
+            # Similar for the last band.
+            # But I don't think it's necessary for the inner ones.
+            #
+            # Hmm... first PBS band isn't passing.
+            # The first PBS band goes from 45 Hz to 56 Hz.
+            # This PSD would have just one band there, centered on 55 Hz, extending from 54 to 56 Hz.
+            # So, that bin width should be 2 Hz.
+            # Looks like that's what I'm doing.
+            # Oh, wait.
+            # Maybe I'm adding it twice here?
+            # Let's see...
+            # `f_nb .+ 0.5*df_nb = [56, 57, 58, 59...]`
+            # And the upper band edge for the first PBS is 56.
+            # So is `iend` here 1, or 2?
+            # `iend == 1`, same as `istart`.
+            # So I bet that has something to do with it.
+            # Yeah, looks like I'm adding this band twice, right?
+            # Yep, so need to deal with that.
+            # Fixed it.
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, lowest narrowband on a left edge" begin
+            freq_min_nb = 57.0
+            freq_max_nb = 1950.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 57 - 0.5*2 = 56 to 1950 + 0.5*2 = 1951.0
+            # So we should be using bands 18 to 33.
+            # But, actually, because of numerical roundoff stuff, the code picks 17.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            # Because of floating point inaccuracy stuff, the code picks one proportional band lower than I think it should.
+            @test lbands[2] ≈ freq_min_nb - 0.5*df_nb
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, highest narrowband on a right edge" begin
+            freq_min_nb = 50.0
+            freq_max_nb = 1799.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 50 - 0.5*2 = 49 to 1799 + 0.5*2 = 1800.0
+            # So we should be using bands 17 to 32.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 32
+            @test ubands[end] ≈ freq_max_nb + 0.5*df_nb
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+
+        @testset "spectrum, highest narrowband on a left edge" begin
+            freq_min_nb = 50.0
+            freq_max_nb = 1801.0
+            df_nb = 2.0
+            f_nb = freq_min_nb:df_nb:freq_max_nb
+            psd = psd_func.(f_nb)
+            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            lbands = lower_bands(pbs)
+            cbands = center_bands(pbs)
+            ubands = upper_bands(pbs)
+            # So, the narrowband frequency range is from 50 - 0.5*2 = 49 to 1801 + 0.5*2 = 1802.0
+            # So we should be using bands 17 to 33.
+            @test band_start(cbands) == 17
+            @test band_end(cbands) == 33
+            @test lbands[end] ≈ freq_max_nb - 0.5*df_nb
+            for (lband, uband, pbs_b) in zip(lbands, ubands, pbs)
+                istart = searchsortedfirst(f_nb .+ 0.5*df_nb, lband)
+                res_first = psd[istart]*(min(uband, f_nb[istart] + 0.5*df_nb) - max(lband, f_nb[istart] - 0.5*df_nb))
+                iend = searchsortedfirst(f_nb .+ 0.5*df_nb, uband)
+                if iend > lastindex(f_nb)
+                    iend = lastindex(f_nb)
+                end
+                if iend == istart
+                    res_last = zero(eltype(psd))
+                else
+                    res_last = psd[iend]*(min(uband, f_nb[iend] + 0.5*df_nb) - max(lband, f_nb[iend] - 0.5*df_nb))
+                end
+                res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
+                @test pbs_b ≈ res
+            end
+        end
+    end
 end
 
 @testset "OASPL" begin
@@ -1066,9 +1449,9 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrum(ap)
+                amp = MSPSpectrumAmplitude(ap)
                 oaspl_time_domain = OASPL(ap)
-                oaspl_freq_domain = OASPL(nbs)
+                oaspl_freq_domain = OASPL(amp)
                 @test oaspl_freq_domain ≈ oaspl_time_domain
             end
         end
@@ -1088,9 +1471,9 @@ end
                 msp_expected = 4^2/2
                 oaspl_expected = 10*log10(msp_expected/p_ref^2)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrum(ap)
+                amp = MSPSpectrumAmplitude(ap)
                 oaspl_time_domain = OASPL(ap)
-                oaspl_freq_domain = OASPL(nbs)
+                oaspl_freq_domain = OASPL(amp)
                 @test oaspl_time_domain ≈ oaspl_expected
                 @test oaspl_freq_domain ≈ oaspl_expected
             end
@@ -1108,7 +1491,6 @@ end
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
                 oaspl = OASPL(ap)
-                # oaspl_a2 = ANOPP2.a2_aa_oaspl(ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs)
                 @test isapprox(oaspl, oaspl_a2, atol=1e-12)
             end
         end
@@ -1132,10 +1514,10 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrum(ap)
+                nbs = MSPSpectrumAmplitude(ap)
                 # nbs_A = W_A(nbs)
                 # amp_A = W_A(nbs)
-                amp_A = W_A.(frequency(nbs)).*amplitude(nbs)
+                amp_A = W_A.(frequency(nbs)).*nbs
                 # ANOPP2.a2_aa_weight(ANOPP2.a2_aa_a_weight, ANOPP2.a2_aa_nbs_enum, ANOPP2.a2_aa_msp, freq, nbs_A_a2)
                 # Wish I could get this to match more closely. But the weighting
                 # function looks pretty nasty numerically (frequencies raised to the
@@ -1157,14 +1539,14 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
-                nbs = NarrowbandSpectrum(ap)
-                amp = amplitude(nbs)
+                nbs = MSPSpectrumAmplitude(ap)
+                # amp = amplitude(nbs)
                 # nbs_A = W_A(nbs)
                 # amp_A = W_A(nbs)
-                amp_A = W_A.(frequency(nbs)).*amplitude(nbs)
+                amp_A = W_A.(frequency(nbs)).*nbs
                 # This is lame. Should be able to get this to match better,
                 # right?
-                @test all(isapprox.(amp_A, amp, atol=1e-5))
+                @test all(isapprox.(amp_A, nbs, atol=1e-5))
             end
         end
     end
