@@ -1,4 +1,4 @@
-[![Tests](https://github.com/dingraha/AcousticMetrics.jl/actions/workflows/test.yaml/badge.svg)](https://github.com/dingraha/AcousticMetrics.jl/actions/workflows/test.yaml)
+[![Tests](https://github.com/OpenMDAO/AcousticMetrics.jl/actions/workflows/test.yaml/badge.svg)](https://github.com/OpenMDAO/AcousticMetrics.jl/actions/workflows/test.yaml)
 
 # Introduction
 AcousticMetrics.jl is a Julia package for computing various metrics useful in acoustics.
