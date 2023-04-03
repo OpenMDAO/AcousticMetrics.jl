@@ -1,4 +1,5 @@
 [![Tests](https://github.com/OpenMDAO/AcousticMetrics.jl/actions/workflows/test.yaml/badge.svg)](https://github.com/OpenMDAO/AcousticMetrics.jl/actions/workflows/test.yaml)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://OpenMDAO.github.io/AcousticMetrics.jl/dev)
 
 # Introduction
 AcousticMetrics.jl is a Julia package for computing various metrics useful in acoustics.
