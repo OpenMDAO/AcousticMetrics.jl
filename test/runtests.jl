@@ -3,11 +3,11 @@ using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2
 using AcousticMetrics: PressureTimeHistory
 using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
 using AcousticMetrics: starttime, timestep, time, pressure, frequency, halfcomplex, OASPL
-using AcousticMetrics: band_start, band_end
+using AcousticMetrics: octave_fraction, band_start, band_end, cband_exact, cband_approx_3rd_octave, cband_approx_octave
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
-using AcousticMetrics: ProportionalBandSpectrum, ExactThirdOctaveSpectrum
+using AcousticMetrics: LazyProportionalBandSpectrumNB, ExactThirdOctaveSpectrum
 using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
 using AcousticMetrics: W_A
@@ -690,6 +690,11 @@ end
         @test ubands.bstart == 9
         @test ubands.bend == 14
 
+        # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
+        for (i, cband) in enumerate(cbands)
+            @test cband_exact(octave_fraction(cbands), cband) == (band_start(cbands) + i - 1)
+        end
+
     end
 
     @testset "exact 1/3-octave" begin
@@ -729,6 +734,11 @@ end
         @test ubands.bstart == 25
         @test ubands.bend == 39
 
+        # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
+        for (i, cband) in enumerate(cbands)
+            @test cband_exact(octave_fraction(cbands), cband) == (band_start(cbands) + i - 1)
+        end
+
         @testset "not-so-narrow narrowband spectrum" begin
             T = 1/1000.0
             t0 = 0.13
@@ -741,7 +751,7 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensityAmplitude(ap)
-            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, psd)
+            pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, psd)
             # So, this should have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz, 4000 Hz, 5000 Hz.
             # And that means that, say, the 1000 Hz signal will exend from 500
             # Hz to 1500 Hz.
@@ -799,7 +809,7 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensityAmplitude(ap)
-            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, psd)
+            pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, psd)
             lbands = lower_bands(pbs)
             ubands = upper_bands(pbs)
             psd_freq = frequency(psd)
@@ -840,7 +850,7 @@ end
             df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
             f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
             cbands = center_bands(pbs)
             pbs_level = @. 10*log10(pbs/p_ref^2)
 
@@ -862,8 +872,8 @@ end
         #     df = psd_freq[2] - psd_freq[1]
         #     msp_amp = 20 .+ 10 .* (1:n_freq)./n_freq
         #     psd_amp = msp_amp ./ df
-        #     # pbs = ExactProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
-        #     pbs = ProportionalBandSpectrum(ExactProportionalBands{3}, first(psd_freq), df, psd_amp)
+        #     # pbs = ExactLazyProportionalBandSpectrumNB{3}(first(psd_freq), df, psd_amp)
+        #     pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, first(psd_freq), df, psd_amp)
         #     cbands = center_bands(pbs)
         #     lbands = lower_bands(pbs)
         #     ubands = upper_bands(pbs)
@@ -961,7 +971,7 @@ end
                         psd = psd_func.(f)
 
                         # And the PBS
-                        # pbs = ExactProportionalBandSpectrum{3}(f[1], df_nb, psd)
+                        # pbs = ExactLazyProportionalBandSpectrumNB{3}(f[1], df_nb, psd)
                         pbs = ExactThirdOctaveSpectrum(f[1], df_nb, psd)
 
                         # We created a narrowband range that should cover from freq_min to freq_max, so the sizes should be the same.
@@ -999,6 +1009,10 @@ end
         cbands = ApproximateOctaveCenterBands(0, 20)
         cbands_expected = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16e3, 31.5e3, 63e3, 125e3, 250e3, 500e3, 1000e3]
         @test all(cbands .≈ cbands_expected)
+        for (i, cband) in enumerate(cbands)
+            @test cband_approx_octave(cband) == (band_start(cbands) + i - 1)
+        end
+
 
         lbands = ApproximateOctaveLowerBands(0, 20)
         lbands_expected = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6]
@@ -1011,6 +1025,9 @@ end
         cbands = ApproximateOctaveCenterBands(-20, 0)
         cbands_expected = [1.0e-6, 2.0e-6, 4.0e-6, 8.0e-6, 16.0e-6, 31.5e-6, 63e-6, 125.0e-6, 250.0e-6, 500.0e-6, 1000.0e-6, 2000.0e-6, 4000.0e-6, 8000.0e-6, 16e-3, 31.5e-3, 63e-3, 125e-3, 250e-3, 500e-3, 1000e-3]
         @test all(cbands .≈ cbands_expected)
+        for (i, cband) in enumerate(cbands)
+            @test cband_approx_octave(cband) == (band_start(cbands) + i - 1)
+        end
 
         lbands = ApproximateOctaveLowerBands(-20, 0)
         lbands_expected = [0.71e-6, 1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71]
@@ -1050,7 +1067,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1088,7 +1105,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1120,7 +1137,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1153,7 +1170,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1192,7 +1209,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1231,6 +1248,11 @@ end
         cbands_expected = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0, 1.0e1, 1.25e1, 1.6e1, 2.0e1, 2.5e1, 3.15e1, 4.0e1, 5.0e1, 6.3e1, 8.0e1, 1.0e2, 1.25e2, 1.6e2, 2.0e2, 2.5e2, 3.15e2, 4.0e2, 5.0e2, 6.3e2, 8.0e2, 1.0e3]
         @test all(cbands .≈ cbands_expected)
 
+        # Test the `cband_approx_3rd_octave` routine, which goes from an approximate 3rd-octave centerband frequency to the band number.
+        for (i, cband) in enumerate(cbands)
+            @test cband_approx_3rd_octave(cband) == (band_start(cbands) + i - 1)
+        end
+
         lbands = ApproximateThirdOctaveLowerBands(0, 30)
         lbands_expected = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3]
         @test all(lbands .≈ lbands_expected)
@@ -1242,6 +1264,10 @@ end
         cbands = ApproximateThirdOctaveCenterBands(-30, 0)
         cbands_expected = [1.0e-3, 1.25e-3, 1.6e-3, 2.0e-3, 2.5e-3, 3.15e-3, 4.0e-3, 5.0e-3, 6.3e-3, 8.0e-3, 1.0e-2, 1.25e-2, 1.6e-2, 2.0e-2, 2.5e-2, 3.15e-2, 4.0e-2, 5.0e-2, 6.3e-2, 8.0e-2, 1.0e-1, 1.25e-1, 1.6e-1, 2.0e-1, 2.5e-1, 3.15e-1, 4.0e-1, 5.0e-1, 6.3e-1, 8.0e-1, 1.0]
         @test all(cbands .≈ cbands_expected)
+
+        for (i, cband) in enumerate(cbands)
+            @test cband_approx_3rd_octave(cband) == (band_start(cbands) + i - 1)
+        end
 
         lbands = ApproximateThirdOctaveLowerBands(-30, 0)
         lbands_expected = [0.9e-3, 1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9]
@@ -1257,7 +1283,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1288,7 +1314,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1344,7 +1370,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1378,7 +1404,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)
@@ -1410,7 +1436,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = ProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
             lbands = lower_bands(pbs)
             cbands = center_bands(pbs)
             ubands = upper_bands(pbs)

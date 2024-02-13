@@ -12,7 +12,9 @@ The `LCU` parameter can take one of three values:
 abstract type AbstractProportionalBands{NO,LCU,TF} <: AbstractVector{TF} end
 
 octave_fraction(::Type{<:AbstractProportionalBands{NO}}) where {NO} = NO
+octave_fraction(bands::AbstractProportionalBands{NO}) where {NO} = octave_fraction(typeof(bands))
 lower_center_upper(::Type{<:AbstractProportionalBands{NO,LCU,TF}}) where {NO,LCU,TF} = LCU
+lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = lower_center_upper(typeof(bands))
 
 const f0_exact = 1000
 const fmin_exact = 1
@@ -72,6 +74,23 @@ ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int) where {NO,LCU} = ExactPro
 
 @inline band_exact_lower_limit(NO, fl) = floor(Int, 1/2 + NO*log2(fl/f0_exact) + 10*NO)
 @inline band_exact_upper_limit(NO, fu) = ceil(Int, -1/2 + NO*log2(fu/f0_exact) + 10*NO)
+
+function cband_exact(NO, fc, tol=10*eps(fc))
+    # f = 2^((b - 10*NO)/NO)*f0
+    # f/f0 = 2^((b - 10*NO)/NO)
+    # log2(f/f0) = log2(2^((b - 10*NO)/NO))
+    # log2(f/f0) = ((b - 10*NO)/NO)
+    # log2(f/f0)*NO = b - 10*NO
+    # log2(f/f0)*NO + 10*NO = b
+    # b = log2(f/f0)*NO + 10*NO
+    # Get the band number from a center band frequency `fc`.
+    log2_fc_over_f0_exact_NO = log2(fc/f0_exact)*NO
+    # Check that the result will be very close to an integer.
+    rounded = round(Int, log2_fc_over_f0_exact_NO)
+    abs_cs_safe(log2_fc_over_f0_exact_NO - rounded) < tol  || throw(ArgumentError("fc does not correspond to a center-band frequency"))
+    b = rounded + 10*NO
+    return b
+end
 
 """
     ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF)
@@ -253,6 +272,22 @@ end
     return (i - 1) + factor10*10
 end
 
+function cband_approx_3rd_octave(f)
+    frac, factor10 = modf(log10(f))
+    if (frac < -eps(frac))
+        frac += 1
+        factor10 -= 1
+    end
+    cband_pattern_entry = 10^frac
+    tol_shift = 0.001
+    b = searchsortedfirst(approx_3rd_octave_cbands_pattern, cband_pattern_entry-tol_shift)
+    tol_compare = 100*eps(approx_3rd_octave_cbands_pattern[b])
+    abs_cs_safe(approx_3rd_octave_cbands_pattern[b] - cband_pattern_entry) < tol_compare || throw(ArgumentError("frequency f does not correspond to an approximate 3rd-octave center band"))
+    b0 = b - 1
+    j = 10*Int(factor10) + b0
+    return j
+end
+
 """
     ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF)
 
@@ -353,6 +388,22 @@ end
     return (i - 1) + factor1000*10
 end
 
+function cband_approx_octave(f)
+    frac, factor1000 = modf(log10(f)/log10(1000))
+    if (frac < -eps(frac))
+        frac += 1
+        factor1000 -= 1
+    end
+    cband_pattern_entry = 1000^frac
+    tol_shift = 0.001
+    b = searchsortedfirst(approx_octave_cbands_pattern, cband_pattern_entry-tol_shift)
+    tol_compare = 100*eps(approx_octave_cbands_pattern[b])
+    abs_cs_safe(approx_octave_cbands_pattern[b] - cband_pattern_entry) < tol_compare || throw(ArgumentError("frequency f does not correspond to an approximate octave center band"))
+    b0 = b - 1
+    j = 10*Int(factor1000) + b0
+    return j
+end
+
 """
     ApproximateOctaveBands{LCU}(fstart::TF, fend::TF)
 
@@ -365,13 +416,21 @@ const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
 const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
 const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
 
+abstract type AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF} end
+
+octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
+@inline lower_bands(pbs::AbstractProportionalBandSpectrum) = pbs.lbands
+@inline center_bands(pbs::AbstractProportionalBandSpectrum) = pbs.cbands
+@inline upper_bands(pbs::AbstractProportionalBandSpectrum) = pbs.ubands
+
+@inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
 
 """
-    ProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
+    LazyProportionalBandSpectrumNB{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
 
 Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
 """
-struct ProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractVector{TF}
+struct LazyProportionalBandSpectrumNB{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
     f1_nb::TF
     df_nb::TF
     psd_amp::TAmp
@@ -379,7 +438,7 @@ struct ProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO
     cbands::TBandsC
     ubands::TBandsU
 
-    function ProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, psd_amp) where {NO}
+    function LazyProportionalBandSpectrumNB(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, psd_amp) where {NO}
         TF = promote_type(typeof(f1_nb), typeof(df_nb), eltype(psd_amp))
 
         f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
@@ -396,63 +455,57 @@ struct ProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO
     end
 end
 
-const ExactOctaveSpectrum{TF,TAmp} = ProportionalBandSpectrum{1,TF,TAmp,
+const ExactOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{1,TF,TAmp,
                                                               ExactProportionalBands{1,:lower,TF},
                                                               ExactProportionalBands{1,:center,TF},
                                                               ExactProportionalBands{1,:upper,TF}}
-ExactOctaveSpectrum(f1_nb, df_nb, psd_amp) = ProportionalBandSpectrum(ExactProportionalBands{1}, f1_nb, df_nb, psd_amp)
-ExactOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = ProportionalBandSpectrum(ExactProportionalBands{1}, sm)
+ExactOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ExactProportionalBands{1}, f1_nb, df_nb, psd_amp)
+ExactOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ExactProportionalBands{1}, sm)
 
-const ExactThirdOctaveSpectrum{TF,TAmp} = ProportionalBandSpectrum{3,TF,TAmp,
+const ExactThirdOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{3,TF,TAmp,
                                                                    ExactProportionalBands{3,:lower,TF},
                                                                    ExactProportionalBands{3,:center,TF},
                                                                    ExactProportionalBands{3,:upper,TF}}
-ExactThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = ProportionalBandSpectrum(ExactProportionalBands{3}, f1_nb, df_nb, psd_amp)
-ExactThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = ProportionalBandSpectrum(ExactProportionalBands{3}, sm)
+ExactThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, f1_nb, df_nb, psd_amp)
+ExactThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, sm)
 
-const ApproximateOctaveSpectrum{TF,TAmp} = ProportionalBandSpectrum{1,TF,TAmp,
+const ApproximateOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{1,TF,TAmp,
                                                               ApproximateOctaveBands{:lower,TF},
                                                               ApproximateOctaveBands{:center,TF},
                                                               ApproximateOctaveBands{:upper,TF}}
-ApproximateOctaveSpectrum(f1_nb, df_nb, psd_amp) = ProportionalBandSpectrum(ApproximateOctaveBands, f1_nb, df_nb, psd_amp)
-ApproximateOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = ProportionalBandSpectrum(ApproximateOctaveBands, sm)
+ApproximateOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, f1_nb, df_nb, psd_amp)
+ApproximateOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, sm)
 
-const ApproximateThirdOctaveSpectrum{TF,TAmp} = ProportionalBandSpectrum{1,TF,TAmp,
+const ApproximateThirdOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{1,TF,TAmp,
                                                               ApproximateThirdOctaveBands{:lower,TF},
                                                               ApproximateThirdOctaveBands{:center,TF},
                                                               ApproximateThirdOctaveBands{:upper,TF}}
-ApproximateThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = ProportionalBandSpectrum(ApproximateThirdOctaveBands, f1_nb, df_nb, psd_amp)
-ApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = ProportionalBandSpectrum(ApproximateThirdOctaveBands, sm)
+ApproximateThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, f1_nb, df_nb, psd_amp)
+ApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, sm)
 
-frequency_nb(pbs::ProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
+frequency_nb(pbs::LazyProportionalBandSpectrumNB) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
 
 """
-    ProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+    LazyProportionalBandSpectrumNB(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
 
-Construct a `ProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`.
+Construct a `LazyProportionalBandSpectrumNB` using a proportional band `TBands` and narrowband spectrum `sm`.
 """
-function ProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+function LazyProportionalBandSpectrumNB(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
     psd = PowerSpectralDensityAmplitude(sm)
     freq = frequency(psd)
     f1_nb = freq[begin+1]
     df_nb = step(freq)
     # Skip the zero frequency.
     psd_amp = @view psd[begin+1:end]
-    return ProportionalBandSpectrum(TBands, f1_nb, df_nb, psd_amp)
+    return LazyProportionalBandSpectrumNB(TBands, f1_nb, df_nb, psd_amp)
 end
 
-@inline lower_bands(pbs::ProportionalBandSpectrum) = pbs.lbands
-@inline center_bands(pbs::ProportionalBandSpectrum) = pbs.cbands
-@inline upper_bands(pbs::ProportionalBandSpectrum) = pbs.ubands
-
-@inline Base.size(pbs::ProportionalBandSpectrum) = size(center_bands(pbs))
-
 """
-    Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
+    Base.getindex(pbs::LazyProportionalBandSpectrumNB, i::Int)
 
 Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
 """
-@inline function Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
+@inline function Base.getindex(pbs::LazyProportionalBandSpectrumNB, i::Int)
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.
@@ -519,3 +572,27 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
     res = res_first_band + res_last_band
     return res_first_band + sum(psd_amp_v2*Δf) + res_last_band
 end
+
+"""
+    ProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
+
+Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
+"""
+struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
+    pbs::TPBS
+    lbands::TBandsL
+    cbands::TBandsC
+    ubands::TBandsU
+
+    function ProportionalBandSpectrum(cbands, pbs) where {NO}
+        TF = eltype(pbs)
+        TFBands = eltype(cbands)
+
+        length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
+        lbands = TBands{:lower}(TFBands, band_start(cbands), band_end(cbands))
+        ubands = TBands{:upper}(TFBands, band_start(cbands), band_end(cbands))
+
+        return new{NO,TF,typeof(pbs),typeof(lbands), typeof(cbands), typeof(ubands)}(pbs, lbands, cbands, ubands)
+    end
+end
+
