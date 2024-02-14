@@ -16,6 +16,8 @@ octave_fraction(bands::AbstractProportionalBands{NO}) where {NO} = octave_fracti
 lower_center_upper(::Type{<:AbstractProportionalBands{NO,LCU,TF}}) where {NO,LCU,TF} = LCU
 lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = lower_center_upper(typeof(bands))
 
+cband_number(bands::AbstractProportionalBands, fc) = cband_number(typeof(bands), fc)
+
 const f0_exact = 1000
 const fmin_exact = 1
 
@@ -75,7 +77,8 @@ ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int) where {NO,LCU} = ExactPro
 @inline band_exact_lower_limit(NO, fl) = floor(Int, 1/2 + NO*log2(fl/f0_exact) + 10*NO)
 @inline band_exact_upper_limit(NO, fu) = ceil(Int, -1/2 + NO*log2(fu/f0_exact) + 10*NO)
 
-function cband_exact(NO, fc, tol=10*eps(fc))
+function cband_exact(NO, fc)
+    tol = 10*eps(fc)
     # f = 2^((b - 10*NO)/NO)*f0
     # f/f0 = 2^((b - 10*NO)/NO)
     # log2(f/f0) = log2(2^((b - 10*NO)/NO))
@@ -90,6 +93,10 @@ function cband_exact(NO, fc, tol=10*eps(fc))
     abs_cs_safe(log2_fc_over_f0_exact_NO - rounded) < tol  || throw(ArgumentError("fc does not correspond to a center-band frequency"))
     b = rounded + 10*NO
     return b
+end
+
+function cband_number(::Type{<:ExactProportionalBands{NO}}, fc) where {NO}
+    return cband_exact(NO, fc)
 end
 
 """
@@ -272,8 +279,8 @@ end
     return (i - 1) + factor10*10
 end
 
-function cband_approx_3rd_octave(f)
-    frac, factor10 = modf(log10(f))
+function cband_approx_3rd_octave(fc)
+    frac, factor10 = modf(log10(fc))
     # if (frac < -eps(frac))
     #     frac += 1
     #     factor10 -= 1
@@ -285,10 +292,14 @@ function cband_approx_3rd_octave(f)
     tol_shift = 0.001
     b = searchsortedfirst(approx_3rd_octave_cbands_pattern, cband_pattern_entry-tol_shift)
     tol_compare = 100*eps(approx_3rd_octave_cbands_pattern[b])
-    abs_cs_safe(approx_3rd_octave_cbands_pattern[b] - cband_pattern_entry) < tol_compare || throw(ArgumentError("frequency f does not correspond to an approximate 3rd-octave center band"))
+    abs_cs_safe(approx_3rd_octave_cbands_pattern[b] - cband_pattern_entry) < tol_compare || throw(ArgumentError("frequency fc does not correspond to an approximate 3rd-octave center band"))
     b0 = b - 1
     j = 10*Int(factor10) + b0
     return j
+end
+
+function cband_number(::Type{<:ApproximateThirdOctaveBands}, fc)
+    return cband_approx_3rd_octave(fc)
 end
 
 """
@@ -302,6 +313,10 @@ ApproximateThirdOctaveBands{LCU,TF}(fstart::TF, fend::TF) where {LCU,TF} = Appro
 const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:center,TF}
 const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,TF}
 const ApproximateThirdOctaveUpperBands{TF} = ApproximateThirdOctaveBands{:upper,TF}
+
+lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:lower,TF}(bands.bstart, bands.bend)
+center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:center,TF}(bands.bstart, bands.bend)
+upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:upper,TF}(bands.bstart, bands.bend)
 
 const approx_octave_cbands_pattern = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63.0, 125.0, 250.0, 500.0]
 const approx_octave_lbands_pattern = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0]
@@ -410,6 +425,10 @@ function cband_approx_octave(f)
     return j
 end
 
+function cband_number(::Type{<:ApproximateOctaveBands}, fc)
+    return cband_approx_octave(fc)
+end
+
 """
     ApproximateOctaveBands{LCU}(fstart::TF, fend::TF)
 
@@ -421,6 +440,10 @@ ApproximateOctaveBands{LCU,TF}(fstart::TF, fend::TF) where {LCU,TF} = Approximat
 const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
 const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
 const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
+
+lower_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:lower,TF}(bands.bstart, bands.bend)
+center_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:center,TF}(bands.bstart, bands.bend)
+upper_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:upper,TF}(bands.bstart, bands.bend)
 
 abstract type AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF} end
 
@@ -580,25 +603,48 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
 end
 
 """
-    ProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
+    ProportionalBandSpectrum{NO,TF,TPBS,TBandsL,TBandsC,TBandsU}
 
 Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
 """
-struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO,:lower},TBandsC<:AbstractProportionalBands{NO,:center},TBandsU<:AbstractProportionalBands{NO,:upper}} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
     lbands::TBandsL
     cbands::TBandsC
     ubands::TBandsU
 
-    function ProportionalBandSpectrum(cbands, pbs) where {NO}
-        TF = eltype(pbs)
-        TFBands = eltype(cbands)
-
+    function ProportionalBandSpectrum(pbs, cbands::AbstractProportionalBands{NO,:center}) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
-        lbands = TBands{:lower}(TFBands, band_start(cbands), band_end(cbands))
-        ubands = TBands{:upper}(TFBands, band_start(cbands), band_end(cbands))
 
-        return new{NO,TF,typeof(pbs),typeof(lbands), typeof(cbands), typeof(ubands)}(pbs, lbands, cbands, ubands)
+        lbands = lower_bands(cbands)
+        ubands = upper_bands(cbands)
+
+        return new{NO,eltype(pbs),typeof(pbs),typeof(lbands), typeof(cbands), typeof(ubands)}(pbs, lbands, cbands, ubands)
     end
 end
 
+"""
+    ProportionalBandSpectrum(pbs, TBandsC, cfreq_start)
+
+Construct a `ProportionalBandSpectrum` from an array of proportional band amplitudes, `TBandsC::Type{<:AbstractProportionalBands{NO,:center}` and `cfreq_start`.
+
+`cfreq_start` is the centerband frequency corresponding to the first entry of `pbs`.
+"""
+function ProportionalBandSpectrum(pbs, TBandsC::Type{<:AbstractProportionalBands{NO,:center}}, cfreq_start) where {NO}
+    bstart = cband_number(TBandsC, cfreq_start)
+    bend = bstart + length(pbs) - 1
+    cbands = TBandsC(bstart, bend)
+
+    return ProportionalBandSpectrum(pbs, cbands)
+end
+
+
+"""
+    Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
+
+Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
+"""
+@inline function Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
+    @boundscheck checkbounds(pbs, i)
+    return pbs.pbs[i]
+end
