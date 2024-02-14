@@ -274,10 +274,13 @@ end
 
 function cband_approx_3rd_octave(f)
     frac, factor10 = modf(log10(f))
-    if (frac < -eps(frac))
-        frac += 1
-        factor10 -= 1
-    end
+    # if (frac < -eps(frac))
+    #     frac += 1
+    #     factor10 -= 1
+    # end
+    adj = ifelse(frac < -eps(frac), 1, 0)
+    frac += adj
+    factor10 -= adj
     cband_pattern_entry = 10^frac
     tol_shift = 0.001
     b = searchsortedfirst(approx_3rd_octave_cbands_pattern, cband_pattern_entry-tol_shift)
@@ -390,10 +393,13 @@ end
 
 function cband_approx_octave(f)
     frac, factor1000 = modf(log10(f)/log10(1000))
-    if (frac < -eps(frac))
-        frac += 1
-        factor1000 -= 1
-    end
+    # if (frac < -eps(frac))
+    #     frac += 1
+    #     factor1000 -= 1
+    # end
+    adj = ifelse(frac < -eps(frac), 1, 0)
+    frac += adj
+    factor1000 -= adj
     cband_pattern_entry = 1000^frac
     tol_shift = 0.001
     b = searchsortedfirst(approx_octave_cbands_pattern, cband_pattern_entry-tol_shift)
