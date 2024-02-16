@@ -655,88 +655,181 @@ end
 
 @testset "Proportional Band Spectrum" begin
     @testset "exact octave" begin
-        bands = ExactOctaveCenterBands(6, 16)
-        bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
-        @test all(isapprox.(bands, bands_expected))
+        @testset "standard" begin
+            bands = ExactOctaveCenterBands(6, 16)
+            bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
+            @test all(isapprox.(bands, bands_expected))
 
-        @test_throws BoundsError bands[0]
-        @test_throws BoundsError bands[12]
+            @test_throws BoundsError bands[0]
+            @test_throws BoundsError bands[12]
 
-        bands_9_to_11 = ExactOctaveCenterBands(9, 11)
-        @test all(isapprox.(bands_9_to_11, bands_expected[4:6]))
+            bands_9_to_11 = ExactOctaveCenterBands(9, 11)
+            @test all(isapprox.(bands_9_to_11, bands_expected[4:6]))
 
-        @test_throws BoundsError bands_9_to_11[0]
-        @test_throws BoundsError bands_9_to_11[4]
+            @test_throws BoundsError bands_9_to_11[0]
+            @test_throws BoundsError bands_9_to_11[4]
 
-        @test_throws ArgumentError ExactOctaveCenterBands(5, 4)
+            @test_throws ArgumentError ExactOctaveCenterBands(5, 4)
 
-        lbands = ExactOctaveLowerBands(6, 16)
-        @test all((log2.(bands) .- log2.(lbands)) .≈ 1/2)
+            lbands = ExactOctaveLowerBands(6, 16)
+            @test all((log2.(bands) .- log2.(lbands)) .≈ 1/2)
 
-        ubands = ExactOctaveUpperBands(6, 16)
-        @test all((log2.(ubands) .- log2.(bands)) .≈ 1/2)
+            ubands = ExactOctaveUpperBands(6, 16)
+            @test all((log2.(ubands) .- log2.(bands)) .≈ 1/2)
 
-        @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
+            @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
 
-        cbands = ExactOctaveCenterBands(700.0, 22000.0)
-        @test cbands.bstart == 9
-        @test cbands.bend == 14
+            cbands = ExactOctaveCenterBands(700.0, 22000.0)
+            @test cbands.bstart == 9
+            @test cbands.bend == 14
 
-        lbands = ExactOctaveLowerBands(700.0, 22000.0)
-        @test lbands.bstart == 9
-        @test lbands.bend == 14
+            lbands = ExactOctaveLowerBands(700.0, 22000.0)
+            @test lbands.bstart == 9
+            @test lbands.bend == 14
 
-        ubands = ExactOctaveUpperBands(700.0, 22000.0)
-        @test ubands.bstart == 9
-        @test ubands.bend == 14
+            ubands = ExactOctaveUpperBands(700.0, 22000.0)
+            @test ubands.bstart == 9
+            @test ubands.bend == 14
 
-        # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
-        for (i, cband) in enumerate(cbands)
-            @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
+            for (i, cband) in enumerate(cbands)
+                @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            end
+        end
+
+        @testset "scaler argument" begin
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                bands = ExactOctaveCenterBands(6, 16, scaler)
+                bands_expected = scaler .* [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
+                @test all(isapprox.(bands, bands_expected))
+
+                @test_throws BoundsError bands[0]
+                @test_throws BoundsError bands[12]
+
+                bands_9_to_11 = ExactOctaveCenterBands(9, 11, scaler)
+                @test all(isapprox.(bands_9_to_11, bands_expected[4:6]))
+
+                @test_throws BoundsError bands_9_to_11[0]
+                @test_throws BoundsError bands_9_to_11[4]
+
+                @test_throws ArgumentError ExactOctaveCenterBands(5, 4, scaler)
+
+                lbands = ExactOctaveLowerBands(6, 16, scaler)
+                @test all((log2.(bands) .- log2.(lbands)) .≈ 1/2)
+
+                ubands = ExactOctaveUpperBands(6, 16, scaler)
+                @test all((log2.(ubands) .- log2.(bands)) .≈ 1/2)
+
+                @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
+
+                cbands = ExactOctaveCenterBands(700.0*scaler, 22000.0*scaler, scaler)
+                @test cbands.bstart == 9
+                @test cbands.bend == 14
+
+                lbands = ExactOctaveLowerBands(700.0*scaler, 22000.0*scaler, scaler)
+                @test lbands.bstart == 9
+                @test lbands.bend == 14
+
+                ubands = ExactOctaveUpperBands(700.0*scaler, 22000.0*scaler, scaler)
+                @test ubands.bstart == 9
+                @test ubands.bend == 14
+
+                # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
+                for (i, cband) in enumerate(cbands)
+                    @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                end
+            end
         end
 
     end
 
     @testset "exact 1/3-octave" begin
-        bands = ExactThirdOctaveCenterBands(17, 40)
-        # These are just from the ANOPP2 manual.
-        bands_expected_all = [49.61, 62.50, 78.75, 99.21, 125.00, 157.49, 198.43, 250.00, 314.98, 396.85, 500.00, 629.96, 793.70, 1000.0, 1259.92, 1587.40, 2000.00, 2519.84, 3174.80, 4000.00, 5039.68, 6349.60, 8000.00, 10079.37]
-        @test all(isapprox.(bands, bands_expected_all; atol=0.005))
+        @testset "standard" begin
+            bands = ExactThirdOctaveCenterBands(17, 40)
+            # These are just from the ANOPP2 manual.
+            bands_expected_all = [49.61, 62.50, 78.75, 99.21, 125.00, 157.49, 198.43, 250.00, 314.98, 396.85, 500.00, 629.96, 793.70, 1000.0, 1259.92, 1587.40, 2000.00, 2519.84, 3174.80, 4000.00, 5039.68, 6349.60, 8000.00, 10079.37]
+            @test all(isapprox.(bands, bands_expected_all; atol=0.005))
 
-        @test_throws BoundsError bands[0]
-        @test_throws BoundsError bands[25]
+            @test_throws BoundsError bands[0]
+            @test_throws BoundsError bands[25]
 
-        bands_30_to_38 = ExactThirdOctaveCenterBands(30, 38)
-        @test all(isapprox.(bands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
+            bands_30_to_38 = ExactThirdOctaveCenterBands(30, 38)
+            @test all(isapprox.(bands_30_to_38, bands_expected_all[14:end-2]; atol=0.005))
 
-        @test_throws BoundsError bands_30_to_38[0]
-        @test_throws BoundsError bands_30_to_38[10]
+            @test_throws BoundsError bands_30_to_38[0]
+            @test_throws BoundsError bands_30_to_38[10]
 
-        @test_throws ArgumentError ExactThirdOctaveCenterBands(5, 4)
+            @test_throws ArgumentError ExactThirdOctaveCenterBands(5, 4)
 
-        lbands = ExactThirdOctaveLowerBands(17, 40)
-        @test all((log2.(bands) .- log2.(lbands)) .≈ 1/(2*3))
+            lbands = ExactThirdOctaveLowerBands(17, 40)
+            @test all((log2.(bands) .- log2.(lbands)) .≈ 1/(2*3))
 
-        ubands = ExactThirdOctaveUpperBands(17, 40)
-        @test all((log2.(ubands) .- log2.(bands)) .≈ 1/(2*3))
+            ubands = ExactThirdOctaveUpperBands(17, 40)
+            @test all((log2.(ubands) .- log2.(bands)) .≈ 1/(2*3))
 
-        @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
+            @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
 
-        cbands = ExactThirdOctaveCenterBands(332.0, 7150.0)
-        @test cbands.bstart == 25
-        @test cbands.bend == 39
+            cbands = ExactThirdOctaveCenterBands(332.0, 7150.0)
+            @test cbands.bstart == 25
+            @test cbands.bend == 39
 
-        lbands = ExactThirdOctaveLowerBands(332.0, 7150.0)
-        @test lbands.bstart == 25
-        @test lbands.bend == 39
+            lbands = ExactThirdOctaveLowerBands(332.0, 7150.0)
+            @test lbands.bstart == 25
+            @test lbands.bend == 39
 
-        ubands = ExactThirdOctaveUpperBands(332.0, 7150.0)
-        @test ubands.bstart == 25
-        @test ubands.bend == 39
+            ubands = ExactThirdOctaveUpperBands(332.0, 7150.0)
+            @test ubands.bstart == 25
+            @test ubands.bend == 39
 
-        # Test the `cband_number` routine, which goes from an exact centerband frequency to the band number.
-        for (i, cband) in enumerate(cbands)
-            @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            # Test the `cband_number` routine, which goes from an exact centerband frequency to the band number.
+            for (i, cband) in enumerate(cbands)
+                @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            end
+        end
+
+        @testset "scaler argument" begin
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                bands = ExactThirdOctaveCenterBands(17, 40, scaler)
+                # These are just from the ANOPP2 manual.
+                bands_expected_all = scaler .* [49.61, 62.50, 78.75, 99.21, 125.00, 157.49, 198.43, 250.00, 314.98, 396.85, 500.00, 629.96, 793.70, 1000.0, 1259.92, 1587.40, 2000.00, 2519.84, 3174.80, 4000.00, 5039.68, 6349.60, 8000.00, 10079.37]
+                @test all(isapprox.(bands, bands_expected_all; atol=0.01))
+
+                @test_throws BoundsError bands[0]
+                @test_throws BoundsError bands[25]
+
+                bands_30_to_38 = ExactThirdOctaveCenterBands(30, 38, scaler)
+                @test all(isapprox.(bands_30_to_38, bands_expected_all[14:end-2]; atol=0.01))
+
+                @test_throws BoundsError bands_30_to_38[0]
+                @test_throws BoundsError bands_30_to_38[10]
+
+                @test_throws ArgumentError ExactThirdOctaveCenterBands(5, 4, scaler)
+
+                lbands = ExactThirdOctaveLowerBands(17, 40, scaler)
+                @test all((log2.(bands) .- log2.(lbands)) .≈ 1/(2*3))
+
+                ubands = ExactThirdOctaveUpperBands(17, 40, scaler)
+                @test all((log2.(ubands) .- log2.(bands)) .≈ 1/(2*3))
+
+                @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
+
+                cbands = ExactThirdOctaveCenterBands(332.0*scaler, 7150.0*scaler, scaler)
+                @test cbands.bstart == 25
+                @test cbands.bend == 39
+
+                lbands = ExactThirdOctaveLowerBands(332.0*scaler, 7150.0*scaler, scaler)
+                @test lbands.bstart == 25
+                @test lbands.bend == 39
+
+                ubands = ExactThirdOctaveUpperBands(332.0*scaler, 7150.0*scaler, scaler)
+                @test ubands.bstart == 25
+                @test ubands.bend == 39
+
+                # Test the `cband_number` routine, which goes from an exact centerband frequency to the band number.
+                for (i, cband) in enumerate(cbands)
+                    @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                end
+            end
         end
 
         @testset "not-so-narrow narrowband spectrum" begin
@@ -1030,60 +1123,119 @@ end
     end
 
     @testset "approximate octave" begin
-        cbands = ApproximateOctaveCenterBands(0, 20)
-        cbands_expected = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16e3, 31.5e3, 63e3, 125e3, 250e3, 500e3, 1000e3]
-        @test all(cbands .≈ cbands_expected)
-        for (i, cband) in enumerate(cbands)
-            @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+        @testset "standard" begin
+            cbands = ApproximateOctaveCenterBands(0, 20)
+            cbands_expected = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16e3, 31.5e3, 63e3, 125e3, 250e3, 500e3, 1000e3]
+            @test all(cbands .≈ cbands_expected)
+            for (i, cband) in enumerate(cbands)
+                @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            end
+
+            lbands = ApproximateOctaveLowerBands(0, 20)
+            lbands_expected = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6]
+            @test all(lbands .≈ lbands_expected)
+
+            ubands = ApproximateOctaveUpperBands(0, 20)
+            ubands_expected = [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6, 1.42e6]
+            @test all(ubands .≈ ubands_expected)
+
+            cbands = ApproximateOctaveCenterBands(-20, 0)
+            cbands_expected = [1.0e-6, 2.0e-6, 4.0e-6, 8.0e-6, 16.0e-6, 31.5e-6, 63e-6, 125.0e-6, 250.0e-6, 500.0e-6, 1000.0e-6, 2000.0e-6, 4000.0e-6, 8000.0e-6, 16e-3, 31.5e-3, 63e-3, 125e-3, 250e-3, 500e-3, 1000e-3]
+            @test all(cbands .≈ cbands_expected)
+            for (i, cband) in enumerate(cbands)
+                @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            end
+
+            lbands = ApproximateOctaveLowerBands(-20, 0)
+            lbands_expected = [0.71e-6, 1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71]
+            @test all(lbands .≈ lbands_expected)
+
+            ubands = ApproximateOctaveUpperBands(-20, 0)
+            ubands_expected = [1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71, 1.42]
+            @test all(ubands .≈ ubands_expected)
+
+            cbands = ApproximateOctaveCenterBands(2.2, 30.5e3)
+            @test cbands.bstart == 1
+            @test cbands.bend == 15
+
+            lbands = ApproximateOctaveLowerBands(2.2, 30.5e3)
+            @test lbands.bstart == 1
+            @test lbands.bend == 15
+
+            ubands = ApproximateOctaveUpperBands(2.2, 30.5e3)
+            @test ubands.bstart == 1
+            @test ubands.bend == 15
+
+            cbands = ApproximateOctaveCenterBands(23.0e-6, 2.8e-3)
+            @test cbands.bstart == -15
+            @test cbands.bend == -9
+
+            lbands = ApproximateOctaveLowerBands(23.0e-6, 2.8e-3)
+            @test lbands.bstart == -15
+            @test lbands.bend == -9
+
+            ubands = ApproximateOctaveUpperBands(23.0e-6, 2.8e-3)
+            @test ubands.bstart == -15
+            @test ubands.bend == -9
         end
 
+        @testset "scaler argument" begin
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                cbands = ApproximateOctaveCenterBands(0, 20, scaler)
+                cbands_expected = scaler .* [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16e3, 31.5e3, 63e3, 125e3, 250e3, 500e3, 1000e3]
+                @test all(cbands .≈ cbands_expected)
+                for (i, cband) in enumerate(cbands)
+                    @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                end
 
-        lbands = ApproximateOctaveLowerBands(0, 20)
-        lbands_expected = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6]
-        @test all(lbands .≈ lbands_expected)
+                lbands = ApproximateOctaveLowerBands(0, 20, scaler)
+                lbands_expected = scaler .* [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6]
+                @test all(lbands .≈ lbands_expected)
 
-        ubands = ApproximateOctaveUpperBands(0, 20)
-        ubands_expected = [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6, 1.42e6]
-        @test all(ubands .≈ ubands_expected)
+                ubands = ApproximateOctaveUpperBands(0, 20, scaler)
+                ubands_expected = scaler .* [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 0.71e3, 1.42e3, 2.84e3, 5.68e3, 11.0e3, 22e3, 44e3, 88e3, 177e3, 355e3, 0.71e6, 1.42e6]
+                @test all(ubands .≈ ubands_expected)
 
-        cbands = ApproximateOctaveCenterBands(-20, 0)
-        cbands_expected = [1.0e-6, 2.0e-6, 4.0e-6, 8.0e-6, 16.0e-6, 31.5e-6, 63e-6, 125.0e-6, 250.0e-6, 500.0e-6, 1000.0e-6, 2000.0e-6, 4000.0e-6, 8000.0e-6, 16e-3, 31.5e-3, 63e-3, 125e-3, 250e-3, 500e-3, 1000e-3]
-        @test all(cbands .≈ cbands_expected)
-        for (i, cband) in enumerate(cbands)
-            @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                cbands = ApproximateOctaveCenterBands(-20, 0, scaler)
+                cbands_expected = scaler .* [1.0e-6, 2.0e-6, 4.0e-6, 8.0e-6, 16.0e-6, 31.5e-6, 63e-6, 125.0e-6, 250.0e-6, 500.0e-6, 1000.0e-6, 2000.0e-6, 4000.0e-6, 8000.0e-6, 16e-3, 31.5e-3, 63e-3, 125e-3, 250e-3, 500e-3, 1000e-3]
+                @test all(cbands .≈ cbands_expected)
+                for (i, cband) in enumerate(cbands)
+                    @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                end
+
+                lbands = ApproximateOctaveLowerBands(-20, 0, scaler)
+                lbands_expected = scaler .* [0.71e-6, 1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71]
+                @test all(lbands .≈ lbands_expected)
+
+                ubands = ApproximateOctaveUpperBands(-20, 0, scaler)
+                ubands_expected = scaler .* [1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71, 1.42]
+                @test all(ubands .≈ ubands_expected)
+
+                cbands = ApproximateOctaveCenterBands(2.2*scaler, 30.5e3*scaler, scaler)
+                @test cbands.bstart == 1
+                @test cbands.bend == 15
+
+                lbands = ApproximateOctaveLowerBands(2.2*scaler, 30.5e3*scaler, scaler)
+                @test lbands.bstart == 1
+                @test lbands.bend == 15
+
+                ubands = ApproximateOctaveUpperBands(2.2*scaler, 30.5e3*scaler, scaler)
+                @test ubands.bstart == 1
+                @test ubands.bend == 15
+
+                cbands = ApproximateOctaveCenterBands(23.0e-6*scaler, 2.8e-3*scaler, scaler)
+                @test cbands.bstart == -15
+                @test cbands.bend == -9
+
+                lbands = ApproximateOctaveLowerBands(23.0e-6*scaler, 2.8e-3*scaler, scaler)
+                @test lbands.bstart == -15
+                @test lbands.bend == -9
+
+                ubands = ApproximateOctaveUpperBands(23.0e-6*scaler, 2.8e-3*scaler, scaler)
+                @test ubands.bstart == -15
+                @test ubands.bend == -9
+            end
         end
-
-        lbands = ApproximateOctaveLowerBands(-20, 0)
-        lbands_expected = [0.71e-6, 1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71]
-        @test all(lbands .≈ lbands_expected)
-
-        ubands = ApproximateOctaveUpperBands(-20, 0)
-        ubands_expected = [1.42e-6, 2.84e-6, 5.68e-6, 11.0e-6, 22.0e-6, 44.0e-6, 88.0e-6, 177.0e-6, 355.0e-6, 0.71e-3, 1.42e-3, 2.84e-3, 5.68e-3, 11.0e-3, 22e-3, 44e-3, 88e-3, 177e-3, 355e-3, 0.71, 1.42]
-        @test all(ubands .≈ ubands_expected)
-
-        cbands = ApproximateOctaveCenterBands(2.2, 30.5e3)
-        @test cbands.bstart == 1
-        @test cbands.bend == 15
-
-        lbands = ApproximateOctaveLowerBands(2.2, 30.5e3)
-        @test lbands.bstart == 1
-        @test lbands.bend == 15
-
-        ubands = ApproximateOctaveUpperBands(2.2, 30.5e3)
-        @test ubands.bstart == 1
-        @test ubands.bend == 15
-
-        cbands = ApproximateOctaveCenterBands(23.0e-6, 2.8e-3)
-        @test cbands.bstart == -15
-        @test cbands.bend == -9
-
-        lbands = ApproximateOctaveLowerBands(23.0e-6, 2.8e-3)
-        @test lbands.bstart == -15
-        @test lbands.bend == -9
-
-        ubands = ApproximateOctaveUpperBands(23.0e-6, 2.8e-3)
-        @test ubands.bstart == -15
-        @test ubands.bend == -9
 
         @testset "spectrum, normal case" begin
             freq_min_nb = 55.0
@@ -1308,38 +1460,77 @@ end
     end
 
     @testset "approximate 1/3rd octave" begin
-        cbands = ApproximateThirdOctaveCenterBands(0, 30)
-        cbands_expected = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0, 1.0e1, 1.25e1, 1.6e1, 2.0e1, 2.5e1, 3.15e1, 4.0e1, 5.0e1, 6.3e1, 8.0e1, 1.0e2, 1.25e2, 1.6e2, 2.0e2, 2.5e2, 3.15e2, 4.0e2, 5.0e2, 6.3e2, 8.0e2, 1.0e3]
-        @test all(cbands .≈ cbands_expected)
+        @testset "standard" begin
+            cbands = ApproximateThirdOctaveCenterBands(0, 30)
+            cbands_expected = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0, 1.0e1, 1.25e1, 1.6e1, 2.0e1, 2.5e1, 3.15e1, 4.0e1, 5.0e1, 6.3e1, 8.0e1, 1.0e2, 1.25e2, 1.6e2, 2.0e2, 2.5e2, 3.15e2, 4.0e2, 5.0e2, 6.3e2, 8.0e2, 1.0e3]
+            @test all(cbands .≈ cbands_expected)
 
-        # Test the `cband_number` routine, which goes from an approximate 3rd-octave centerband frequency to the band number.
-        for (i, cband) in enumerate(cbands)
-            @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            # Test the `cband_number` routine, which goes from an approximate 3rd-octave centerband frequency to the band number.
+            for (i, cband) in enumerate(cbands)
+                @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            end
+
+            lbands = ApproximateThirdOctaveLowerBands(0, 30)
+            lbands_expected = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3]
+            @test all(lbands .≈ lbands_expected)
+
+            ubands = ApproximateThirdOctaveUpperBands(0, 30)
+            ubands_expected = [1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3, 1.12e3]
+            @test all(ubands .≈ ubands_expected)
+
+            cbands = ApproximateThirdOctaveCenterBands(-30, 0)
+            cbands_expected = [1.0e-3, 1.25e-3, 1.6e-3, 2.0e-3, 2.5e-3, 3.15e-3, 4.0e-3, 5.0e-3, 6.3e-3, 8.0e-3, 1.0e-2, 1.25e-2, 1.6e-2, 2.0e-2, 2.5e-2, 3.15e-2, 4.0e-2, 5.0e-2, 6.3e-2, 8.0e-2, 1.0e-1, 1.25e-1, 1.6e-1, 2.0e-1, 2.5e-1, 3.15e-1, 4.0e-1, 5.0e-1, 6.3e-1, 8.0e-1, 1.0]
+            @test all(cbands .≈ cbands_expected)
+
+            for (i, cband) in enumerate(cbands)
+                @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+            end
+
+            lbands = ApproximateThirdOctaveLowerBands(-30, 0)
+            lbands_expected = [0.9e-3, 1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9]
+            @test all(lbands .≈ lbands_expected)
+
+            ubands = ApproximateThirdOctaveUpperBands(-30, 0)
+            ubands_expected = [1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9, 1.12]
+            @test all(ubands .≈ ubands_expected)
         end
 
-        lbands = ApproximateThirdOctaveLowerBands(0, 30)
-        lbands_expected = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3]
-        @test all(lbands .≈ lbands_expected)
+        @testset "scaler argument" begin
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                cbands = ApproximateThirdOctaveCenterBands(0, 30, scaler)
+                cbands_expected = scaler .* [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0, 1.0e1, 1.25e1, 1.6e1, 2.0e1, 2.5e1, 3.15e1, 4.0e1, 5.0e1, 6.3e1, 8.0e1, 1.0e2, 1.25e2, 1.6e2, 2.0e2, 2.5e2, 3.15e2, 4.0e2, 5.0e2, 6.3e2, 8.0e2, 1.0e3]
+                @test all(cbands .≈ cbands_expected)
 
-        ubands = ApproximateThirdOctaveUpperBands(0, 30)
-        ubands_expected = [1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3, 1.12e3]
-        @test all(ubands .≈ ubands_expected)
+                # Test the `cband_number` routine, which goes from an approximate 3rd-octave centerband frequency to the band number.
+                for (i, cband) in enumerate(cbands)
+                    @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                end
 
-        cbands = ApproximateThirdOctaveCenterBands(-30, 0)
-        cbands_expected = [1.0e-3, 1.25e-3, 1.6e-3, 2.0e-3, 2.5e-3, 3.15e-3, 4.0e-3, 5.0e-3, 6.3e-3, 8.0e-3, 1.0e-2, 1.25e-2, 1.6e-2, 2.0e-2, 2.5e-2, 3.15e-2, 4.0e-2, 5.0e-2, 6.3e-2, 8.0e-2, 1.0e-1, 1.25e-1, 1.6e-1, 2.0e-1, 2.5e-1, 3.15e-1, 4.0e-1, 5.0e-1, 6.3e-1, 8.0e-1, 1.0]
-        @test all(cbands .≈ cbands_expected)
+                lbands = ApproximateThirdOctaveLowerBands(0, 30, scaler)
+                lbands_expected = scaler .* [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3]
+                @test all(lbands .≈ lbands_expected)
 
-        for (i, cband) in enumerate(cbands)
-            @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                ubands = ApproximateThirdOctaveUpperBands(0, 30, scaler)
+                ubands_expected = scaler .* [1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1, 0.9e1, 1.12e1, 1.4e1, 1.8e1, 2.24e1, 2.8e1, 3.35e1, 4.5e1, 5.6e1, 7.1e1, 0.9e2, 1.12e2, 1.4e2, 1.8e2, 2.24e2, 2.8e2, 3.35e2, 4.5e2, 5.6e2, 7.1e2, 0.9e3, 1.12e3]
+                @test all(ubands .≈ ubands_expected)
+
+                cbands = ApproximateThirdOctaveCenterBands(-30, 0, scaler)
+                cbands_expected = scaler .* [1.0e-3, 1.25e-3, 1.6e-3, 2.0e-3, 2.5e-3, 3.15e-3, 4.0e-3, 5.0e-3, 6.3e-3, 8.0e-3, 1.0e-2, 1.25e-2, 1.6e-2, 2.0e-2, 2.5e-2, 3.15e-2, 4.0e-2, 5.0e-2, 6.3e-2, 8.0e-2, 1.0e-1, 1.25e-1, 1.6e-1, 2.0e-1, 2.5e-1, 3.15e-1, 4.0e-1, 5.0e-1, 6.3e-1, 8.0e-1, 1.0]
+                @test all(cbands .≈ cbands_expected)
+
+                for (i, cband) in enumerate(cbands)
+                    @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
+                end
+
+                lbands = ApproximateThirdOctaveLowerBands(-30, 0, scaler)
+                lbands_expected = scaler .* [0.9e-3, 1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9]
+                @test all(lbands .≈ lbands_expected)
+
+                ubands = ApproximateThirdOctaveUpperBands(-30, 0, scaler)
+                ubands_expected = scaler .* [1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9, 1.12]
+                @test all(ubands .≈ ubands_expected)
+            end
         end
-
-        lbands = ApproximateThirdOctaveLowerBands(-30, 0)
-        lbands_expected = [0.9e-3, 1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9]
-        @test all(lbands .≈ lbands_expected)
-
-        ubands = ApproximateThirdOctaveUpperBands(-30, 0)
-        ubands_expected = [1.12e-3, 1.4e-3, 1.8e-3, 2.24e-3, 2.8e-3, 3.35e-3, 4.5e-3, 5.6e-3, 7.1e-3, 0.9e-2, 1.12e-2, 1.4e-2, 1.8e-2, 2.24e-2, 2.8e-2, 3.35e-2, 4.5e-2, 5.6e-2, 7.1e-2, 0.9e-1, 1.12e-1, 1.4e-1, 1.8e-1, 2.24e-1, 2.8e-1, 3.35e-1, 4.5e-1, 5.6e-1, 7.1e-1, 0.9, 1.12]
-        @test all(ubands .≈ ubands_expected)
 
         @testset "spectrum, normal case" begin
             freq_min_nb = 50.0

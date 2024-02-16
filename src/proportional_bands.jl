@@ -16,7 +16,27 @@ octave_fraction(bands::AbstractProportionalBands{NO}) where {NO} = octave_fracti
 lower_center_upper(::Type{<:AbstractProportionalBands{NO,LCU,TF}}) where {NO,LCU,TF} = LCU
 lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = lower_center_upper(typeof(bands))
 
-cband_number(bands::AbstractProportionalBands, fc) = cband_number(typeof(bands), fc)
+@inline freq_scaler(bands::AbstractProportionalBands) = bands.scaler
+@inline band_start(bands::AbstractProportionalBands) = bands.bstart
+@inline band_end(bands::AbstractProportionalBands) = bands.bend
+
+@inline function Base.size(bands::AbstractProportionalBands)
+    return (band_end(bands) - band_start(bands) + 1,)
+end
+
+function bands_lower(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
+    return TBands{:lower}(fstart, fend)
+end
+
+function bands_upper(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
+    return TBands{:upper}(fstart, fend)
+end
+
+function bands_center(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
+    return TBands{:center}(fstart, fend)
+end
+
+cband_number(bands::AbstractProportionalBands, fc) = cband_number(typeof(bands), fc, freq_scaler(bands))
 
 const f0_exact = 1000
 const fmin_exact = 1
@@ -35,49 +55,38 @@ The `LCU` parameter can take one of three values:
 ExactProportionalBands
 
 """
-    ExactProportionalBands{NO,LCU}(TF=Float64, bstart::Int, bend::Int)
+    ExactProportionalBands{NO,LCU}(TF=Float64, bstart::Int, bend::Int, scaler=1)
 
 Construct an `ExactProportionalBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
+
+The "standard" band frequencies will be scaled by `scaler`, e.g. if `scaler = 0.5` then what would normally be the `1000 Hz` frequency will be `500 Hz`.
 """
 struct ExactProportionalBands{NO,LCU,TF} <: AbstractProportionalBands{NO,LCU,TF}
     bstart::Int
     bend::Int
     f0::TF
-    function ExactProportionalBands{NO,LCU,TF}(bstart::Int, bend::Int) where {NO,LCU,TF}
-        NO > 0 || throw(ArgumentError("Octave band fraction NO = $NO should be greater than 0"))
+    scaler::TF
+    function ExactProportionalBands{NO,LCU,TF}(bstart::Int, bend::Int, scaler=1) where {NO,LCU,TF}
+        NO > 0 || throw(ArgumentError("Octave band fraction NO must be greater than 0"))
         LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU must be one of :lower, :center, :upper"))
         bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
-        return new{NO,LCU,TF}(bstart, bend, TF(f0_exact))
-    end
-    function ExactProportionalBands{NO,LCU}(TF, bstart::Int, bend::Int) where {NO,LCU}
-        return ExactProportionalBands{NO,LCU,TF}(bstart, bend)
+        scaler > 0 || throw(ArgumentError("non-positive scaler argument not supported"))
+        return new{NO,LCU,TF}(bstart, bend, TF(f0_exact), TF(scaler))
     end
 end
 
-@inline band_start(bands::AbstractProportionalBands) = bands.bstart
-@inline band_end(bands::AbstractProportionalBands) = bands.bend
-@inline function Base.size(bands::AbstractProportionalBands)
-    return (band_end(bands) - band_start(bands) + 1,)
+function ExactProportionalBands{NO,LCU}(TF::Type, bstart::Int, bend::Int, scalar=1) where {NO,LCU}
+    return ExactProportionalBands{NO,LCU,TF}(bstart, bend, scalar)
 end
 
-function bands_lower(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
-    return TBands{:lower}(fstart, fend)
+function ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int, scaler=1) where {NO,LCU} 
+    return ExactProportionalBands{NO,LCU}(Float64, bstart, bend, scaler)
 end
 
-function bands_upper(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
-    return TBands{:upper}(fstart, fend)
-end
+@inline band_exact_lower_limit(NO, fl, scaler) = floor(Int, 1/2 + NO*log2(fl/(f0_exact*scaler)) + 10*NO)
+@inline band_exact_upper_limit(NO, fu, scaler) = ceil(Int, -1/2 + NO*log2(fu/(f0_exact*scaler)) + 10*NO)
 
-function bands_center(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
-    return TBands{:center}(fstart, fend)
-end
-
-ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int) where {NO,LCU} = ExactProportionalBands{NO,LCU}(Float64, bstart, bend)
-
-@inline band_exact_lower_limit(NO, fl) = floor(Int, 1/2 + NO*log2(fl/f0_exact) + 10*NO)
-@inline band_exact_upper_limit(NO, fu) = ceil(Int, -1/2 + NO*log2(fu/f0_exact) + 10*NO)
-
-function cband_exact(NO, fc)
+function cband_exact(NO, fc, scaler)
     tol = 10*eps(fc)
     # f = 2^((b - 10*NO)/NO)*f0
     # f/f0 = 2^((b - 10*NO)/NO)
@@ -87,7 +96,7 @@ function cband_exact(NO, fc)
     # log2(f/f0)*NO + 10*NO = b
     # b = log2(f/f0)*NO + 10*NO
     # Get the band number from a center band frequency `fc`.
-    log2_fc_over_f0_exact_NO = log2(fc/f0_exact)*NO
+    log2_fc_over_f0_exact_NO = log2(fc/(f0_exact*scaler))*NO
     # Check that the result will be very close to an integer.
     rounded = round(Int, log2_fc_over_f0_exact_NO)
     abs_cs_safe(log2_fc_over_f0_exact_NO - rounded) < tol  || throw(ArgumentError("fc does not correspond to a center-band frequency"))
@@ -95,17 +104,17 @@ function cband_exact(NO, fc)
     return b
 end
 
-function cband_number(::Type{<:ExactProportionalBands{NO}}, fc) where {NO}
-    return cband_exact(NO, fc)
+function cband_number(::Type{<:ExactProportionalBands{NO}}, fc, scaler) where {NO}
+    return cband_exact(NO, fc, scaler)
 end
 
 """
-    ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF)
+    ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF, scaler)
 
 Construct an `ExactProportionalBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
 """
-ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(fstart, fend)
-ExactProportionalBands{NO,LCU,TF}(fstart::TF, fend::TF) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(band_exact_lower_limit(NO, fstart), band_exact_upper_limit(NO, fend))
+ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF, scaler=1) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(fstart, fend, scaler)
+ExactProportionalBands{NO,LCU,TF}(fstart::TF, fend::TF, scaler=1) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(band_exact_lower_limit(NO, fstart, scaler), band_exact_upper_limit(NO, fend, scaler), scaler)
 
 """
     Base.getindex(bands::ExactProportionalBands{NO,LCU}, i::Int) where {NO,LCU}
@@ -126,7 +135,7 @@ Base.getindex(bands::ExactProportionalBands, i::Int)
     # where f_0 is the reference frequency, 1000 Hz.
     # OK, so.
     #   2^((b - 10*NO)/NO)*f_c
-    return 2^((b - 10*NO)/NO)*bands.f0
+    return 2^((b - 10*NO)/NO)*(bands.f0*freq_scaler(bands))
 end
 
 @inline function Base.getindex(bands::ExactProportionalBands{NO,:lower}, i::Int) where {NO}
@@ -134,7 +143,7 @@ end
     b = bands.bstart + (i - 1)
     # return 2^((b - 10*NO)/NO)*(2^(-1/(2*NO)))*bands.f0
     # return 2^(2*(b - 10*NO)/(2*NO))*(2^(-1/(2*NO)))*bands.f0
-    return 2^((2*(b - 10*NO) - 1)/(2*NO))*bands.f0
+    return 2^((2*(b - 10*NO) - 1)/(2*NO))*(bands.f0*freq_scaler(bands))
 end
 
 @inline function Base.getindex(bands::ExactProportionalBands{NO,:upper}, i::Int) where {NO}
@@ -142,7 +151,7 @@ end
     b = bands.bstart + (i - 1)
     # return 2^((b - 10*NO)/NO)*(2^(1/(2*NO)))*bands.f0
     # return 2^(2*(b - 10*NO)/(2*NO))*(2^(1/(2*NO)))*bands.f0
-    return 2^((2*(b - 10*NO) + 1)/(2*NO))*bands.f0
+    return 2^((2*(b - 10*NO) + 1)/(2*NO))*(bands.f0*freq_scaler(bands))
 end
 
 """
@@ -187,9 +196,9 @@ Alias for ExactProportionalBands{3,:upper,TF}
 """
 const ExactThirdOctaveUpperBands{TF} = ExactProportionalBands{3,:upper,TF}
 
-lower_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(bands.bstart, bands.bend)
-center_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(bands.bstart, bands.bend)
-upper_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(bands.bstart, bands.bend)
+lower_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+center_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+upper_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
 
 const approx_3rd_octave_cbands_pattern = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0]
 const approx_3rd_octave_lbands_pattern = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1]
@@ -209,25 +218,30 @@ The `LCU` parameter can take one of three values:
 struct ApproximateThirdOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF}
     bstart::Int
     bend::Int
+    scaler::TF
 
-    function ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int) where {LCU, TF}
+    function ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int, scaler=1) where {LCU, TF}
         LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU must be one of :lower, :center, :upper"))
         bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
-        return new{LCU,TF}(bstart, bend)
-    end
-    function ApproximateThirdOctaveBands{LCU}(TF, bstart::Int, bend::Int) where {LCU}
-        return ApproximateThirdOctaveBands{LCU,TF}(bstart, bend)
+        scaler > 0 || throw(ArgumentError("non-positive scaler argument not supported"))
+        return new{LCU,TF}(bstart, bend, TF(scaler))
     end
 end
 
 """
-    ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int)
+    ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int, scaler=1)
 
-Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
+Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`, scaling the standard frequencies by `scaler`.
 
 `TF` defaults to `Float64`.
 """
-ApproximateThirdOctaveBands{LCU}(bstart::Int, bend::Int) where {LCU} = ApproximateThirdOctaveBands{LCU,Float64}(bstart, bend)
+function ApproximateThirdOctaveBands{LCU}(TF::Type, bstart::Int, bend::Int, scaler=1) where {LCU}
+    return ApproximateThirdOctaveBands{LCU,TF}(bstart, bend, scaler)
+end
+
+function ApproximateThirdOctaveBands{LCU}(bstart::Int, bend::Int, scaler=1) where {LCU} 
+    return ApproximateThirdOctaveBands{LCU}(Float64, bstart, bend, scaler)
+end
 
 """
     Base.getindex(bands::ApproximateThirdOctaveBands{LCU}, i::Int) where {LCU}
@@ -241,7 +255,7 @@ Base.getindex(bands::ApproximateThirdOctaveBands, i::Int)
     j = bands.bstart + i - 1
     factor10, b0 = divrem(j, 10, RoundDown)
     b = b0 + 1
-    return approx_3rd_octave_cbands_pattern[b]*TF(10)^factor10
+    return freq_scaler(bands)*approx_3rd_octave_cbands_pattern[b]*TF(10)^factor10
 end
 
 @inline function Base.getindex(bands::ApproximateThirdOctaveBands{:lower,TF}, i::Int) where {TF}
@@ -249,7 +263,7 @@ end
     j = bands.bstart + i - 1
     factor10, b0 = divrem(j, 10, RoundDown)
     b = b0 + 1
-    return approx_3rd_octave_lbands_pattern[b]*TF(10)^factor10
+    return freq_scaler(bands)*approx_3rd_octave_lbands_pattern[b]*TF(10)^factor10
 end
 
 @inline function Base.getindex(bands::ApproximateThirdOctaveBands{:upper,TF}, i::Int) where {TF}
@@ -257,12 +271,15 @@ end
     j = bands.bstart + i - 1
     factor10, b0 = divrem(j, 10, RoundDown)
     b = b0 + 1
-    return approx_3rd_octave_ubands_pattern[b]*TF(10)^factor10
+    return freq_scaler(bands)*approx_3rd_octave_ubands_pattern[b]*TF(10)^factor10
 end
 
-@inline function band_approx_3rd_octave_lower_limit(fl::TF) where {TF}
-    factor10 = floor(Int, log10(fl/approx_3rd_octave_lbands_pattern[1]))
-    i = searchsortedfirst(approx_3rd_octave_lbands_pattern, fl; lt=(lband, f)->isless(lband*TF(10)^factor10, f))
+@inline function band_approx_3rd_octave_lower_limit(fl::TF, scaler) where {TF}
+    # For the `scaler`, I've been thinking about always leaving the input frequency (here `fl`) alone and modifying the standard bands (here `approx_3rd_octave_lbands_pattern`).
+    # But then that would involve multiplying all of `approx_3rd_octave_lbands_pattern`...
+    # Or maybe not.
+    factor10 = floor(Int, log10(fl/(scaler*approx_3rd_octave_lbands_pattern[1])))
+    i = searchsortedfirst(approx_3rd_octave_lbands_pattern, fl; lt=(lband, f)->isless(scaler*lband*TF(10)^factor10, f))
     # - 2 because
     #
     #   * -1 for searchsortedfirst giving us the first index in approx_3rd_octave_lbands_pattern that is greater than fl, and we want the band before that
@@ -270,17 +287,18 @@ end
     return (i - 2) + factor10*10
 end
 
-@inline function band_approx_3rd_octave_upper_limit(fu::TF) where {TF}
-    factor10 = floor(Int, log10(fu/approx_3rd_octave_lbands_pattern[1]))
-    i = searchsortedfirst(approx_3rd_octave_ubands_pattern, fu; lt=(uband, f)->isless(uband*TF(10)^factor10, f))
+@inline function band_approx_3rd_octave_upper_limit(fu::TF, scaler) where {TF}
+    factor10 = floor(Int, log10(fu/(scaler*approx_3rd_octave_lbands_pattern[1])))
+    i = searchsortedfirst(approx_3rd_octave_ubands_pattern, fu; lt=(uband, f)->isless(scaler*uband*TF(10)^factor10, f))
     # - 1 because
     #
     #   * -1 because the array approx_3rd_octave_lbands_pattern is 1-based, but the third-octave band pattern band numbers are 0-based (centerband 1.0 Hz is band number 0, etc..)
     return (i - 1) + factor10*10
 end
 
-function cband_approx_3rd_octave(fc)
-    frac, factor10 = modf(log10(fc))
+function cband_approx_3rd_octave(fc, scaler)
+    fc_scaled = fc/scaler
+    frac, factor10 = modf(log10(fc_scaled))
     # if (frac < -eps(frac))
     #     frac += 1
     #     factor10 -= 1
@@ -298,25 +316,25 @@ function cband_approx_3rd_octave(fc)
     return j
 end
 
-function cband_number(::Type{<:ApproximateThirdOctaveBands}, fc)
-    return cband_approx_3rd_octave(fc)
+function cband_number(::Type{<:ApproximateThirdOctaveBands}, fc, scaler)
+    return cband_approx_3rd_octave(fc, scaler)
 end
 
 """
-    ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF)
+    ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1)
 
 Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
 """
-ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(fstart, fend)
-ApproximateThirdOctaveBands{LCU,TF}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(band_approx_3rd_octave_lower_limit(fstart), band_approx_3rd_octave_upper_limit(fend))
+ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(fstart, fend, scaler)
+ApproximateThirdOctaveBands{LCU,TF}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(band_approx_3rd_octave_lower_limit(fstart, scaler), band_approx_3rd_octave_upper_limit(fend, scaler), scaler)
 
 const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:center,TF}
 const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,TF}
 const ApproximateThirdOctaveUpperBands{TF} = ApproximateThirdOctaveBands{:upper,TF}
 
-lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:lower,TF}(bands.bstart, bands.bend)
-center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:center,TF}(bands.bstart, bands.bend)
-upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:upper,TF}(bands.bstart, bands.bend)
+lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:lower,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:center,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:upper,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
 
 const approx_octave_cbands_pattern = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63.0, 125.0, 250.0, 500.0]
 const approx_octave_lbands_pattern = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0]
@@ -336,14 +354,13 @@ The `LCU` parameter can take one of three values:
 struct ApproximateOctaveBands{LCU,TF} <: AbstractProportionalBands{1,LCU,TF}
     bstart::Int
     bend::Int
+    scaler::TF
 
-    function ApproximateOctaveBands{LCU,TF}(bstart::Int, bend::Int) where {LCU, TF}
+    function ApproximateOctaveBands{LCU,TF}(bstart::Int, bend::Int, scaler=1) where {LCU, TF}
         LCU in (:lower, :center, :upper) || throw(ArgumentError("LCU must be one of :lower, :center, :upper"))
         bend >= bstart || throw(ArgumentError("bend should be greater than or equal to bstart"))
-        return new{LCU,TF}(bstart, bend)
-    end
-    function ApproximateOctaveBands{LCU}(TF, bstart::Int, bend::Int) where {LCU}
-        return ApproximateOctaveBands{LCU,TF}(bstart, bend)
+        scaler > 0 || throw(ArgumentError("non-positive scaler argument not supported"))
+        return new{LCU,TF}(bstart, bend, TF(scaler))
     end
 end
 
@@ -354,7 +371,13 @@ Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing band number
 
 `TF` defaults to `Float64`.
 """
-ApproximateOctaveBands{LCU}(bstart::Int, bend::Int) where {LCU} = ApproximateOctaveBands{LCU,Float64}(bstart, bend)
+function ApproximateOctaveBands{LCU}(TF::Type, bstart::Int, bend::Int, scaler=1) where {LCU}
+    return ApproximateOctaveBands{LCU,TF}(bstart, bend, scaler)
+end
+
+function ApproximateOctaveBands{LCU}(bstart::Int, bend::Int, scaler=1) where {LCU} 
+    return ApproximateOctaveBands{LCU}(Float64, bstart, bend, scaler)
+end
 
 """
     Base.getindex(bands::ApproximateOctaveBands{LCU}, i::Int) where {LCU}
@@ -368,7 +391,7 @@ Base.getindex(bands::ApproximateOctaveBands, i::Int)
     j = bands.bstart + i - 1
     factor1000, b0 = divrem(j, 10, RoundDown)
     b = b0 + 1
-    return approx_octave_cbands_pattern[b]*TF(1000)^factor1000
+    return freq_scaler(bands)*approx_octave_cbands_pattern[b]*TF(1000)^factor1000
 end
 
 @inline function Base.getindex(bands::ApproximateOctaveBands{:lower,TF}, i::Int) where {TF}
@@ -376,7 +399,7 @@ end
     j = bands.bstart + i - 1
     factor1000, b0 = divrem(j, 10, RoundDown)
     b = b0 + 1
-    return approx_octave_lbands_pattern[b]*TF(1000)^factor1000
+    return freq_scaler(bands)*approx_octave_lbands_pattern[b]*TF(1000)^factor1000
 end
 
 @inline function Base.getindex(bands::ApproximateOctaveBands{:upper,TF}, i::Int) where {TF}
@@ -384,12 +407,12 @@ end
     j = bands.bstart + i - 1
     factor1000, b0 = divrem(j, 10, RoundDown)
     b = b0 + 1
-    return approx_octave_ubands_pattern[b]*TF(1000)^factor1000
+    return freq_scaler(bands)*approx_octave_ubands_pattern[b]*TF(1000)^factor1000
 end
 
-@inline function band_approx_octave_lower_limit(fl::TF) where {TF}
-    factor1000 = floor(Int, log10(fl/approx_octave_lbands_pattern[1])/3)
-    i = searchsortedfirst(approx_octave_lbands_pattern, fl; lt=(lband, f)->isless(lband*TF(10)^(3*factor1000), f))
+@inline function band_approx_octave_lower_limit(fl::TF, scaler) where {TF}
+    factor1000 = floor(Int, log10(fl/(scaler*approx_octave_lbands_pattern[1]))/3)
+    i = searchsortedfirst(approx_octave_lbands_pattern, fl; lt=(lband, f)->isless(scaler*lband*TF(10)^(3*factor1000), f))
     # - 2 because
     #
     #   * -1 for searchsortedfirst giving us the first index in approx_octave_lbands_pattern that is greater than fl, and we want the band before that
@@ -397,17 +420,18 @@ end
     return (i - 2) + factor1000*10
 end
 
-@inline function band_approx_octave_upper_limit(fu::TF) where {TF}
-    factor1000 = floor(Int, log10(fu/approx_octave_lbands_pattern[1])/3)
-    i = searchsortedfirst(approx_octave_ubands_pattern, fu; lt=(lband, f)->isless(lband*TF(10)^(3*factor1000), f))
+@inline function band_approx_octave_upper_limit(fu::TF, scaler) where {TF}
+    factor1000 = floor(Int, log10(fu/(scaler*approx_octave_lbands_pattern[1]))/3)
+    i = searchsortedfirst(approx_octave_ubands_pattern, fu; lt=(lband, f)->isless(scaler*lband*TF(10)^(3*factor1000), f))
     # - 1 because
     #
     #   * -1 because the array approx_octave_lbands_pattern is 1-based, but the octave band pattern band numbers are 0-based (centerband 1.0 Hz is band number 0, etc..)
     return (i - 1) + factor1000*10
 end
 
-function cband_approx_octave(f)
-    frac, factor1000 = modf(log10(f)/log10(1000))
+function cband_approx_octave(fc, scaler)
+    fc_scaled = fc/scaler
+    frac, factor1000 = modf(log10(fc_scaled)/log10(1000))
     # if (frac < -eps(frac))
     #     frac += 1
     #     factor1000 -= 1
@@ -425,8 +449,8 @@ function cband_approx_octave(f)
     return j
 end
 
-function cband_number(::Type{<:ApproximateOctaveBands}, fc)
-    return cband_approx_octave(fc)
+function cband_number(::Type{<:ApproximateOctaveBands}, fc, scaler)
+    return cband_approx_octave(fc, scaler)
 end
 
 """
@@ -434,16 +458,16 @@ end
 
 Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
 """
-ApproximateOctaveBands{LCU}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(fstart, fend)
-ApproximateOctaveBands{LCU,TF}(fstart::TF, fend::TF) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(band_approx_octave_lower_limit(fstart), band_approx_octave_upper_limit(fend))
+ApproximateOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(fstart, fend, scaler)
+ApproximateOctaveBands{LCU,TF}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(band_approx_octave_lower_limit(fstart, scaler), band_approx_octave_upper_limit(fend, scaler), scaler)
 
 const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
 const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
 const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
 
-lower_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:lower,TF}(bands.bstart, bands.bend)
-center_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:center,TF}(bands.bstart, bands.bend)
-upper_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:upper,TF}(bands.bstart, bands.bend)
+lower_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:lower,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+center_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:center,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+upper_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:upper,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
 
 abstract type AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF} end
 
@@ -624,20 +648,20 @@ struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO
 end
 
 """
-    ProportionalBandSpectrum(pbs, TBandsC, cfreq_start)
+    ProportionalBandSpectrum(pbs, TBandsC, cfreq_start, scaler=1)
 
 Construct a `ProportionalBandSpectrum` from an array of proportional band amplitudes, `TBandsC::Type{<:AbstractProportionalBands{NO,:center}` and `cfreq_start`.
 
-`cfreq_start` is the centerband frequency corresponding to the first entry of `pbs`.
+`cfreq_start` is the centerband frequency corresponding to the first entry of `pbs`. 
+The proportional band frequencies indicated by `TBandsC` are multiplied by `scaler`.
 """
-function ProportionalBandSpectrum(pbs, TBandsC::Type{<:AbstractProportionalBands{NO,:center}}, cfreq_start) where {NO}
-    bstart = cband_number(TBandsC, cfreq_start)
+function ProportionalBandSpectrum(pbs, TBandsC::Type{<:AbstractProportionalBands{NO,:center}}, cfreq_start, scaler=1) where {NO}
+    bstart = cband_number(TBandsC, cfreq_start, scaler)
     bend = bstart + length(pbs) - 1
-    cbands = TBandsC(bstart, bend)
+    cbands = TBandsC(bstart, bend, scaler)
 
     return ProportionalBandSpectrum(pbs, cbands)
 end
-
 
 """
     Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
