@@ -479,11 +479,11 @@ octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
 @inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
 
 """
-    LazyProportionalBandSpectrumNB{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
+    LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
 
 Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
 """
-struct LazyProportionalBandSpectrumNB{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
     f1_nb::TF
     df_nb::TF
     psd_amp::TAmp
@@ -491,7 +491,7 @@ struct LazyProportionalBandSpectrumNB{NO,TF,TAmp,TBandsL<:AbstractProportionalBa
     cbands::TBandsC
     ubands::TBandsU
 
-    function LazyProportionalBandSpectrumNB(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, psd_amp) where {NO}
+    function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, psd_amp) where {NO}
         TF = promote_type(typeof(f1_nb), typeof(df_nb), eltype(psd_amp))
 
         f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
@@ -508,57 +508,57 @@ struct LazyProportionalBandSpectrumNB{NO,TF,TAmp,TBandsL<:AbstractProportionalBa
     end
 end
 
-const ExactOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{1,TF,TAmp,
+const LazyNBExactOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
                                                               ExactProportionalBands{1,:lower,TF},
                                                               ExactProportionalBands{1,:center,TF},
                                                               ExactProportionalBands{1,:upper,TF}}
-ExactOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ExactProportionalBands{1}, f1_nb, df_nb, psd_amp)
-ExactOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ExactProportionalBands{1}, sm)
+LazyNBExactOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyNBProportionalBandSpectrum(ExactProportionalBands{1}, f1_nb, df_nb, psd_amp)
+LazyNBExactOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyNBProportionalBandSpectrum(ExactProportionalBands{1}, sm)
 
-const ExactThirdOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{3,TF,TAmp,
+const LazyNBExactThirdOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{3,TF,TAmp,
                                                                    ExactProportionalBands{3,:lower,TF},
                                                                    ExactProportionalBands{3,:center,TF},
                                                                    ExactProportionalBands{3,:upper,TF}}
-ExactThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, f1_nb, df_nb, psd_amp)
-ExactThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, sm)
+LazyNBExactThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, f1_nb, df_nb, psd_amp)
+LazyNBExactThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, sm)
 
-const ApproximateOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{1,TF,TAmp,
+const LazyNBApproximateOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
                                                               ApproximateOctaveBands{:lower,TF},
                                                               ApproximateOctaveBands{:center,TF},
                                                               ApproximateOctaveBands{:upper,TF}}
-ApproximateOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, f1_nb, df_nb, psd_amp)
-ApproximateOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, sm)
+LazyNBApproximateOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, f1_nb, df_nb, psd_amp)
+LazyNBApproximateOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, sm)
 
-const ApproximateThirdOctaveSpectrum{TF,TAmp} = LazyProportionalBandSpectrumNB{1,TF,TAmp,
+const LazyNBApproximateThirdOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
                                                               ApproximateThirdOctaveBands{:lower,TF},
                                                               ApproximateThirdOctaveBands{:center,TF},
                                                               ApproximateThirdOctaveBands{:upper,TF}}
-ApproximateThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, f1_nb, df_nb, psd_amp)
-ApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, sm)
+LazyNBApproximateThirdOctaveSpectrum(f1_nb, df_nb, psd_amp) = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, f1_nb, df_nb, psd_amp)
+LazyNBApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, sm)
 
-frequency_nb(pbs::LazyProportionalBandSpectrumNB) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
+frequency_nb(pbs::LazyNBProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
 
 """
-    LazyProportionalBandSpectrumNB(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+    LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
 
-Construct a `LazyProportionalBandSpectrumNB` using a proportional band `TBands` and narrowband spectrum `sm`.
+Construct a `LazyNBProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`.
 """
-function LazyProportionalBandSpectrumNB(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
     psd = PowerSpectralDensityAmplitude(sm)
     freq = frequency(psd)
     f1_nb = freq[begin+1]
     df_nb = step(freq)
     # Skip the zero frequency.
     psd_amp = @view psd[begin+1:end]
-    return LazyProportionalBandSpectrumNB(TBands, f1_nb, df_nb, psd_amp)
+    return LazyNBProportionalBandSpectrum(TBands, f1_nb, df_nb, psd_amp)
 end
 
 """
-    Base.getindex(pbs::LazyProportionalBandSpectrumNB, i::Int)
+    Base.getindex(pbs::LazyNBProportionalBandSpectrum, i::Int)
 
 Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
 """
-@inline function Base.getindex(pbs::LazyProportionalBandSpectrumNB, i::Int)
+@inline function Base.getindex(pbs::LazyNBProportionalBandSpectrum, i::Int)
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.

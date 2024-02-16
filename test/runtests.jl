@@ -7,7 +7,7 @@ using AcousticMetrics: octave_fraction, band_start, band_end, cband_number
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
-using AcousticMetrics: LazyProportionalBandSpectrumNB, ExactThirdOctaveSpectrum, ProportionalBandSpectrum
+using AcousticMetrics: LazyNBProportionalBandSpectrum, LazyNBExactThirdOctaveSpectrum, ProportionalBandSpectrum
 using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
 using AcousticMetrics: W_A
@@ -844,7 +844,7 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensityAmplitude(ap)
-            pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, psd)
+            pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -910,7 +910,7 @@ end
             p = f.(t)
             ap = PressureTimeHistory(p, dt)
             psd = PowerSpectralDensityAmplitude(ap)
-            pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, psd)
+            pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -959,7 +959,7 @@ end
             df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
             f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -989,8 +989,8 @@ end
         #     df = psd_freq[2] - psd_freq[1]
         #     msp_amp = 20 .+ 10 .* (1:n_freq)./n_freq
         #     psd_amp = msp_amp ./ df
-        #     # pbs = ExactLazyProportionalBandSpectrumNB{3}(first(psd_freq), df, psd_amp)
-        #     pbs = LazyProportionalBandSpectrumNB(ExactProportionalBands{3}, first(psd_freq), df, psd_amp)
+        #     # pbs = ExactLazyNBProportionalBandSpectrum{3}(first(psd_freq), df, psd_amp)
+        #     pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, first(psd_freq), df, psd_amp)
         #     cbands = center_bands(pbs)
         #     lbands = lower_bands(pbs)
         #     ubands = upper_bands(pbs)
@@ -1019,7 +1019,7 @@ end
                         f1 = ubands[b] - 0.5*df_nb
                         f = f0 .+ (0:nfreq-1).*df_nb
                         psd = psd_func.(f)
-                        pbs = ExactThirdOctaveSpectrum(f0, df_nb, psd)
+                        pbs = LazyNBExactThirdOctaveSpectrum(f0, df_nb, psd)
                         if length(pbs) > 1
                             # We tried above to construct the narrowand frequencies
                             # to only cover the current 1/3-octave proportional
@@ -1088,8 +1088,8 @@ end
                         psd = psd_func.(f)
 
                         # And the PBS
-                        # pbs = ExactLazyProportionalBandSpectrumNB{3}(f[1], df_nb, psd)
-                        pbs = ExactThirdOctaveSpectrum(f[1], df_nb, psd)
+                        # pbs = ExactLazyNBProportionalBandSpectrum{3}(f[1], df_nb, psd)
+                        pbs = LazyNBExactThirdOctaveSpectrum(f[1], df_nb, psd)
 
                         # We created a narrowband range that should cover from freq_min to freq_max, so the sizes should be the same.
                         @test length(pbs) == length(cbands)
@@ -1243,7 +1243,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1289,7 +1289,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1329,7 +1329,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1370,7 +1370,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1417,7 +1417,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1538,7 +1538,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1577,7 +1577,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1641,7 +1641,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1683,7 +1683,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
@@ -1723,7 +1723,7 @@ end
             df_nb = 2.0
             f_nb = freq_min_nb:df_nb:freq_max_nb
             psd = psd_func.(f_nb)
-            pbs = LazyProportionalBandSpectrumNB(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
+            pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
             pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
