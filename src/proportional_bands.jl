@@ -24,16 +24,16 @@ lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF
     return (band_end(bands) - band_start(bands) + 1,)
 end
 
-function bands_lower(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
-    return TBands{:lower}(fstart, fend)
+function lower_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF}
+    return TBands{:lower}(fstart, fend, scaler)
 end
 
-function bands_upper(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
-    return TBands{:upper}(fstart, fend)
+function upper_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF}
+    return TBands{:upper}(fstart, fend, scaler)
 end
 
-function bands_center(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF) where {NO,TF}
-    return TBands{:center}(fstart, fend)
+function center_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF}
+    return TBands{:center}(fstart, fend, scaler)
 end
 
 cband_number(bands::AbstractProportionalBands, fc) = cband_number(typeof(bands), fc, freq_scaler(bands))
@@ -475,13 +475,14 @@ octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
 @inline lower_bands(pbs::AbstractProportionalBandSpectrum) = pbs.lbands
 @inline center_bands(pbs::AbstractProportionalBandSpectrum) = pbs.cbands
 @inline upper_bands(pbs::AbstractProportionalBandSpectrum) = pbs.ubands
+@inline freq_scaler(pbs::AbstractProportionalBandSpectrum) = freq_scaler(center_bands(pbs))
 
 @inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
 
 """
     LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
 
-Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
+Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a narrowband spectrum.
 """
 struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
     f1_nb::TF
@@ -491,7 +492,7 @@ struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBa
     cbands::TBandsC
     ubands::TBandsU
 
-    function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, psd_amp) where {NO}
+    function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, psd_amp, scaler=1) where {NO}
         TF = promote_type(typeof(f1_nb), typeof(df_nb), eltype(psd_amp))
 
         f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
@@ -500,9 +501,9 @@ struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBa
         fstart = max(f1_nb - 0.5*df_nb, TF(fmin_exact))
         fend = f1_nb + (length(psd_amp)-1)*df_nb + 0.5*df_nb
 
-        lbands = TBands{:lower}(fstart, fend)
-        cbands = TBands{:center}(TF, band_start(lbands), band_end(lbands))
-        ubands = TBands{:upper}(TF, band_start(lbands), band_end(lbands))
+        lbands = TBands{:lower}(fstart, fend, scaler)
+        cbands = center_bands(lbands)
+        ubands = upper_bands(lbands)
 
         return new{NO,TF,typeof(psd_amp),typeof(lbands), typeof(cbands), typeof(ubands)}(f1_nb, df_nb, psd_amp, lbands, cbands, ubands)
     end
@@ -539,18 +540,18 @@ LazyNBApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum) = LazyNBPro
 frequency_nb(pbs::LazyNBProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.psd_amp)-1).*pbs.df_nb
 
 """
-    LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+    LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum, scaler=1)
 
-Construct a `LazyNBProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`.
+Construct a `LazyNBProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`, and optional frequency scaler `scaler`.
 """
-function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum)
+function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum, scaler=1)
     psd = PowerSpectralDensityAmplitude(sm)
     freq = frequency(psd)
     f1_nb = freq[begin+1]
     df_nb = step(freq)
     # Skip the zero frequency.
     psd_amp = @view psd[begin+1:end]
-    return LazyNBProportionalBandSpectrum(TBands, f1_nb, df_nb, psd_amp)
+    return LazyNBProportionalBandSpectrum(TBands, f1_nb, df_nb, psd_amp, scaler)
 end
 
 """
@@ -637,7 +638,7 @@ struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO
     cbands::TBandsC
     ubands::TBandsU
 
-    function ProportionalBandSpectrum(pbs, cbands::AbstractProportionalBands{NO,:center}) where {NO}
+    function ProportionalBandSpectrum(cbands::AbstractProportionalBands{NO,:center}, pbs) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
 
         lbands = lower_bands(cbands)
@@ -648,19 +649,19 @@ struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO
 end
 
 """
-    ProportionalBandSpectrum(pbs, TBandsC, cfreq_start, scaler=1)
+    ProportionalBandSpectrum(TBandsC, cfreq_start, pbs, scaler=1)
 
 Construct a `ProportionalBandSpectrum` from an array of proportional band amplitudes, `TBandsC::Type{<:AbstractProportionalBands{NO,:center}` and `cfreq_start`.
 
 `cfreq_start` is the centerband frequency corresponding to the first entry of `pbs`. 
 The proportional band frequencies indicated by `TBandsC` are multiplied by `scaler`.
 """
-function ProportionalBandSpectrum(pbs, TBandsC::Type{<:AbstractProportionalBands{NO,:center}}, cfreq_start, scaler=1) where {NO}
+function ProportionalBandSpectrum(TBandsC::Type{<:AbstractProportionalBands{NO,:center}}, cfreq_start, pbs, scaler=1) where {NO}
     bstart = cband_number(TBandsC, cfreq_start, scaler)
     bend = bstart + length(pbs) - 1
     cbands = TBandsC(bstart, bend, scaler)
 
-    return ProportionalBandSpectrum(pbs, cbands)
+    return ProportionalBandSpectrum(cbands, pbs)
 end
 
 """

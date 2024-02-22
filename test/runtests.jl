@@ -10,6 +10,7 @@ using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_
 using AcousticMetrics: LazyNBProportionalBandSpectrum, LazyNBExactThirdOctaveSpectrum, ProportionalBandSpectrum
 using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
+using AcousticMetrics: freq_scaler
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -847,7 +848,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -913,7 +914,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -962,7 +963,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -981,6 +982,46 @@ end
                 @test isapprox(pbs_level[j], a2_pbs[i]; atol=1e-2)
             end
 
+        end
+
+        @testset "narrowband spectrum, many narrowbands per proportional band, scaled frequency" begin
+            # Create a PBS with the standard frequencies.
+            nfreq_nb = 800
+            freq_min_nb = 55.0
+            freq_max_nb = 1950.0
+            df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
+            f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
+            psd = psd_func.(f_nb)
+            pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
+
+            # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
+            @test all(pbs_non_lazy .≈ pbs)
+            @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
+            @test center_bands(pbs_non_lazy) === center_bands(pbs)
+            @test upper_bands(pbs_non_lazy) === upper_bands(pbs)
+
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                # Now create another PBS, but with the scaled frequency bands, same psd.
+                freq_min_nb_scaled = 55.0*scaler
+                freq_max_nb_scaled = 1950.0*scaler
+                df_nb_scaled = (freq_max_nb_scaled - freq_min_nb_scaled)/(nfreq_nb - 1)
+                f_nb_scaled = freq_min_nb_scaled .+ (0:(nfreq_nb-1)).*df_nb_scaled
+                pbs_scaled = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the same as the original, but got to divide by the scaler itself.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+
+            end
         end
 
         # @testset "ANOPP2 docs example" begin
@@ -1246,7 +1287,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1281,6 +1322,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, lowest narrowband on a right edge" begin
@@ -1292,7 +1355,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1321,6 +1384,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, lowest narrowband on a left edge" begin
@@ -1332,7 +1417,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1362,6 +1447,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, highest narrowband on a left edge" begin
@@ -1373,7 +1480,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1409,6 +1516,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, highest narrowband on a right edge" begin
@@ -1420,7 +1549,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1455,6 +1584,28 @@ end
                 end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
+            end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
             end
         end
     end
@@ -1541,7 +1692,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1569,6 +1720,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, lowest narrowband on a right edge" begin
@@ -1580,7 +1753,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1633,6 +1806,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, lowest narrowband on a left edge" begin
@@ -1644,7 +1839,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1675,6 +1870,40 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                if length(pbs_scaled) == length(pbs)
+                    @test all(pbs_scaled./scaler .≈ pbs)
+                    # And the band frequencies should all be scaled.
+                    @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                    @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                    @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+                else
+
+                    # But because of numerical stuff, the unscaled test above grabbed a lower frequency band that it shouldn't have or whatever, so we have to skip that one.
+                    # And test that the "extra" band at the beginning is essentially zero.
+                    @test pbs[1] ≈ 0
+                    @test all(pbs_scaled./scaler .≈ pbs[2:end])
+                    # And the band frequencies should all be scaled.
+                    @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs)[2:end])
+                    @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs)[2:end])
+                    @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs)[2:end])
+                end
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, highest narrowband on a right edge" begin
@@ -1686,7 +1915,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1715,6 +1944,28 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
         end
 
         @testset "spectrum, highest narrowband on a left edge" begin
@@ -1726,7 +1977,7 @@ end
             pbs = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb, df_nb, psd)
 
             # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
-            pbs_non_lazy = ProportionalBandSpectrum(pbs, typeof(center_bands(pbs)), center_bands(pbs)[begin])
+            pbs_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs)), center_bands(pbs)[begin], pbs)
             @test all(pbs_non_lazy .≈ pbs)
             @test lower_bands(pbs_non_lazy) === lower_bands(pbs)
             @test center_bands(pbs_non_lazy) === center_bands(pbs)
@@ -1754,6 +2005,28 @@ end
                 end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
+            end
+
+            # Now, check that the `scaler` argument works.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, freq_min_nb_scaled, df_nb_scaled, psd, scaler)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the original PBS multipiled by `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs))
+
+                # Creating a non-lazy version of the PBS should give the same stuff as the lazy version.
+                pbs_scaled_non_lazy = ProportionalBandSpectrum(typeof(center_bands(pbs_scaled)), center_bands(pbs_scaled)[begin], pbs_scaled, freq_scaler(pbs_scaled))
+                @test all(pbs_scaled_non_lazy .≈ pbs_scaled)
+                @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
+                @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
+                @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
             end
         end
     end
