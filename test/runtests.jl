@@ -10,6 +10,7 @@ using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_
 using AcousticMetrics: LazyNBProportionalBandSpectrum, LazyNBExactThirdOctaveSpectrum, ProportionalBandSpectrum
 using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
+using AcousticMetrics: combine
 using AcousticMetrics: freq_scaler
 using AcousticMetrics: W_A
 using ForwardDiff
@@ -1040,6 +1041,170 @@ end
         #     # @show cbands pbs_level
         #     # @show length(cbands) length(pbs_level)
         # end
+
+        @testset "combining proportional band spectrums" begin
+            @testset "same bands" begin
+                nfreq_nb = 800
+                freq_min_nb = 55.0
+                freq_max_nb = 1950.0
+                df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
+                f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
+                psd = psd_func.(f_nb)
+                pbs1_lazy = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
+                pbs1 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs2 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs3 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+
+                # So, when we add these, the proportional band spectrum should be just 3 times whatever the original was, and all the bands should be the same.
+                pbs_combined = combine([pbs1, pbs2, pbs3], center_bands(pbs1_lazy))
+                @test lower_bands(pbs_combined) == lower_bands(pbs1_lazy)
+                @test center_bands(pbs_combined) == center_bands(pbs1_lazy)
+                @test upper_bands(pbs_combined) == upper_bands(pbs1_lazy)
+                @test all(pbs_combined .≈ (3 .* pbs1_lazy))
+            end
+
+            @testset "outbands lower than all inbands" begin
+                nfreq_nb = 800
+                freq_min_nb = 55.0
+                freq_max_nb = 1950.0
+                df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
+                f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
+                psd = psd_func.(f_nb)
+                pbs1_lazy = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
+                pbs1 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs2 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs3 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+
+                outcbands = ExactProportionalBands{3, :center}(10, 16)
+                # Make sure the outbands are actually all lower than the input narrowbands.
+                @test last(upper_bands(outcbands)) < freq_min_nb - 0.5*df_nb
+                pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
+                @test center_bands(pbs_combined) == outcbands
+                @test all(pbs_combined .≈ 0)
+            end
+
+            @testset "outbands higher than all inbands" begin
+                nfreq_nb = 800
+                freq_min_nb = 55.0
+                freq_max_nb = 1950.0
+                df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
+                f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
+                psd = psd_func.(f_nb)
+                pbs1_lazy = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
+                pbs1 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs2 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs3 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+
+                outcbands = ExactProportionalBands{3, :center}(44, 50)
+                # Make sure the outbands are actually all higher than the input narrowbands.
+                @test first(lower_bands(outcbands)) > freq_max_nb + 0.5*df_nb
+                pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
+                @test center_bands(pbs_combined) == outcbands
+                @test all(pbs_combined .≈ 0)
+            end
+
+            @testset "inbands lined up with outbands" begin
+                cbands1 = ExactProportionalBands{3, :center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                cbands2 = ExactProportionalBands{3, :center}(11, 16)
+                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                cbands3 = ExactProportionalBands{3, :center}(12, 16)
+                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+
+                outcbands = ExactProportionalBands{3, :center}(10, 16)
+                pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
+                @test pbs_combined[1] ≈ pbs1[1]
+                @test pbs_combined[2] ≈ pbs1[2] + pbs2[1]
+                @test all(pbs_combined[3:end] .≈ pbs1[3:end] .+ pbs2[2:end] .+ pbs3)
+            end
+
+            @testset "scaled outbands" begin
+                # Since proportional bands are... proportional, we can be clever about the scaler argument.
+                # For example, for a 1/3 octave band, log2(f_center2/f_center1) = (1/3), where f_center1 is a center frequency, and f_center2 is the next highest center frequency after f_center1.
+                # So, log2(f_center2) - log2(f_center1) = 1/3
+                # log2(f_center2) = log2(f_center1) + 1/3
+                # f_center2 = 2^(log2(f_center1) + 1/3) = f_center1*2^(1/3)
+                # So if I set the scaler argument to 2^(1/3), that should have the effect of shifting the frequency bands up one unscaled band.
+                # And if I do that twice (i.e., squaring the scaler), that should shift the frequency bands by two.
+                cbands1 = ExactProportionalBands{3, :center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                cbands2 = ExactProportionalBands{3, :center}(10, 15, 2^(1/3))
+                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                cbands3 = ExactProportionalBands{3, :center}(10, 14, (2^(1/3))^2)
+                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+
+                outcbands = ExactProportionalBands{3, :center}(10, 16)
+                pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
+                @test pbs_combined[1] ≈ pbs1[1]
+                @test pbs_combined[2] ≈ pbs1[2] + pbs2[1]
+                @test all(pbs_combined[3:end] .≈ pbs1[3:end] .+ pbs2[2:end] .+ pbs3)
+            end
+
+            @testset "non-aligned outbands, one input spectrum" begin
+                cbands1 = ExactProportionalBands{3, :center}(10, 16)
+                lbands1 = lower_bands(cbands1)
+                ubands1 = upper_bands(cbands1)
+                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+
+                outcbands = ExactProportionalBands{3, :center}(10, 16, 1.1)
+                outlbands = lower_bands(outcbands)
+                outubands = upper_bands(outcbands)
+                pbs_combined = combine([pbs1], outcbands)
+                for i in 1:length(pbs_combined)-1
+                    @test pbs_combined[i] ≈ (
+                         pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i]) +
+                         pbs1[i+1]/(ubands1[i+1] - lbands1[i+1])*(outubands[i] - lbands1[i+1])
+                    )
+                end
+                i = length(pbs_combined)
+                @test pbs_combined[i] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i])
+            end
+
+            @testset "non-aligned outbands, multiple input spectrums" begin
+                cbands1 = ExactProportionalBands{3, :center}(10, 16)
+                lbands1 = lower_bands(cbands1)
+                ubands1 = upper_bands(cbands1)
+                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+
+                cbands2 = ExactProportionalBands{3, :center}(10, 15, 2^(1/3))
+                lbands2 = lower_bands(cbands2)
+                ubands2 = upper_bands(cbands2)
+                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+
+                cbands3 = ExactProportionalBands{3, :center}(10, 14, (2^(1/3))^2)
+                lbands3 = lower_bands(cbands3)
+                ubands3 = upper_bands(cbands3)
+                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+
+                outcbands = ExactProportionalBands{3, :center}(10, 16, 1.1)
+                outlbands = lower_bands(outcbands)
+                outubands = upper_bands(outcbands)
+                pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
+
+                i = 1
+                @test pbs_combined[i] ≈ (
+                     pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i]) +
+                     pbs1[i+1]/(ubands1[i+1] - lbands1[i+1])*(outubands[i] - lbands1[i+1]) +
+                     pbs2[i]/(ubands2[i] - lbands2[i])*(outubands[i] - lbands2[i])
+                )
+                # i = 2
+                # @test pbs_combined[i] ≈ (
+                #      pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i]) +
+                #      pbs1[i+1]/(ubands1[i+1] - lbands1[i+1])*(outubands[i] - lbands1[i+1]) +
+                #      pbs2[i]/(ubands2[i] - lbands2[i])*(outubands[i] - lbands2[i+1]) +
+                #      pbs2[i+1]/(ubands2[i+1] - lbands2[i+1])*(outubands[i] - lbands2[i+1])
+                # )
+                # for i in 3:length(pbs_combined)-3
+                #     @test pbs_combined[i] ≈ (
+                #          pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i]) +
+                #          pbs1[i+1]/(ubands1[i+1] - lbands1[i+1])*(outubands[i] - lbands1[i+1])
+                #     )
+                # end
+                # i = length(pbs_combined)
+                # @test pbs_combined[i] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i])
+            end
+
+        end
 
         @testset "convergence test" begin
 
