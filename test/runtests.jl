@@ -2178,6 +2178,10 @@ end
                 end
                 i = length(pbs_combined)
                 @test pbs_combined[i] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i])
+
+                # Can I do the `combine` thing with a `Ref`?
+                pbs_combined2 = combine(Ref(pbs1), outcbands)
+                @test all(pbs_combined2 .≈ pbs_combined)
             end
         end
 

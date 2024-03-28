@@ -823,9 +823,9 @@ end
 """
     combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
 
-Combine each input proportional band spectrum of `pbs` into one output proportional band spectrum using the proportional bands indicated by `outcbands`.
+Combine each input proportional band spectrum of `pbs` into one output proportional band spectrum using the proportional center bands indicated by `outcbands`.
 """
-function combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N,NO}
+function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},Base.RefValue{<:AbstractProportionalBandSpectrum}}, outcbands::AbstractProportionalBands{NO,:center}) where {N,NO}
    # Create the vector that will contain the new PBS.
    # An <:AbstractProportionalBandSpectrum is <:AbstractVector{TF}, so AbstractArray{<:AbstractProportionalBandSpectrum,N} is actually an Array of AbstractVectors.
    # So `eltype(eltype(pbs))` should give me the element type of the PBS.
