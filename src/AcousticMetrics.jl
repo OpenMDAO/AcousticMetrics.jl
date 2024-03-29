@@ -1,5 +1,6 @@
 module AcousticMetrics
 
+using Base.Iterators: Iterators
 using ConcreteStructs: @concrete
 using FFTW: r2r!, R2HC, HC2R, rfftfreq
 using FLOWMath: abs_cs_safe

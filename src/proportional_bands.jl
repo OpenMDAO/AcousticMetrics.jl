@@ -196,9 +196,9 @@ Alias for ExactProportionalBands{3,:upper,TF}
 """
 const ExactThirdOctaveUpperBands{TF} = ExactProportionalBands{3,:upper,TF}
 
-lower_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
-center_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
-upper_bands(bands::ExactProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+lower_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(band_start(bands), band_end(bands), scaler)
+center_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(band_start(bands), band_end(bands), scaler)
+upper_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(band_start(bands), band_end(bands), scaler)
 
 const approx_3rd_octave_cbands_pattern = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0]
 const approx_3rd_octave_lbands_pattern = [0.9, 1.12, 1.4, 1.8, 2.24, 2.8, 3.35, 4.5, 5.6, 7.1]
@@ -332,9 +332,9 @@ const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:cente
 const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,TF}
 const ApproximateThirdOctaveUpperBands{TF} = ApproximateThirdOctaveBands{:upper,TF}
 
-lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:lower,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
-center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:center,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
-upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateThirdOctaveBands{:upper,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateThirdOctaveBands{:lower,TF}(band_start(bands), band_end(bands), scaler)
+center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateThirdOctaveBands{:center,TF}(band_start(bands), band_end(bands), scaler)
+upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateThirdOctaveBands{:upper,TF}(band_start(bands), band_end(bands), scaler)
 
 const approx_octave_cbands_pattern = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63.0, 125.0, 250.0, 500.0]
 const approx_octave_lbands_pattern = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0]
@@ -465,9 +465,9 @@ const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
 const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
 const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
 
-lower_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:lower,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
-center_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:center,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
-upper_bands(bands::ApproximateOctaveBands{LCU,TF}) where {LCU,TF} = ApproximateOctaveBands{:upper,TF}(band_start(bands), band_end(bands), freq_scaler(bands))
+lower_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateOctaveBands{:lower,TF}(band_start(bands), band_end(bands), scaler)
+center_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateOctaveBands{:center,TF}(band_start(bands), band_end(bands), scaler)
+upper_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateOctaveBands{:upper,TF}(band_start(bands), band_end(bands), scaler)
 
 abstract type AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF} end
 
@@ -476,6 +476,20 @@ octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
 @inline center_bands(pbs::AbstractProportionalBandSpectrum) = pbs.cbands
 @inline upper_bands(pbs::AbstractProportionalBandSpectrum) = pbs.ubands
 @inline freq_scaler(pbs::AbstractProportionalBandSpectrum) = freq_scaler(center_bands(pbs))
+@inline has_observer_time(pbs::AbstractProportionalBandSpectrum) = false
+@inline observer_time(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = zero(TF)
+
+"""
+    time_period(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N})
+
+Find the period of time over which the collection of proportional band spectrum `pbs` exists.
+"""
+function time_period(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum},Base.RefValue{<:AbstractProportionalBandSpectrum}})
+    tmin, tmax = extrema(observer_time, Iterators.filter(has_observer_time, pbs); init=(Inf, -Inf))
+    return tmax - tmin
+end
+
+time_scaler(pbs::AbstractProportionalBandSpectrum{NO,TF}, period) where {NO,TF} = one(TF)
 
 @inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
 
@@ -496,6 +510,7 @@ struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBa
         TF = promote_type(typeof(f1_nb), typeof(df_nb), eltype(psd_amp))
 
         f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
+        df_nb > zero(df_nb) || throw(ArgumentError("df_nb must be > 0"))
         # We're thinking of each non-zero freqeuncy as being a bin with center frequency `f` and width `df_nb`.
         # So to get the lowest non-zero frequency we'll subtract 0.5*df_nb from the lowest non-zero frequency center:
         fstart = max(f1_nb - 0.5*df_nb, TF(fmin_exact))
@@ -820,6 +835,7 @@ end
 
 # end
 
+
 """
     combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
 
@@ -835,6 +851,9 @@ function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},
    # Get the lower and upper edges of the output band spectrum.
    outbands_lower = lower_bands(outcbands)
    outbands_upper = upper_bands(outcbands)
+
+   # Get the time period for this collection of PBSs.
+   period = time_period(pbs)
 
    # Now start looping over each input PBS.
    for pbs_in in pbs
@@ -884,6 +903,9 @@ function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},
            #     continue
            # else
            if (istart <= lastindex(pbs_in)) && (iend >= firstindex(pbs_in))
+               # Get the time scaler associated with this PBS.
+               scaler = time_scaler(pbs_in, period)
+
                # First, get the bandwidth of the first input band associated with this output band.
                fil_start = inbands_lower[istart]
                fiu_start = inbands_upper[istart]
@@ -896,7 +918,7 @@ function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},
                foverlapu_start = min(fou, fiu_start)
 
                # Now get the first band's contribution to the PBS.
-               pbs_out[idx_out] += pbs_in[istart]/dfin_start*(foverlapu_start - foverlapl_start)
+               pbs_out[idx_out] += pbs_in[istart]/dfin_start*(foverlapu_start - foverlapl_start)*scaler
 
                # Now, think about the last band's contribution to the PBS.
                # First, we need to check if the first and last band are identicial, which would indicate that there's only one input band in this output band.
@@ -911,12 +933,12 @@ function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},
                    foverlapu_end = min(fou, fiu_end)
 
                    # Now we can get the last band's contribution to the PBS.
-                   pbs_out[idx_out] += pbs_in[iend]/dfin_end*(foverlapu_end - foverlapl_end)
+                   pbs_out[idx_out] += pbs_in[iend]/dfin_end*(foverlapu_end - foverlapl_end)*scaler
 
                    # Now we need the contribution of the input bands between `istart+1` and `iend-1`, inclusive.
                    # Don't need to worry about incomplete overlap of the bands since these are "inside" this output band, so we can just directly sum them.
                    pbs_in_v = @view pbs_in[istart+1:iend-1]
-                   pbs_out[idx_out] += sum(pbs_in_v)
+                   pbs_out[idx_out] += sum(pbs_in_v)*scaler
                end
            end
        end
