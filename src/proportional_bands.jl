@@ -472,12 +472,13 @@ upper_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) wh
 abstract type AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF} end
 
 octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
-@inline lower_bands(pbs::AbstractProportionalBandSpectrum) = pbs.lbands
+@inline lower_bands(pbs::AbstractProportionalBandSpectrum) = lower_bands(pbs.cbands)
 @inline center_bands(pbs::AbstractProportionalBandSpectrum) = pbs.cbands
-@inline upper_bands(pbs::AbstractProportionalBandSpectrum) = pbs.ubands
+@inline upper_bands(pbs::AbstractProportionalBandSpectrum) = upper_bands(pbs.cbands)
 @inline freq_scaler(pbs::AbstractProportionalBandSpectrum) = freq_scaler(center_bands(pbs))
 @inline has_observer_time(pbs::AbstractProportionalBandSpectrum) = false
 @inline observer_time(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = zero(TF)
+@inline amplitude(pbs::AbstractProportionalBandSpectrum) = pbs.pbs
 
 """
     time_period(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N})
@@ -492,6 +493,16 @@ end
 time_scaler(pbs::AbstractProportionalBandSpectrum{NO,TF}, period) where {NO,TF} = one(TF)
 
 @inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
+
+"""
+    Base.getindex(pbs::AbstractProportionalBandSpectrum, i::Int)
+
+Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
+"""
+@inline function Base.getindex(pbs::AbstractProportionalBandSpectrum, i::Int)
+    @boundscheck checkbounds(pbs, i)
+    return amplitude(pbs)[i]
+end
 
 """
     LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL,TBandsC,TBandsU}
@@ -523,6 +534,9 @@ struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBa
         return new{NO,TF,typeof(psd_amp),typeof(lbands), typeof(cbands), typeof(ubands)}(f1_nb, df_nb, psd_amp, lbands, cbands, ubands)
     end
 end
+
+@inline lower_bands(pbs::LazyNBProportionalBandSpectrum) = pbs.lbands
+@inline upper_bands(pbs::LazyNBProportionalBandSpectrum) = pbs.ubands
 
 const LazyNBExactOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
                                                               ExactProportionalBands{1,:lower,TF},
@@ -662,6 +676,9 @@ struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO
     end
 end
 
+@inline lower_bands(pbs::ProportionalBandSpectrum) = pbs.lbands
+@inline upper_bands(pbs::ProportionalBandSpectrum) = pbs.ubands
+
 """
     ProportionalBandSpectrum(TBandsC, cfreq_start, pbs, scaler=1)
 
@@ -676,16 +693,6 @@ function ProportionalBandSpectrum(TBandsC::Type{<:AbstractProportionalBands{NO,:
     cbands = TBandsC(bstart, bend, scaler)
 
     return ProportionalBandSpectrum(cbands, pbs)
-end
-
-"""
-    Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
-
-Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
-"""
-@inline function Base.getindex(pbs::ProportionalBandSpectrum, i::Int)
-    @boundscheck checkbounds(pbs, i)
-    return pbs.pbs[i]
 end
 
 #function project(pbs::AbstractProportionalBandSpectrum, outbands::AbstractProportionalBands)
