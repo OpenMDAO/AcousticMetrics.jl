@@ -478,6 +478,7 @@ octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
 @inline freq_scaler(pbs::AbstractProportionalBandSpectrum) = freq_scaler(center_bands(pbs))
 @inline has_observer_time(pbs::AbstractProportionalBandSpectrum) = false
 @inline observer_time(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = zero(TF)
+@inline timestep(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = Inf*one(TF)
 @inline amplitude(pbs::AbstractProportionalBandSpectrum) = pbs.pbs
 
 """
@@ -509,7 +510,7 @@ end
 
 Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a narrowband spectrum.
 """
-struct LazyNBProportionalBandSpectrum{NO,TF,TAmp,TBandsL<:AbstractProportionalBands{NO,:lower,TF},TBandsC<:AbstractProportionalBands{NO,:center,TF},TBandsU<:AbstractProportionalBands{NO,:upper,TF}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct LazyNBProportionalBandSpectrum{NO,TF,TAmp<:AbstractVector{TF},TBandsL<:AbstractProportionalBands{NO,:lower},TBandsC<:AbstractProportionalBands{NO,:center},TBandsU<:AbstractProportionalBands{NO,:upper}} <: AbstractProportionalBandSpectrum{NO,TF}
     f1_nb::TF
     df_nb::TF
     psd_amp::TAmp
@@ -660,7 +661,7 @@ end
 
 Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
 """
-struct ProportionalBandSpectrum{NO,TF,TPBS,TBandsL<:AbstractProportionalBands{NO,:lower},TBandsC<:AbstractProportionalBands{NO,:center},TBandsU<:AbstractProportionalBands{NO,:upper}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct ProportionalBandSpectrum{NO,TF,TPBS<:AbstractVector{TF},TBandsL<:AbstractProportionalBands{NO,:lower},TBandsC<:AbstractProportionalBands{NO,:center},TBandsU<:AbstractProportionalBands{NO,:upper}} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
     lbands::TBandsL
     cbands::TBandsC
@@ -695,152 +696,28 @@ function ProportionalBandSpectrum(TBandsC::Type{<:AbstractProportionalBands{NO,:
     return ProportionalBandSpectrum(cbands, pbs)
 end
 
-#function project(pbs::AbstractProportionalBandSpectrum, outbands::AbstractProportionalBands)
-#    # Create the vector that will contain the new PBS.
-#    TFOut = promote_type(eltype(pbs), eltype(outbands))
-#    pbs_out = Vector{TFOut}(undef, length(outbands))
+"""
+    ProportionalBandSpectrumWithTime{NO,TF,TPBS,TBandsC,TTime,TDTime}
 
-#    outbands_lower = lower_bands(outbands)
-#    outbands_upper = upper_bands(outbands)
+Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`, but with an observer time.
+"""
+struct ProportionalBandSpectrumWithTime{NO,TF,TPBS<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center},TTime,TDTime} <: AbstractProportionalBandSpectrum{NO,TF}
+    t::TTime
+    dt::TDTime
+    pbs::TPBS
+    cbands::TBandsC
 
-#    inbands_lower = lower_bands(pbs)
-#    inbands_upper = upper_bands(pbs)
+    function ProportionalBandSpectrumWithTime(t, dt, cbands::AbstractProportionalBands{NO,:center}, pbs) where {NO}
+        length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
 
-#    n_inbands = length(pbs)
-#    for (idx_out, (fol, fou)) in enumerate(zip(outbands_lower, outbands_upper))
-#        # So, the goal is to find:
-#        #
-#        #   * the first *input* band who's upper edge is greater than `fol`.
-#        #   * the last *input* band who's lower edge is less than `fou`.
+        return new{NO,eltype(pbs),typeof(pbs),typeof(cbands),typeof(t),typeof(dt)}(t, dt, pbs, cbands)
+    end
+end
 
-#        # For this one, what if:
-#        #
-#        #   * All of `inbands_upper` are less than `fol`?
-#        #     That would mean all of the `inband` frequencies are lower than and outside the current `outband`.
-#        #     Then the docs for `searchsortedfirst` say that it will return `length(inbands_upper)+1`.
-#        #     So if I started a view of the data from that index, it would obviously be empty, which is what I'd want.
-#        #   * All of the `inbands_upper` are greater than `fol`?
-#        #     Not necessarily a problem, unless, I guess, the lowest of `inbands_lower` is *also* greater than `fou`.
-#        #     Then the entire input spectrum would be larger than this band.
-#        #     But `searchsortedfirst` should just return `1`, and hopefully that would be the right thing.
-#        #
-#        istart = searchsortedfirst(inbands_upper, fol)
-
-#        # For this one, what if:
-#        #
-#        #   * All of the `inbands_lower` are greater than `fou`?
-#        #     That would mean all of the `inband` frequencies are greater than and outside the current `outband`.
-#        #     The docs for `searchsortedlast` would return `firstindex(a)-1`.
-#        #     So if I ended a view from there, that should be empty I think, which is what I'd want.
-#        #   * All of the `inbands_lower` are lower than `fou`?
-#        #     Not necessarily a problem, unless, I guess, the the highest of `inbands_upper` is lower than `fol`.
-#        #     Then the entire input spectrum would be smaller than this band.
-#        iend = searchsortedlast(inbands_lower, fou)
-
-#        # I should think about all the different scenarios.
-#        # There's
-#        #
-#        #   * The "normal" case, which is when the there are multiple input bands within the output bands, i.e., that intersect `outbands_lower` and `outbands_upper`.
-#        #
-#        #     * I think I have this covered by `istart` and `iend` at the moment.
-#        #
-#        #   * All the input bands could be *lower* than this output band.
-#        #
-#        #     * In this case,
-#        #
-#        #         * `istart = searchsortedfirst(inbands_upper, fol) = length(inbands_upper)+1`
-#        #         * `iend = searchsortedlast(inbands_lower, fou) = length(inbands)`
-#        #
-#        #       and so `istart:iend` would give us an empty view, since `istart > iend`.
-#        #
-#        #   * All of the input bands could be *greater* than this output band.
-#        #
-#        #     * In this case,
-#        #
-#        #         * `istart = searchsortedfirst(inbands_upper, fol) = 1`
-#        #         * `iend = searchsortedlast(inbands_lower, fou) = 0`
-#        #
-#        #       and so `istart:iend` would give us an empty view, since `istart > iend`.
-#        #
-#        #   * There's only one input band inside the output band, leaving a gap on the right (i.e. the higher side).
-#        #
-#        #     * In this case,
-#        #
-#        #         * `istart = searchsortedfirst(inbands_upper, fol) = length(inbands_upper)`
-#        #         * `iend = searchsortedlast(inbands_lower, fou) = length(inbands_upper)`
-#        #
-#        #       which is what I want: `istart:iend` would just give me the last input band.
-#        #
-#        #   * There's only one input band inside the output band, leaving a gap on the left (i.e. the lower side).
-#        #
-#        #     * In this case,
-#        #
-#        #         * `istart = searchsortedfirst(inbands_upper, fol) = 1`
-#        #         * `iend = searchsortedlast(inbands_lower, fou) = 1`
-#        #
-#        #       which is what I want: `istart:iend` would just give me the first input band.
-#        #
-#        #   * There's only one input band inside the output band, leaving a gap on the left and right.
-#        #
-#        #     * In this case,
-#        #
-#        #         * `istart = searchsortedfirst(inbands_upper, fol) = 1`
-#        #         * `iend = searchsortedlast(inbands_lower, fou) = 1`
-#        #
-#        #       which is what I want: `istart:iend` would just give me the first (and only) input band.
-#        #
-#        #   * There's only one input band inside the output band, and the input band is wider than the output band, so no gaps.
-#        #
-#        #     * In this case,
-#        #
-#        #         * `istart = searchsortedfirst(inbands_upper, fol) = b`, where `b` is the input band we want.
-#        #         * `iend = searchsortedlast(inbands_lower, fou) = b`, where `b` is the input band we want.
-#        #
-#        #       So that would do what I want.
-#        #
-#        # Now I need to figure out the PBS stuff.
-#        # The way this will work is this: I need to find the amount of frequency overlap for a particular input band and this output band.
-#        # I also need the band width of this particular input band.
-#        # Let's call the input band width `dfin` and the overlap `dfoverlap`.
-#        # Then I think what I need to do is to take the input PBS for this band (`pbs`) and multiply it by `dfoverlap/dfin`.
-#        if (istart == n_inbands + 1) || (iend == 0)
-#            pbs_out[idx_out] = zero(TFOut)
-#        else
-#            # First, get the bandwidth of the first input band associated with this output band.
-#            fil_start = inbands_lower[istart]
-#            fiu_start = inbands_upper[istart]
-#            dfin_start = fiu_start - fil_start
-
-#            # Next, need to get the frequency overlap of the first input band and this output band.
-#            # For the lower edge of the overlap, it will usually be `fol`, unless there's a gap where `inbands_lower[istart]` is greater than `fol`.
-#            foverlapl_start = maximum(fol, fil_start)
-#            # For the upper edge of the overlap, it will usually be `fiu_start`, unless there's a gap where `inbands_upper[istart]` is less than `fou`.
-#            foverlapu_start = minimum(fou, fiu_start)
-
-#            # Now get the first band's contribution to the PBS.
-#            res_start = pbs[istart]/dfin_start*(foverlapu_start - foverlapl_start)
-
-#            # Now, think about the last band's contribution to the PBS.
-#            # First, we need to check if the first and last band are identicial, which would indicate that there's only one input band in this output band.
-#            if iend > istart
-#                # Now need to get the bandwidth associated with this input band.
-#                fil_end = inbands_lower[iend]
-#                fiu_end = inbands_upper[iend]
-#                dfin_end = fiu_end - fil_end
-
-#                # Next, need to get the frequency overlap of the last input band and this output band.
-#                foverlapl_end = maximum(fol, fil_end)
-#                foverlapu_end = minimum(fou, fiu_end)
-#                res_end = pbs[iend]/dfin_end*(foverlapu_end - foverlapl_end)
-#            else
-#                res_end = zero(TFOut)
-#            end
-
-#            # Now we need the contribution of the input bands between `istart+1` and `iend-1`, inclusive.
-#        end
-#    end
-
-# end
+@inline has_observer_time(pbs::ProportionalBandSpectrumWithTime) = true
+@inline observer_time(pbs::ProportionalBandSpectrumWithTime) = pbs.t
+@inline timestep(pbs::ProportionalBandSpectrumWithTime{NO,TF}) where {NO,TF} = pbs.dt
+@inline time_scaler(pbs::ProportionalBandSpectrumWithTime, period) = timestep(pbs)/period
 
 
 """
