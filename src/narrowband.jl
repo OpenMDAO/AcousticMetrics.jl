@@ -132,6 +132,18 @@ The frequencies are calculated using the `rfftfreq` function in the FFTW.jl pack
 """
 @inline frequency(sm::AbstractNarrowbandSpectrum) = rfftfreq(inputlength(sm), samplerate(sm))
 
+
+"""
+    frequencystep(sm::AbstractNarrowbandSpectrum)
+
+Return the frequency step size `Δf` associated with the narrowband spectrum.
+"""
+@inline function frequencystep(sm::AbstractNarrowbandSpectrum)
+    m = inputlength(sm)
+    df = 1/(timestep(sm)*m)
+    return df
+end
+
 """
     PressureTimeHistory(sm::AbstractNarrowbandSpectrum, p=similar(halfcomplex(sm)))
 
@@ -459,7 +471,7 @@ end
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{false}, i::Int)
     @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
-    df = 1/(timestep(psa)*m)
+    df = frequencystep(psa)
     if i == 1
         @inbounds hc_real = psa.hc[i]/m
         return hc_real^2/df
@@ -473,7 +485,7 @@ end
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{true}, i::Int)
     @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
-    df = 1/(timestep(psa)*m)
+    df = frequencystep(psa)
     if i == 1 || i == length(psa)
         @inbounds hc_real = psa.hc[i]/m
         return hc_real^2/df

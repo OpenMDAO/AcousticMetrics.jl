@@ -2,7 +2,7 @@ using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
 using AcousticMetrics: PressureTimeHistory
 using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
-using AcousticMetrics: starttime, timestep, time, pressure, frequency, halfcomplex, OASPL
+using AcousticMetrics: starttime, timestep, frequencystep, time, pressure, frequency, halfcomplex, OASPL
 using AcousticMetrics: octave_fraction, band_start, band_end, cband_number
 using AcousticMetrics: AbstractProportionalBands
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
@@ -218,6 +218,8 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                @test frequencystep(amp) ≈ freq_expected[2]
+                @test frequencystep(phase) ≈ freq_expected[2]
 
                 # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
                 ap_from_ps = PressureTimeHistory(amp)
@@ -263,6 +265,8 @@ end
                     @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                     @test all(isapprox.(amp, amp_expected; atol=1e-12))
                     @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                    @test frequencystep(amp) ≈ freq_expected[2]
+                    @test frequencystep(phase) ≈ freq_expected[2]
 
                     # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
                     ap_from_ps = PressureTimeHistory(amp)
@@ -315,6 +319,8 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
+                @test frequencystep(amp) ≈ freq_expected[2]
+                @test frequencystep(phase) ≈ freq_expected[2]
 
                 # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
                 ap_from_ps = PressureTimeHistory(amp)
@@ -363,6 +369,8 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                @test frequencystep(amp) ≈ freq_expected[2]
+                @test frequencystep(phase) ≈ freq_expected[2]
 
                 # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
@@ -430,6 +438,8 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
+                @test frequencystep(amp) ≈ freq_expected[2]
+                @test frequencystep(phase) ≈ freq_expected[2]
 
                 # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
@@ -529,6 +539,8 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                @test frequencystep(amp) ≈ freq_expected[2]
+                @test frequencystep(phase) ≈ freq_expected[2]
 
                 # Make sure I can convert a PSD to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
@@ -597,6 +609,8 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
+                @test frequencystep(amp) ≈ freq_expected[2]
+                @test frequencystep(phase) ≈ freq_expected[2]
 
                 # Make sure I can convert a PSD to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
