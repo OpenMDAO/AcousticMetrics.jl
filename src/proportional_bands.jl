@@ -502,7 +502,7 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
 """
 @inline function Base.getindex(pbs::AbstractProportionalBandSpectrum, i::Int)
     @boundscheck checkbounds(pbs, i)
-    return amplitude(pbs)[i]
+    return @inbounds amplitude(pbs)[i]
 end
 
 """

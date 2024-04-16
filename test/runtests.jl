@@ -2,7 +2,7 @@ using AcousticMetrics: p_ref
 using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
 using AcousticMetrics: PressureTimeHistory
 using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
-using AcousticMetrics: starttime, timestep, frequencystep, time, pressure, frequency, halfcomplex, OASPL
+using AcousticMetrics: starttime, timestep, frequencystep, time, pressure, frequency, halfcomplex, OASPL, istonal
 using AcousticMetrics: octave_fraction, band_start, band_end, cband_number
 using AcousticMetrics: AbstractProportionalBands
 using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
@@ -188,8 +188,6 @@ end
                 @test all(isapprox.(time(ap), t))
                 @test timestep(ap) ≈ dt
                 @test starttime(ap) ≈ 0.0
-                # ps = PressureSpectrum(ap)
-                # amp = amplitude(ps)
                 amp = PressureSpectrumAmplitude(ap)
                 phase = PressureSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -218,14 +216,37 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp) ≈ dt
+                @test timestep(phase) ≈ dt
+                @test starttime(amp) ≈ 0.0
+                @test starttime(phase) ≈ 0.0
                 @test frequencystep(amp) ≈ freq_expected[2]
                 @test frequencystep(phase) ≈ freq_expected[2]
+                @test istonal(amp) == false
+                @test istonal(phase) == false
 
                 # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
                 ap_from_ps = PressureTimeHistory(amp)
                 @test timestep(ap_from_ps) ≈ timestep(ap)
                 @test starttime(ap_from_ps) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+
+                # Create a tonal version of the same spectrum.
+                # Nothing should be any different except the `IsTonal` parameter.
+                amp_tonal = PressureSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                phase_tonal = PressureSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                @test all(isapprox.(frequency(amp_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp_tonal, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase_tonal.*amp_tonal, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp_tonal) ≈ dt
+                @test timestep(phase_tonal) ≈ dt
+                @test starttime(amp_tonal) ≈ 0.0
+                @test starttime(phase_tonal) ≈ 0.0
+                @test frequencystep(amp_tonal) ≈ freq_expected[2]
+                @test frequencystep(phase_tonal) ≈ freq_expected[2]
+                @test istonal(amp_tonal) == true
+                @test istonal(phase_tonal) == true
             end
         end
         @testset "negative amplitudes" begin
@@ -236,7 +257,9 @@ end
                     t = (0:n-1).*dt
                     p = f.(t)
                     ap = PressureTimeHistory(p, dt)
-                    # ps = PressureSpectrum(ap)
+                    @test all(isapprox.(time(ap), t))
+                    @test timestep(ap) ≈ dt
+                    @test starttime(ap) ≈ 0.0
                     amp = PressureSpectrumAmplitude(ap)
                     phase = PressureSpectrumPhase(ap)
                     freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -265,14 +288,37 @@ end
                     @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                     @test all(isapprox.(amp, amp_expected; atol=1e-12))
                     @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                    @test timestep(amp) ≈ dt
+                    @test timestep(phase) ≈ dt
+                    @test starttime(amp) ≈ 0.0
+                    @test starttime(phase) ≈ 0.0
                     @test frequencystep(amp) ≈ freq_expected[2]
                     @test frequencystep(phase) ≈ freq_expected[2]
+                    @test istonal(amp) == false
+                    @test istonal(phase) == false
 
                     # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
                     ap_from_ps = PressureTimeHistory(amp)
                     @test timestep(ap_from_ps) ≈ timestep(ap)
                     @test starttime(ap_from_ps) ≈ starttime(ap)
                     @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+
+                    # Create a tonal version of the same spectrum.
+                    # Nothing should be any different except the `IsTonal` parameter.
+                    amp_tonal = PressureSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                    phase_tonal = PressureSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                    @test all(isapprox.(frequency(amp_tonal), freq_expected; atol=1e-12))
+                    @test all(isapprox.(frequency(phase_tonal), freq_expected; atol=1e-12))
+                    @test all(isapprox.(amp_tonal, amp_expected; atol=1e-12))
+                    @test all(isapprox.(phase_tonal.*amp_tonal, phase_expected.*amp_expected; atol=1e-12))
+                    @test timestep(amp_tonal) ≈ dt
+                    @test timestep(phase_tonal) ≈ dt
+                    @test starttime(amp_tonal) ≈ 0.0
+                    @test starttime(phase_tonal) ≈ 0.0
+                    @test frequencystep(amp_tonal) ≈ freq_expected[2]
+                    @test frequencystep(phase_tonal) ≈ freq_expected[2]
+                    @test istonal(amp_tonal) == true
+                    @test istonal(phase_tonal) == true
                 end
             end
         end
@@ -290,7 +336,6 @@ end
                 @test all(isapprox.(time(ap), t))
                 @test timestep(ap) ≈ dt
                 @test starttime(ap) ≈ t0
-                # ps = PressureSpectrum(ap)
                 amp = PressureSpectrumAmplitude(ap)
                 phase = PressureSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -319,14 +364,37 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
+                @test timestep(amp) ≈ dt
+                @test timestep(phase) ≈ dt
+                @test starttime(amp) ≈ t0
+                @test starttime(phase) ≈ t0
                 @test frequencystep(amp) ≈ freq_expected[2]
                 @test frequencystep(phase) ≈ freq_expected[2]
+                @test istonal(amp) == false
+                @test istonal(phase) == false
 
                 # Make sure I can go from a PressureSpectrum to an PressureTimeHistory.
                 ap_from_ps = PressureTimeHistory(amp)
                 @test timestep(ap_from_ps) ≈ timestep(ap)
                 @test starttime(ap_from_ps) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_ps), pressure(ap)))
+
+                # Create a tonal version of the same spectrum.
+                # Nothing should be any different except the `IsTonal` parameter.
+                amp_tonal = PressureSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                phase_tonal = PressureSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                @test all(isapprox.(frequency(amp_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp_tonal, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase_tonal.*amp_tonal, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp_tonal) ≈ dt
+                @test timestep(phase_tonal) ≈ dt
+                @test starttime(amp_tonal) ≈ t0
+                @test starttime(phase_tonal) ≈ t0
+                @test frequencystep(amp_tonal) ≈ freq_expected[2]
+                @test frequencystep(phase_tonal) ≈ freq_expected[2]
+                @test istonal(amp_tonal) == true
+                @test istonal(phase_tonal) == true
             end
         end
     end
@@ -341,6 +409,9 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
+                @test all(isapprox.(time(ap), t))
+                @test timestep(ap) ≈ dt
+                @test starttime(ap) ≈ 0.0
                 amp = MSPSpectrumAmplitude(ap)
                 phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -369,32 +440,55 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp) ≈ dt
+                @test timestep(phase) ≈ dt
+                @test starttime(amp) ≈ 0.0
+                @test starttime(phase) ≈ 0.0
                 @test frequencystep(amp) ≈ freq_expected[2]
                 @test frequencystep(phase) ≈ freq_expected[2]
+                @test istonal(amp) == false
+                @test istonal(phase) == false
 
                 # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                amp_expected = similar(amp)
-                amp_expected[1] = 6
-                amp_expected[2] = 8
-                amp_expected[3] = 2.5
-                amp_expected[4] = 9
-                amp_expected[5] = 0.5
+                psamp_expected = similar(amp)
+                psamp_expected[1] = 6
+                psamp_expected[2] = 8
+                psamp_expected[3] = 2.5
+                psamp_expected[4] = 9
+                psamp_expected[5] = 0.5
                 # Handle the Nyquist frequency (kinda tricky). There isn't really a
                 # Nyquist frequency for the odd input length case.
                 if n == 10
-                    amp_expected[6] = 3*cos(0.2)
+                    psamp_expected[6] = 3*cos(0.2)
                 else
-                    amp_expected[6] = 3
+                    psamp_expected[6] = 3
                 end
                 @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
-                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
+                @test all(isapprox.(psamp, psamp_expected; atol=1e-12))
 
                 # Make sure I can convert a mean-squared pressure to the acoustic pressure.
                 ap_from_msp = PressureTimeHistory(amp)
                 @test timestep(ap_from_msp) ≈ timestep(ap)
                 @test starttime(ap_from_msp) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_msp), pressure(ap)))
+
+                # Create a tonal version of the same spectrum.
+                # Nothing should be any different except the `IsTonal` parameter.
+                amp_tonal = MSPSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                phase_tonal = MSPSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                @test all(isapprox.(frequency(amp_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp_tonal, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase_tonal.*amp_tonal, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp_tonal) ≈ dt
+                @test timestep(phase_tonal) ≈ dt
+                @test starttime(amp_tonal) ≈ 0.0
+                @test starttime(phase_tonal) ≈ 0.0
+                @test frequencystep(amp_tonal) ≈ freq_expected[2]
+                @test frequencystep(phase_tonal) ≈ freq_expected[2]
+                @test istonal(amp_tonal) == true
+                @test istonal(phase_tonal) == true
             end
         end
     end
@@ -408,6 +502,9 @@ end
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt, t0)
+                @test all(isapprox.(time(ap), t))
+                @test timestep(ap) ≈ dt
+                @test starttime(ap) ≈ t0
                 amp = MSPSpectrumAmplitude(ap)
                 phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -438,36 +535,59 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
+                @test timestep(amp) ≈ dt
+                @test timestep(phase) ≈ dt
+                @test starttime(amp) ≈ t0
+                @test starttime(phase) ≈ t0
                 @test frequencystep(amp) ≈ freq_expected[2]
                 @test frequencystep(phase) ≈ freq_expected[2]
+                @test istonal(amp) == false
+                @test istonal(phase) == false
 
                 # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                amp_expected = similar(psamp)
-                amp_expected[1] = 6
-                amp_expected[2] = 8
-                amp_expected[3] = 2.5
-                amp_expected[4] = 9
-                amp_expected[5] = 0.5
+                psamp_expected = similar(psamp)
+                psamp_expected[1] = 6
+                psamp_expected[2] = 8
+                psamp_expected[3] = 2.5
+                psamp_expected[4] = 9
+                psamp_expected[5] = 0.5
                 # Handle the Nyquist frequency (kinda tricky). There isn't really a
                 # Nyquist frequency for the odd input length case.
                 if n == 10
                     # The `t0` term pushes the cosine below zero, which messes
                     # up the test. Hmm... what's the right thing to do here?
                     # Well, what should the phase and amplitude be?
-                    # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
-                    amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
+                    # psamp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
+                    psamp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
                 else
-                    amp_expected[6] = 3
+                    psamp_expected[6] = 3
                 end
                 @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
-                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
+                @test all(isapprox.(psamp, psamp_expected; atol=1e-12))
 
                 # Make sure I can convert a mean-squared pressure to the acoustic pressure.
                 ap_from_msp = PressureTimeHistory(amp)
                 @test timestep(ap_from_msp) ≈ timestep(ap)
                 @test starttime(ap_from_msp) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_msp), pressure(ap)))
+
+                # Create a tonal version of the same spectrum.
+                # Nothing should be any different except the `IsTonal` parameter.
+                amp_tonal = MSPSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                phase_tonal = MSPSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                @test all(isapprox.(frequency(amp_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(frequency(phase_tonal), freq_expected; atol=1e-12))
+                @test all(isapprox.(amp_tonal, amp_expected; atol=1e-12))
+                @test all(isapprox.(phase_tonal.*amp_tonal, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp_tonal) ≈ dt
+                @test timestep(phase_tonal) ≈ dt
+                @test starttime(amp_tonal) ≈ t0
+                @test starttime(phase_tonal) ≈ t0
+                @test frequencystep(amp_tonal) ≈ freq_expected[2]
+                @test frequencystep(phase_tonal) ≈ freq_expected[2]
+                @test istonal(amp_tonal) == true
+                @test istonal(phase_tonal) == true
             end
         end
     end
@@ -511,6 +631,9 @@ end
                 t = (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt)
+                @test all(isapprox.(time(ap), t))
+                @test timestep(ap) ≈ dt
+                @test starttime(ap) ≈ 0.0
                 amp = PowerSpectralDensityAmplitude(ap)
                 phase = PowerSpectralDensityPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -539,32 +662,44 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase.*amp, phase_expected.*amp_expected; atol=1e-12))
+                @test timestep(amp) ≈ dt
+                @test timestep(phase) ≈ dt
+                @test starttime(amp) ≈ 0.0
+                @test starttime(phase) ≈ 0.0
                 @test frequencystep(amp) ≈ freq_expected[2]
                 @test frequencystep(phase) ≈ freq_expected[2]
+                @test istonal(amp) == false
+                @test istonal(phase) == false
 
                 # Make sure I can convert a PSD to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                amp_expected = similar(psamp)
-                amp_expected[1] = 6
-                amp_expected[2] = 8
-                amp_expected[3] = 2.5
-                amp_expected[4] = 9
-                amp_expected[5] = 0.5
+                psamp_expected = similar(psamp)
+                psamp_expected[1] = 6
+                psamp_expected[2] = 8
+                psamp_expected[3] = 2.5
+                psamp_expected[4] = 9
+                psamp_expected[5] = 0.5
                 # Handle the Nyquist frequency (kinda tricky). There isn't really a
                 # Nyquist frequency for the odd input length case.
                 if n == 10
-                    amp_expected[6] = 3*cos(0.2)
+                    psamp_expected[6] = 3*cos(0.2)
                 else
-                    amp_expected[6] = 3
+                    psamp_expected[6] = 3
                 end
                 @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
-                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
+                @test all(isapprox.(psamp, psamp_expected; atol=1e-12))
 
                 # Make sure I can convert a PSD to the acoustic pressure.
                 ap_from_psd = PressureTimeHistory(amp)
                 @test timestep(ap_from_psd) ≈ timestep(ap)
                 @test starttime(ap_from_psd) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_psd), pressure(ap)))
+
+                # I shouldn't be able to create a PSD from a tonal spectrum.
+                amp_tonal = PressureSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                phase_tonal = PressureSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                @test_throws ArgumentError PowerSpectralDensityAmplitude(amp_tonal)
+                # @test_throws ArgumentError PowerSpectralDensityPhase(phase_tonal)
             end
         end
     end
@@ -579,6 +714,9 @@ end
                 t = t0 .+ (0:n-1).*dt
                 p = f.(t)
                 ap = PressureTimeHistory(p, dt, t0)
+                @test all(isapprox.(time(ap), t))
+                @test timestep(ap) ≈ dt
+                @test starttime(ap) ≈ t0
                 amp = PowerSpectralDensityAmplitude(ap)
                 phase = PowerSpectralDensityPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
@@ -609,17 +747,23 @@ end
                 @test all(isapprox.(frequency(phase), freq_expected; atol=1e-12))
                 @test all(isapprox.(amp, amp_expected; atol=1e-12))
                 @test all(isapprox.(phase, phase_expected; atol=1e-12))
+                @test timestep(amp) ≈ dt
+                @test timestep(phase) ≈ dt
+                @test starttime(amp) ≈ t0
+                @test starttime(phase) ≈ t0
                 @test frequencystep(amp) ≈ freq_expected[2]
                 @test frequencystep(phase) ≈ freq_expected[2]
+                @test istonal(amp) == false
+                @test istonal(phase) == false
 
                 # Make sure I can convert a PSD to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                amp_expected = similar(psamp)
-                amp_expected[1] = 6
-                amp_expected[2] = 8
-                amp_expected[3] = 2.5
-                amp_expected[4] = 9
-                amp_expected[5] = 0.5
+                psamp_expected = similar(psamp)
+                psamp_expected[1] = 6
+                psamp_expected[2] = 8
+                psamp_expected[3] = 2.5
+                psamp_expected[4] = 9
+                psamp_expected[5] = 0.5
                 # Handle the Nyquist frequency (kinda tricky). There isn't really a
                 # Nyquist frequency for the odd input length case.
                 if n == 10
@@ -627,18 +771,25 @@ end
                     # up the test. Hmm... what's the right thing to do here?
                     # Well, what should the phase and amplitude be?
                     # amp_expected[6] = 3*cos(5*2*pi/T*t0 + 0.2)
-                    amp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
+                    psamp_expected[6] = abs(3*cos(5*2*pi/T*t0 + 0.2))
                 else
-                    amp_expected[6] = 3
+                    psamp_expected[6] = 3
                 end
                 @test all(isapprox.(frequency(psamp), freq_expected; atol=1e-12))
-                @test all(isapprox.(psamp, amp_expected; atol=1e-12))
+                @test all(isapprox.(psamp, psamp_expected; atol=1e-12))
 
                 # Make sure I can convert a PSD to the acoustic pressure.
                 ap_from_psd = PressureTimeHistory(amp)
                 @test timestep(ap_from_psd) ≈ timestep(ap)
                 @test starttime(ap_from_psd) ≈ starttime(ap)
                 @test all(isapprox.(pressure(ap_from_psd), pressure(ap)))
+
+                # I shouldn't be able to create a PSD from a tonal spectrum.
+                # But I actually can creeate a PSD phase, since the PSD phase is the same as the pressure and MSP phase.
+                amp_tonal = PressureSpectrumAmplitude(halfcomplex(amp), timestep(amp), starttime(amp), true)
+                phase_tonal = PressureSpectrumPhase(halfcomplex(phase), timestep(phase), starttime(phase), true)
+                @test_throws ArgumentError PowerSpectralDensityAmplitude(amp_tonal)
+                # @test_throws ArgumentError PowerSpectralDensityPhase(phase_tonal)
             end
         end
     end
