@@ -155,7 +155,6 @@ Return `true` if the spectrum is tonal, `false` otherwise.
 """
 @inline istonal(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = IsTonal
 
-@inline starttime(sm::AbstractNarrowbandSpectrum) = sm.t0
 """
     PressureTimeHistory(sm::AbstractNarrowbandSpectrum, p=similar(halfcomplex(sm)))
 
