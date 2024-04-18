@@ -205,13 +205,13 @@ struct PressureSpectrumAmplitude{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarr
 end
 
 """
-    PressureSpectrumAmplitude(hc, dt, t0=zero(dt), istonal=false)
+    PressureSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
 
 Construct a narrowband spectrum of the pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
 The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
 If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function PressureSpectrumAmplitude(hc, dt, t0=zero(dt), istonal=false)
+function PressureSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
     return PressureSpectrumAmplitude{iseven(n),istonal}(hc, dt, t0)
 end
@@ -224,7 +224,7 @@ Construct a narrowband spectrum of the pressure amplitude from another narrowban
 PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = PressureSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
 """
-    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal=false, hc=similar(pressure(pth)))
+    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the pressure amplitude from a pressure time history.
 
@@ -232,7 +232,7 @@ The optional argument `hc` will be used to store the discrete Fourier transform 
 The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
 If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal=false, hc=similar(pressure(pth)))
+function PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
     p = pressure(pth)
 
     # Get the FFT of the acoustic pressure.
@@ -290,11 +290,11 @@ struct PressureSpectrumPhase{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarrowba
 end
 
 """
-    PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal=false)
+    PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal::Bool=false)
 
 Construct a narrowband spectrum of the pressure phase from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
 """
-function PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal=false)
+function PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
     return PressureSpectrumPhase{iseven(n),istonal}(hc, dt, t0)
 end
@@ -307,7 +307,7 @@ Construct a narrowband spectrum of the pressure phase from another narrowband sp
 PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = PressureSpectrumPhase{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
 """
-    PressureSpectrumPhase(pth::AbstractPressureTimeHistory, istonal=false, hc=similar(pressure(pth)))
+    PressureSpectrumPhase(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the pressure phase from a pressure time history.
 
@@ -315,7 +315,7 @@ The optional argument `hc` will be used to store the discrete Fourier transform 
 The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
 If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function PressureSpectrumPhase(pth::AbstractPressureTimeHistory, istonal=false, hc=similar(pressure(pth)))
+function PressureSpectrumPhase(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
     p = pressure(pth)
 
     # Get the FFT of the acoustic pressure.
@@ -377,13 +377,13 @@ struct MSPSpectrumAmplitude{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarrowban
 end
 
 """
-    MSPSpectrumAmplitude(hc, dt, t0=zero(dt), istonal=false)
+    MSPSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
 The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
 If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function MSPSpectrumAmplitude(hc, dt, t0=zero(dt), istonal=false)
+function MSPSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
     return MSPSpectrumAmplitude{iseven(n),istonal}(hc, dt, t0)
 end
@@ -396,7 +396,7 @@ Construct a narrowband spectrum of the mean-squared pressure amplitude from anot
 MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = MSPSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
 """
-    MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal=false, hc=similar(pressure(pth)))
+    MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from a pressure time history.
 
@@ -404,7 +404,7 @@ The optional argument `hc` will be used to store the discrete Fourier transform 
 The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
 If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal=false, hc=similar(pressure(pth)))
+function MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
     p = pressure(pth)
 
     # Get the FFT of the acoustic pressure.

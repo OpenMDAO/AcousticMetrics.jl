@@ -1065,6 +1065,29 @@ end
             @test pbs[10] ≈ 0.5*0.5^2/df*(ubands[10] - lbands[10])
             # Last one is wierd because of the Nyquist frequency.
             @test pbs[11] ≈ 0.5*0.5^2/df*(4500 - lbands[11]) + (3*cos(0.2))^2/df*(5500 - 4500)
+
+            # Now, what if `istonal==true`?
+            # Then the narrowband frequencies are thin, and so each narrowband frequency can only show up in one proportional band each.
+            tonal = true
+            msp_tonal = MSPSpectrumAmplitude(ap, tonal)
+            # Using `istonal=true` shouldn't be any different than `istonal=false`.
+            @test all(msp_tonal .≈ MSPSpectrumAmplitude(psd))
+            # Now get the PBS and check it.
+            pbs_tonal = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, msp_tonal)
+            # Check that we end up with the proportional bands we expect:
+            cbands_tonal = center_bands(pbs_tonal)
+            band_start(cbands_tonal) == 30
+            band_end(cbands_tonal) == 37
+            # Now check that we have the right answer for the PBS.
+            @test pbs_tonal[1] ≈ 0.5*8^2 # 1000 Hz
+            @test pbs_tonal[2] ≈ 0
+            @test pbs_tonal[3] ≈ 0
+            @test pbs_tonal[4] ≈ 0.5*2.5^2  # 2000 Hz
+            @test pbs_tonal[5] ≈ 0
+            @test pbs_tonal[6] ≈ 0.5*9^2  # 3000 Hz
+            @test pbs_tonal[7] ≈ 0.5*0.5^2  # 4000 Hz
+            # Last one is wierd because of the Nyquist frequency.
+            @test pbs_tonal[8] ≈ (3*cos(0.2))^2  # 5000 Hz
         end
 
         @testset "narrowband spectrum, one narrowband per proportional band" begin
@@ -1120,6 +1143,23 @@ end
                 end
             end
 
+            # So, for this example, I only have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz.
+            # But the lowest non-zero frequency is 50 Hz, highest is 3200 Hz.
+            istonal = true
+            msp_tonal = MSPSpectrumAmplitude(ap, istonal)
+            pbs_tonal = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, msp_tonal)
+            cbands_tonal = center_bands(pbs_tonal)
+            @test band_start(cbands_tonal) == 17
+            @test band_end(cbands_tonal) == 35
+            for (i, amp) in enumerate(pbs_tonal)
+                if i ∉ [14, 17, 19]
+                    @test isapprox(amp, 0; atol=1e-12)
+                end
+            end
+            @test pbs_tonal[14] ≈ 0.5*8^2
+            @test pbs_tonal[17] ≈ 0.5*2.5^2
+            @test pbs_tonal[19] ≈ 0.5*9^2
+
         end
 
         @testset "narrowband spectrum, many narrowbands per proportional band" begin
@@ -1151,6 +1191,30 @@ end
                 j = i + 1
                 @test cbands[j] ≈ a2_pbs_freq[i]
                 @test isapprox(pbs_level[j], a2_pbs[i]; atol=1e-2)
+            end
+
+            # Let's create a tonal MSP.
+            scaler = 1
+            tonal = true
+            pbs_tonal = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, msp, scaler, tonal)
+            # So, the narrowband frequencies go from 55.0 Hz to 1950 Hz.
+            # Let's check that.
+            cbands_tonal = center_bands(pbs_tonal)
+            @test band_start(cbands_tonal) == 17
+            @test band_end(cbands_tonal) == 33
+
+            # Now, this really isn't a tonal spectrum—it's actually very broadband.
+            # But I should still be able to check it.
+            # I need to indentify which narrowbands are in which proportional band.
+            lbands = lower_bands(pbs_tonal)
+            ubands = upper_bands(pbs_tonal)
+            for (lband, uband, amp) in zip(lbands, ubands, pbs_tonal)
+                # First index we want in f_nb is the one that is greater than or equal to lband.
+                istart = searchsortedfirst(f_nb, lband)
+                # Last index we want in f_nb is th one that is less than or equal to uband.
+                iend = searchsortedlast(f_nb, uband)
+                # Now check that we get the right answer.
+                @test sum(msp[istart:iend]) ≈ amp
             end
 
         end
@@ -1199,6 +1263,46 @@ end
                 @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
                 @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
 
+            end
+
+            # Now, for the tonal stuff, let's make sure we get the right thing, also.
+            scaler = 1
+            tonal = true
+            pbs_tonal = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, msp, scaler, tonal)
+
+            # So, the narrowband frequencies go from 55.0 Hz to 1950 Hz.
+            # Let's check that.
+            cbands_tonal = center_bands(pbs_tonal)
+            @test band_start(cbands_tonal) == 17
+            @test band_end(cbands_tonal) == 33
+
+            # Now check that the pbs is what we expect.
+            lbands = lower_bands(pbs_tonal)
+            ubands = upper_bands(pbs_tonal)
+            for (lband, uband, amp) in zip(lbands, ubands, pbs_tonal)
+                # First index we want in f_nb is the one that is greater than or equal to lband.
+                istart = searchsortedfirst(f_nb, lband)
+                # Last index we want in f_nb is th one that is less than or equal to uband.
+                iend = searchsortedlast(f_nb, uband)
+                # Now check that we get the right answer.
+                @test sum(msp[istart:iend]) ≈ amp
+            end
+
+            # Now, what about the scaler stuff?
+            # Should be able to use the same trick for the istonal == false stuff.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                # Now create another PBS, but with the scaled frequency bands, same psd.
+                freq_min_nb_scaled = 55.0*scaler
+                freq_max_nb_scaled = 1950.0*scaler
+                df_nb_scaled = (freq_max_nb_scaled - freq_min_nb_scaled)/(nfreq_nb - 1)
+                f_nb_scaled = freq_min_nb_scaled .+ (0:(nfreq_nb-1)).*df_nb_scaled
+                msp_scaled = psd .* df_nb_scaled
+                pbs_scaled = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb_scaled, df_nb_scaled, msp_scaled, scaler, tonal)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the same as the original as long as we account for the different frequency bin widths via the `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs_tonal)
+                # And the band frequencies should all be scaled.
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs_tonal))
             end
         end
 
@@ -1530,6 +1634,41 @@ end
                 @test lower_bands(pbs_scaled_non_lazy) === lower_bands(pbs_scaled)
                 @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
                 @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
+            end
+
+            # Now, for the tonal stuff.
+            scaler = 1
+            tonal = true
+            pbs_tonal = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, msp, scaler, tonal)
+            # Narrowband frequencies go from 55 Hz to 1950 Hz, so check that.
+            cbands = center_bands(pbs_tonal)
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+
+            # Now make sure we get the right answer.
+            lbands = lower_bands(pbs_tonal)
+            ubands = upper_bands(pbs_tonal)
+            for (lband, uband, amp) in zip(lbands, ubands, pbs_tonal)
+                # First index we want in f_nb is the one that is greater than or equal to lband.
+                istart = searchsortedfirst(f_nb, lband)
+                # Last index we want in f_nb is th one that is less than or equal to uband.
+                iend = searchsortedlast(f_nb, uband)
+                # Now check that we get the right answer.
+                @test sum(msp[istart:iend]) ≈ amp
+            end
+
+            # Now for the scaler stuff, can use the same trick for the non-tonal.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                msp_scaled = psd .* df_nb_scaled
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, msp_scaled, scaler, tonal)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the same as the original as long as we account for the different frequency bin widths via the `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs_tonal)
+                # And the band frequencies should all be scaled.
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs_tonal))
             end
         end
 
