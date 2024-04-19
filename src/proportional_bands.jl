@@ -717,7 +717,10 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
 
     # What is the last index we want?
     # It's the last one that has f_nb[i] <= fu
-    iend = searchsortedlast(f_nb, fu)
+    # iend = searchsortedlast(f_nb, fu)
+    # But we don't want to double-count frequencies, so we actually want f_nb[i] < fu.
+    # Could just do `searchsortedlast(f_nb, fu; lt=<=)`, but this avoids the possibly-slow keyword arguments.
+    iend = searchsortedlast(f_nb, fu, ord(<=, identity, nothing, Forward))
     if iend == 0
         # All the frequencies are lower than the band we're looking for.
         return zero(eltype(pbs))

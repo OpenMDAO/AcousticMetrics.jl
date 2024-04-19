@@ -1652,7 +1652,7 @@ end
                 # First index we want in f_nb is the one that is greater than or equal to lband.
                 istart = searchsortedfirst(f_nb, lband)
                 # Last index we want in f_nb is th one that is less than or equal to uband.
-                iend = searchsortedlast(f_nb, uband)
+                iend = searchsortedlast(f_nb, uband; lt=<=)
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
@@ -1737,6 +1737,43 @@ end
                 @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
                 @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
             end
+
+            # Now, for the tonal stuff.
+            scaler = 1
+            tonal = true
+            pbs_tonal = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, msp, scaler, tonal)
+            # Narrowband frequencies go from 87 Hz to 1950 Hz, so check that.
+            cbands = center_bands(pbs_tonal)
+            @test band_start(cbands) == 6
+            @test band_end(cbands) == 11
+
+            # Now make sure we get the right answer.
+            lbands = lower_bands(pbs_tonal)
+            ubands = upper_bands(pbs_tonal)
+            for (lband, uband, amp) in zip(lbands, ubands, pbs_tonal)
+                # First index we want in f_nb is the one that is greater than or equal to lband.
+                istart = searchsortedfirst(f_nb, lband)
+                # Last index we want in f_nb is th one that is less than or equal to uband.
+                iend = searchsortedlast(f_nb, uband; lt=<=)
+                # Now check that we get the right answer.
+                @test sum(msp[istart:iend]) ≈ amp
+            end
+
+            # Now for the scaler stuff, can use the same trick for the non-tonal.
+            for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
+                freq_min_nb_scaled = freq_min_nb*scaler
+                freq_max_nb_scaled = freq_max_nb*scaler
+                df_nb_scaled = df_nb*scaler
+                msp_scaled = psd .* df_nb_scaled
+                pbs_scaled = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb_scaled, df_nb_scaled, msp_scaled, scaler, tonal)
+
+                # We've changed the frequencies, but not the PSD, so the scaled PBS should be the same as the original as long as we account for the different frequency bin widths via the `scaler`.
+                @test all(pbs_scaled./scaler .≈ pbs_tonal)
+                # And the band frequencies should all be scaled.
+                @test all(lower_bands(pbs_scaled)./scaler .≈ lower_bands(pbs_tonal))
+                @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs_tonal))
+                @test all(upper_bands(pbs_scaled)./scaler .≈ upper_bands(pbs_tonal))
+            end
         end
 
         @testset "spectrum, lowest narrowband on a left edge" begin
@@ -1805,6 +1842,28 @@ end
                 @test center_bands(pbs_scaled_non_lazy) === center_bands(pbs_scaled)
                 @test upper_bands(pbs_scaled_non_lazy) === upper_bands(pbs_scaled)
             end
+
+            # Now, for the tonal stuff.
+            scaler = 1
+            tonal = true
+            pbs_tonal = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, freq_min_nb, df_nb, msp, scaler, tonal)
+            # Narrowband frequencies go from 89 Hz to 1950 Hz, so check that.
+            cbands = center_bands(pbs_tonal)
+            @test band_start(cbands) == 7
+            @test band_end(cbands) == 11
+
+            # Now make sure we get the right answer.
+            lbands = lower_bands(pbs_tonal)
+            ubands = upper_bands(pbs_tonal)
+            for (lband, uband, amp) in zip(lbands, ubands, pbs_tonal)
+                # First index we want in f_nb is the one that is greater than or equal to lband.
+                istart = searchsortedfirst(f_nb, lband)
+                # Last index we want in f_nb is th one that is less than or equal to uband.
+                iend = searchsortedlast(f_nb, uband; lt=<=)
+                # Now check that we get the right answer.
+                @test sum(msp[istart:iend]) ≈ amp
+            end
+
         end
 
         @testset "spectrum, highest narrowband on a left edge" begin
