@@ -694,7 +694,16 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.
     fl = lower_bands(pbs)[i]
-    fu = upper_bands(pbs)[i]
+    # Arg, numerical problems: lower_bands[i+1] should be the same as upper_bands[i].
+    # But because of floating point inaccuracies, they can be a tiny bit different.
+    # And that can lead to a "gap" between, say, upper_bands[i] and lower_bands[i+1].
+    # And then if a tone is right in that gap, we'll miss part of the spectrum.
+    # So, to fix this, always use the lower band values except for the last proportional band (where it won't matter, since that frequency value is only used once, and hence there can't be any gap).
+    if i < length(pbs)
+        fu = lower_bands(pbs)[i+1]
+    else
+        fu = upper_bands(pbs)[i]
+    end
     # Now I need to find the starting and ending indices that are included in this frequency band.
 
     # Need the narrowband frequencies.
