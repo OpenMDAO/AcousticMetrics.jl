@@ -1066,6 +1066,10 @@ end
             # Last one is wierd because of the Nyquist frequency.
             @test pbs[11] ≈ 0.5*0.5^2/df*(4500 - lbands[11]) + (3*cos(0.2))^2/df*(5500 - 4500)
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(psd, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, what if `istonal==true`?
             # Then the narrowband frequencies are thin, and so each narrowband frequency can only show up in one proportional band each.
             tonal = true
@@ -1088,6 +1092,10 @@ end
             @test pbs_tonal[7] ≈ 0.5*0.5^2  # 4000 Hz
             # Last one is wierd because of the Nyquist frequency.
             @test pbs_tonal[8] ≈ (3*cos(0.2))^2  # 5000 Hz
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(msp_tonal, center_bands(pbs_tonal))
+            @test all(pbs_init_cbands .≈ pbs_tonal)
         end
 
         @testset "narrowband spectrum, one narrowband per proportional band" begin
@@ -1143,6 +1151,10 @@ end
                 end
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(psd, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # So, for this example, I only have non-zero stuff at 1000 Hz, 2000 Hz, 3000 Hz.
             # But the lowest non-zero frequency is 50 Hz, highest is 3200 Hz.
             istonal = true
@@ -1160,6 +1172,9 @@ end
             @test pbs_tonal[17] ≈ 0.5*2.5^2
             @test pbs_tonal[19] ≈ 0.5*9^2
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(msp_tonal, center_bands(pbs_tonal))
+            @test all(pbs_init_cbands .≈ pbs_tonal)
         end
 
         @testset "narrowband spectrum, many narrowbands per proportional band" begin
@@ -1193,6 +1208,10 @@ end
                 @test isapprox(pbs_level[j], a2_pbs[i]; atol=1e-2)
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Let's create a tonal MSP.
             scaler = 1
             tonal = true
@@ -1217,6 +1236,9 @@ end
                 @test sum(msp[istart:iend]) ≈ amp
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
         end
 
         @testset "narrowband spectrum, many narrowbands per proportional band, scaled frequency" begin
@@ -1265,6 +1287,10 @@ end
 
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, for the tonal stuff, let's make sure we get the right thing, also.
             scaler = 1
             tonal = true
@@ -1304,6 +1330,10 @@ end
                 # And the band frequencies should all be scaled.
                 @test all(center_bands(pbs_scaled)./scaler .≈ center_bands(pbs_tonal))
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
         end
 
         # @testset "ANOPP2 docs example" begin
@@ -1611,6 +1641,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -1656,6 +1690,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -1713,6 +1751,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -1758,6 +1800,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -1818,6 +1864,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -1863,6 +1913,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -1929,6 +1983,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -1974,6 +2032,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -2040,6 +2102,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -2085,6 +2151,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -2219,6 +2289,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -2273,6 +2347,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -2354,6 +2432,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -2407,6 +2489,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -2464,6 +2550,10 @@ end
                 res = res_first + sum(psd[istart+1:iend-1].*df_nb) + res_last
                 @test pbs_b ≈ res
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
 
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -2531,6 +2621,10 @@ end
                 @test sum(msp[istart:iend]) ≈ amp
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
+
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -2588,6 +2682,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -2641,6 +2739,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -2698,6 +2800,10 @@ end
                 @test pbs_b ≈ res
             end
 
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs))
+            @test all(pbs_init_cbands .≈ pbs)
+
             # Now, check that the `scaler` argument works.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
                 freq_min_nb_scaled = freq_min_nb*scaler
@@ -2751,6 +2857,10 @@ end
                 # Now check that we get the right answer.
                 @test sum(msp[istart:iend]) ≈ amp
             end
+
+            # Make sure I get the same thing if I pass in an initialized proportional center band object.
+            pbs_init_cbands = LazyNBProportionalBandSpectrum(freq_min_nb, df_nb, msp, center_bands(pbs_tonal), tonal)
+            @test all(pbs_init_cbands .≈ pbs_tonal)
 
             # Now for the scaler stuff, can use the same trick for the non-tonal.
             for scaler in [0.1, 0.5, 1.0, 1.5, 2.0]
