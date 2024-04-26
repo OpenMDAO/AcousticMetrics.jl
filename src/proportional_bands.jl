@@ -784,7 +784,7 @@ struct ProportionalBandSpectrum{NO,TF,TPBS<:AbstractVector{TF},TBandsL<:Abstract
     cbands::TBandsC
     ubands::TBandsU
 
-    function ProportionalBandSpectrum(cbands::AbstractProportionalBands{NO,:center}, pbs) where {NO}
+    function ProportionalBandSpectrum(pbs, cbands::AbstractProportionalBands{NO,:center}) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
 
         lbands = lower_bands(cbands)
@@ -810,7 +810,7 @@ function ProportionalBandSpectrum(TBandsC::Type{<:AbstractProportionalBands{NO,:
     bend = bstart + length(pbs) - 1
     cbands = TBandsC(bstart, bend, scaler)
 
-    return ProportionalBandSpectrum(cbands, pbs)
+    return ProportionalBandSpectrum(pbs, cbands)
 end
 
 """
@@ -837,19 +837,124 @@ end
 @inline time_scaler(pbs::ProportionalBandSpectrumWithTime, period) = timestep(pbs)/period
 
 
-# struct LazyPBSProportionalBandSpectrum{NO,TF,TPBS<:AbstractProportionalBandSpectrum{NOIn,TF},TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
-#     pbs::TPBS
-#     cbands::TBandsC
+struct LazyPBSProportionalBandSpectrum{NO,TF,TPBS<:AbstractProportionalBandSpectrum,TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
+    pbs::TPBS
+    cbands::TBandsC
 
-#     function LazyPBSProportionalBandSpectrum(pbs::AbstractProportionalBandSpectrum{NOIn,TF}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,NO,TF}
-#         return new{NO,TF,typeof(pbs),typeof(cbands)}(pbs, cbands)
-#     end
-# end
+    function LazyPBSProportionalBandSpectrum(pbs::AbstractProportionalBandSpectrum{NOIn,TF}, cbands::AbstractProportionalBands{NO,:center}) where {NO,TF,NOIn}
+        return new{NO,TF,typeof(pbs),typeof(cbands)}(pbs, cbands)
+    end
+end
 
-# @inline has_observer_time(pbs::LazyPBSProportionalBandSpectrum) = has_observer_time(pbs.pbs)
-# @inline observer_time(pbs::ProportionalBandSpectrumWithTime) = observer_time(pbs.pbs)
-# @inline timestep(pbs::ProportionalBandSpectrumWithTime{NO,TF}) where {NO,TF} = pbs.dt
-# @inline time_scaler(pbs::ProportionalBandSpectrumWithTime, period) = timestep(pbs)/period
+function LazyPBSProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::AbstractProportionalBandSpectrum, scaler=1) where {NO}
+    # First, get the minimum and maximum frequencies associated with the input pbs.
+    fstart = lower_bands(pbs)[begin]
+    fend = upper_bands(pbs)[end]
+    # Now use those frequencies to construct some centerbands.
+    cbands = TBands{:center}(fstart, fend, scaler)
+    # Now we can create the object.
+    return LazyPBSProportionalBandSpectrum(pbs, cbands)
+end
+
+@inline has_observer_time(pbs::LazyPBSProportionalBandSpectrum) = has_observer_time(pbs.pbs)
+@inline observer_time(pbs::LazyPBSProportionalBandSpectrum) = observer_time(pbs.pbs)
+@inline timestep(pbs::LazyPBSProportionalBandSpectrum{NO,TF}) where {NO,TF} = timestep(pbs.pbs)
+@inline time_scaler(pbs::LazyPBSProportionalBandSpectrum, period) = time_scaler(pbs.pbs, period)
+
+@inline function Base.getindex(pbs::LazyPBSProportionalBandSpectrum, i::Int)
+    @boundscheck checkbounds(pbs, i)
+
+    # So, first I want the lower and upper bands of this output band.
+    fol = lower_bands(pbs)[i]
+    fou = upper_bands(pbs)[i]
+
+    # Get the underlying pbs.
+    pbs_in = pbs.pbs
+
+    # Get the lower and upper edges of the input band's spectrum.
+    inbands_lower = lower_bands(pbs_in)
+    inbands_upper = upper_bands(pbs_in)
+
+    # So now I have the boundaries of the frequencies I'm interested in in `fol` and `fou`.
+    # What I'm looking for now is:
+    #
+    #   * the first input band whose upper edge is greater than `fol`
+    #   * the last input band whose lower edge is less than `fou`.
+    #
+    # So, for the first input band whose upper edge is greater than `fol`, I should be able to do this:
+    istart = searchsortedfirst(inbands_upper, fol)
+
+    # For that, what if
+    #
+    #   * All of `inbands_upper` are less than `fol`?
+    #     That would mean all of the `inband` frequencies are lower than and outside the current `outband`.
+    #     Then the docs for `searchsortedfirst` say that it will return `length(inbands_upper)+1`.
+    #     So if I started a view of the data from that index, it would obviously be empty, which is what I'd want.
+    #   * All of the `inbands_upper` are greater than `fol`?
+    #     Not necessarily a problem, unless, I guess, the lowest of `inbands_lower` is *also* greater than `fou`.
+    #     Then the entire input spectrum would be larger than this band.
+    #     But `searchsortedfirst` should just return `1`, and hopefully that would be the right thing.
+
+    # Now I want the last input band whose lower edge is less than `fou`.
+    # I should be able to get that from
+    iend = searchsortedlast(inbands_lower, fou)
+    # For that, what if 
+    #
+    #   * All of the `inbands_lower` are greater than `fou`?
+    #     That would mean all of the `inband` frequencies are greater than and outside the current `outband`.
+    #     The docs indicate `searchsortedlast` would return `firstindex(inbands_lower)-1` for that case, i.e. `0`.
+    #     That's what I'd want, I think.
+    #   * All of the `inbands_lower` are lower than `fou`?
+    #     Not necessarily a problem, unless the highest of `inbands_upper` are also lower than `fou`, which would mean the entire input spectrum is lower than this output band.
+
+
+    # Now I have the first and last input bands relevant to this output band, and so I can start adding up the input PBS's contributions to this output band.
+    pbs_out = zero(eltype(pbs))
+
+    # First, we need to check that there's something to do:
+    # if (istart > n_inbands) || (iend < 1)
+    #     continue
+    # else
+    if (istart <= lastindex(pbs_in)) && (iend >= firstindex(pbs_in))
+
+        # First, get the bandwidth of the first input band associated with this output band.
+        fil_start = inbands_lower[istart]
+        fiu_start = inbands_upper[istart]
+        dfin_start = fiu_start - fil_start
+
+        # Next, need to get the frequency overlap of the first input band and this output band.
+        # For the lower edge of the overlap, it will usually be `fol`, unless there's a gap where `inbands_lower[istart]` is greater than `fol`.
+        foverlapl_start = max(fol, fil_start)
+        # For the upper edge of the overlap, it will usually be `fiu_start`, unless there's a gap where `inbands_upper[istart]` is less than `fou`.
+        foverlapu_start = min(fou, fiu_start)
+
+        # Now get the first band's contribution to the PBS.
+        pbs_out += pbs_in[istart]/dfin_start*(foverlapu_start - foverlapl_start)
+
+        # Now, think about the last band's contribution to the PBS.
+        # First, we need to check if the first and last band are identicial, which would indicate that there's only one input band in this output band.
+        if iend > istart
+            # Now need to get the bandwidth associated with this input band.
+            fil_end = inbands_lower[iend]
+            fiu_end = inbands_upper[iend]
+            dfin_end = fiu_end - fil_end
+
+            # Next, need to get the frequency overlap of the last input band and this output band.
+            foverlapl_end = max(fol, fil_end)
+            foverlapu_end = min(fou, fiu_end)
+
+            # Now we can get the last band's contribution to the PBS.
+            pbs_out += pbs_in[iend]/dfin_end*(foverlapu_end - foverlapl_end)
+
+            # Now we need the contribution of the input bands between `istart+1` and `iend-1`, inclusive.
+            # Don't need to worry about incomplete overlap of the bands since these are "inside" this output band, so we can just directly sum them.
+            pbs_in_v = @view pbs_in[istart+1:iend-1]
+            pbs_out += sum(pbs_in_v)
+        end
+    end
+
+    return pbs_out
+end
 
 """
     combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
@@ -959,5 +1064,5 @@ function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},
        end
    end
 
-   return ProportionalBandSpectrum(outcbands, pbs_out)
+   return ProportionalBandSpectrum(pbs_out, outcbands)
 end

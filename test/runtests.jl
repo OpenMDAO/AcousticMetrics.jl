@@ -15,6 +15,7 @@ using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenter
 using AcousticMetrics: combine
 using AcousticMetrics: freq_scaler, time_period, time_scaler, has_observer_time, observer_time
 using AcousticMetrics: ProportionalBandSpectrumWithTime
+using AcousticMetrics: LazyPBSProportionalBandSpectrum
 using AcousticMetrics: W_A
 using ForwardDiff
 using JLD2
@@ -2878,6 +2879,210 @@ end
         end
     end
 
+    @testset "lazy PBS ProportionalBandSpectrum" begin
+        @testset "same bands" begin
+            for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                        ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                cbands1 = TPB{:center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+                cbands2 = TPB{ :center}(10, 16)
+                pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+                @test all(pbs2 .≈ pbs1)
+            end
+        end
+
+        @testset "shift bands by whole indices" begin
+            for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                        ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                cbands1 = TPB{:center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+                cbands2 = TPB{:center}(9, 17)
+                pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+                @test pbs2[begin] ≈ 0
+                @test all(pbs2[begin+1:end-1] .≈ pbs1)
+                @test pbs2[end] ≈ 0
+            end
+        end
+
+        @testset "shift bands up by non-whole indices" begin
+            for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                        ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                cbands1 = TPB{:center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+                scaler2 = 1.01
+                cbands2 = TPB{:center}(10, 16, scaler2)
+                pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+                lbands1 = lower_bands(pbs1)
+                ubands1 = upper_bands(pbs1)
+                lbands2 = lower_bands(pbs2)
+                ubands2 = upper_bands(pbs2)
+                for i in 1:length(pbs1)
+                    if i < length(pbs1)
+                        amp2_left = pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - lbands2[i])
+                        amp2_right = pbs1[i+1]/(ubands1[i+1] - lbands1[i+1])*(ubands2[i] - lbands1[i+1])
+                        amp2_check = amp2_left + amp2_right
+                    else
+                        amp2_check = pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - lbands2[i])
+                    end
+                    @test pbs2[i] ≈ amp2_check
+                end
+            end
+        end
+
+        @testset "shift bands down by non-whole indices" begin
+            for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                        ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                cbands1 = TPB{:center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+                scaler2 = 0.99
+                cbands2 = TPB{:center}(10, 16, scaler2)
+                pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+                lbands1 = lower_bands(pbs1)
+                ubands1 = upper_bands(pbs1)
+                lbands2 = lower_bands(pbs2)
+                ubands2 = upper_bands(pbs2)
+                for i in 1:length(pbs1)
+                    if i > 1
+                        amp2_left = pbs1[i-1]/(ubands1[i-1] - lbands1[i-1])*(ubands1[i-1] - lbands2[i])
+                        amp2_right = pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[i] - lbands1[i])
+                        amp2_check = amp2_left + amp2_right
+                    else
+                        amp2_check = pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[i] - lbands1[i])
+                    end
+                    @test pbs2[i] ≈ amp2_check
+                end
+            end
+        end
+
+        @testset "output bands too low" begin
+            for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                        ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                cbands1 = TPB{:center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+                cbands2 = TPB{:center}(1, 9)
+                pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+                @test all(pbs2 .≈ 0)
+            end
+        end
+
+        @testset "output bands too high" begin
+            for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                        ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                cbands1 = TPB{:center}(10, 16)
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+                cbands2 = TPB{:center}(17, 20)
+                pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+                @test all(pbs2 .≈ 0)
+            end
+        end
+
+        @testset "input 3rd-octave, output octave, aligned" begin
+            cbands1 = ExactProportionalBands{3,:center}(32, 49)
+            pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+            pbs2 = LazyPBSProportionalBandSpectrum(ExactProportionalBands{1}, pbs1)
+            cbands2 = center_bands(pbs2)
+            @test band_start(cbands2) == 11
+            @test band_end(cbands2) == 16
+            for i in 1:length(pbs2)
+                j = (i-1)*3 + 1
+                @test pbs2[i] ≈ sum(pbs1[j:j+2])
+            end
+        end
+
+        @testset "input octave, output 3rd-octave, aligned" begin
+            cbands1 = ExactProportionalBands{1,:center}(11, 16)
+            pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+            pbs2 = LazyPBSProportionalBandSpectrum(ExactProportionalBands{3}, pbs1)
+            cbands2 = center_bands(pbs2)
+            @test band_start(cbands2) == 32
+            @test band_end(cbands2) == 49
+
+            lbands1 = lower_bands(pbs1)
+            ubands1 = upper_bands(pbs1)
+            lbands2 = lower_bands(pbs2)
+            ubands2 = upper_bands(pbs2)
+
+            for i in 1:length(pbs1)
+                j = (i-1)*3 + 1
+
+                @test pbs2[j] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j] - lbands2[j])
+                @test pbs2[j+1] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j+1] - lbands2[j+1])
+                @test pbs2[j+2] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j+2] - lbands2[j+2])
+            end
+        end
+
+        @testset "input 3rd-octave, output octave, not aligned, scaled up" begin
+            cbands1 = ExactProportionalBands{3,:center}(32, 49)
+            pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+            cbands2 = ExactProportionalBands{1,:center}(11, 16, 1.01)
+            # pbs2 = LazyPBSProportionalBandSpectrum(ExactProportionalBands{1}, pbs1, 1.01)
+            pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+            lbands1 = lower_bands(pbs1)
+            ubands1 = upper_bands(pbs1)
+            lbands2 = lower_bands(pbs2)
+            ubands2 = upper_bands(pbs2)
+            for i in 1:length(pbs2)
+                if i < length(pbs2)
+                    # |  .    . |   .    .  |
+                    #  |         |           |
+                    j = (i-1)*3 + 1
+                    amp2_left = (pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - lbands2[i])
+                                 + pbs1[j+1]
+                                 + pbs1[j+2])
+
+                    j = (i)*3 + 1
+                    amp2_right = pbs1[j]/(ubands1[j] - lbands1[j])*(ubands2[i] - lbands1[j])
+
+                    amp2_check = amp2_left + amp2_right
+                else
+                    j = (i-1)*3 + 1
+                    amp2_check = (pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - lbands2[i])
+                                 + pbs1[j+1]
+                                 + pbs1[j+2])
+
+
+                end
+                @test pbs2[i] ≈ amp2_check
+            end
+        end
+
+        # @testset "input 3rd-octave, output octave, not aligned, scaled down" begin
+        #     cbands1 = ExactProportionalBands{3,:center}(32, 49)
+        #     pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+        #     cbands2 = ExactProportionalBands{1,:center}(11, 16, 0.99)
+        #     # pbs2 = LazyPBSProportionalBandSpectrum(ExactProportionalBands{1}, pbs1, 1.01)
+        #     pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+        #     lbands1 = lower_bands(pbs1)
+        #     ubands1 = upper_bands(pbs1)
+        #     lbands2 = lower_bands(pbs2)
+        #     ubands2 = upper_bands(pbs2)
+        #     for i in 1:length(pbs2)
+        #         if i > 1
+        #             #  |  .    . |   .    .  |
+        #             # |         |           |
+        #             j = (i-1)*3 + 1
+        #             # amp2_left = (pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - lbands2[i])
+        #             #              + pbs1[j+1]
+        #             #              + pbs1[j+2])
+
+        #             # j = (i)*3 + 1
+        #             # amp2_right = pbs1[j]/(ubands1[j] - lbands1[j])*(ubands2[i] - lbands1[j])
+
+        #             amp2_check = amp2_left + amp2_right
+        #         else
+        #             j = (i-1)*3 + 1
+        #             amp2_check = (pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - lbands2[i])
+        #                          + pbs1[j+1]
+        #                          + pbs1[j+2])
+
+
+        #         end
+        #         @test pbs2[i] ≈ amp2_check
+        #     end
+        # end
+
+    end
+
     @testset "combining proportional band spectrums" begin
 
         @testset "same bands" begin
@@ -2891,9 +3096,9 @@ end
             for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12}, ApproximateThirdOctaveBands, ApproximateOctaveBands]
                 # pbs1_lazy = LazyNBProportionalBandSpectrum(TPB, freq_min_nb, df_nb, psd)
                 pbs1_lazy = LazyNBProportionalBandSpectrum(TPB, freq_min_nb, df_nb, msp)
-                pbs1 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
-                pbs2 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
-                pbs3 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs1 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
+                pbs2 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
+                pbs3 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
 
                 # So, when we add these, the proportional band spectrum should be just 3 times whatever the original was, and all the bands should be the same.
                 pbs_combined = combine([pbs1, pbs2, pbs3], center_bands(pbs1_lazy))
@@ -2916,9 +3121,9 @@ end
             for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12}, ApproximateThirdOctaveBands, ApproximateOctaveBands]
                 # pbs1_lazy = LazyNBProportionalBandSpectrum(TPB, freq_min_nb, df_nb, psd)
                 pbs1_lazy = LazyNBProportionalBandSpectrum(TPB, freq_min_nb, df_nb, msp)
-                pbs1 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
-                pbs2 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
-                pbs3 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs1 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
+                pbs2 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
+                pbs3 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
 
                 # outcbands = ExactProportionalBands{3, :center}(10, 16)
                 outcbands = TPB{:center}(2.0, 10.0)
@@ -2941,9 +3146,9 @@ end
             for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12}, ApproximateThirdOctaveBands, ApproximateOctaveBands]
                 # pbs1_lazy = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, psd)
                 pbs1_lazy = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, freq_min_nb, df_nb, msp)
-                pbs1 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
-                pbs2 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
-                pbs3 = ProportionalBandSpectrum(center_bands(pbs1_lazy), collect(pbs1_lazy))
+                pbs1 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
+                pbs2 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
+                pbs3 = ProportionalBandSpectrum(collect(pbs1_lazy), center_bands(pbs1_lazy))
 
                 outcbands = TPB{:center}(3000.0, 20000.0)
                 # Make sure the outbands are actually all higher than the input narrowbands.
@@ -2957,11 +3162,11 @@ end
         @testset "inbands lined up with outbands" begin
             for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12}, ApproximateThirdOctaveBands, ApproximateOctaveBands]
                 cbands1 = TPB{:center}(10, 16)
-                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
                 cbands2 = TPB{:center}(11, 16)
-                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                pbs2 = ProportionalBandSpectrum(rand(length(cbands2)), cbands2)
                 cbands3 = TPB{:center}(12, 16)
-                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+                pbs3 = ProportionalBandSpectrum(rand(length(cbands3)), cbands3)
 
                 # outcbands = ExactProportionalBands{3, :center}(10, 16)
                 outcbands = TPB{:center}(10, 16)
@@ -2986,16 +3191,16 @@ end
                        ]
                 # cbands1 = ExactProportionalBands{3, :center}(10, 16)
                 cbands1 = TPB{:center}(10, 16)
-                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
                 # NO = octave_fraction(cbands1)
                 scaler = cbands1[2]/cbands1[1]
                 # cbands2 = ExactProportionalBands{3, :center}(10, 15, scaler)
                 cbands2 = TPB{:center}(10, 15, scaler)
-                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                pbs2 = ProportionalBandSpectrum(rand(length(cbands2)), cbands2)
                 scaler = cbands1[3]/cbands1[1]
                 # cbands3 = ExactProportionalBands{3, :center}(10, 14, scaler)
                 cbands3 = TPB{:center}(10, 14, scaler)
-                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+                pbs3 = ProportionalBandSpectrum(rand(length(cbands3)), cbands3)
 
                 # outcbands = ExactProportionalBands{3, :center}(10, 16)
                 outcbands = TPB{:center}(10, 16)
@@ -3014,7 +3219,7 @@ end
                 cbands1 = TPB{:center}(10, 16)
                 lbands1 = lower_bands(cbands1)
                 ubands1 = upper_bands(cbands1)
-                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
 
                 # outcbands = ExactProportionalBands{3, :center}(10, 16, 1.1)
                 # Need to make sure the frequency shift (here `1.05`) is small enough to shift the frequency bands by less than 1.
@@ -3044,21 +3249,21 @@ end
                 cbands1 = TPB{:center}(10, 16)
                 lbands1 = lower_bands(cbands1)
                 ubands1 = upper_bands(cbands1)
-                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
 
                 scaler = cbands1[2]/cbands1[1]
                 cbands2 = TPB{:center}(10, 15, scaler)
                 lbands2 = lower_bands(cbands2)
                 ubands2 = upper_bands(cbands2)
                 @test all(cbands2 ./ cbands1[1:end-1] .≈ scaler)
-                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                pbs2 = ProportionalBandSpectrum(rand(length(cbands2)), cbands2)
 
                 scaler = cbands1[3]/cbands1[1]
                 cbands3 = TPB{:center}(10, 14, scaler)
                 lbands3 = lower_bands(cbands3)
                 ubands3 = upper_bands(cbands3)
                 @test all(cbands3 ./ cbands1[1:end-2] .≈ scaler)
-                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+                pbs3 = ProportionalBandSpectrum(rand(length(cbands3)), cbands3)
 
                 scaler = 1.05
                 outcbands = TPB{:center}(10, 16, scaler)
@@ -3126,19 +3331,19 @@ end
                 cbands1 = TPB{:center}(10, 16)
                 lbands1 = lower_bands(cbands1)
                 ubands1 = upper_bands(cbands1)
-                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
 
                 scaler = cbands1[2]/cbands1[1]
                 cbands2 = TPB{:center}(10, 16, scaler)
                 lbands2 = lower_bands(cbands2)
                 ubands2 = upper_bands(cbands2)
-                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                pbs2 = ProportionalBandSpectrum(rand(length(cbands2)), cbands2)
 
                 scaler = cbands1[3]/cbands1[1]
                 cbands3 = TPB{:center}(10, 16, scaler)
                 lbands3 = lower_bands(cbands3)
                 ubands3 = upper_bands(cbands3)
-                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+                pbs3 = ProportionalBandSpectrum(rand(length(cbands3)), cbands3)
 
                 outcbands = TPB{:center}(10, 16, 1.05)
                 outlbands = lower_bands(outcbands)
@@ -3209,19 +3414,19 @@ end
                 cbands1 = TPB{:center}(10, 16)
                 lbands1 = lower_bands(cbands1)
                 ubands1 = upper_bands(cbands1)
-                pbs1 = ProportionalBandSpectrum(cbands1, rand(length(cbands1)))
+                pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
 
                 scaler = cbands1[2]/cbands1[1]
                 cbands2 = TPB{:center}(10, 16, scaler)
                 lbands2 = lower_bands(cbands2)
                 ubands2 = upper_bands(cbands2)
-                pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                pbs2 = ProportionalBandSpectrum(rand(length(cbands2)), cbands2)
 
                 scaler = cbands1[3]/cbands1[1]
                 cbands3 = TPB{:center}(10, 16, scaler)
                 lbands3 = lower_bands(cbands3)
                 ubands3 = upper_bands(cbands3)
-                pbs3 = ProportionalBandSpectrum(cbands3, rand(length(cbands3)))
+                pbs3 = ProportionalBandSpectrum(rand(length(cbands3)), cbands3)
 
                 outcbands = TPB{:center}(5, 30, 1.05)
                 outlbands = lower_bands(outcbands)
@@ -3822,7 +4027,7 @@ end
                     ubands2 = upper_bands(cbands2)
                     # t2 = 2.1
                     # dt2 = 0.3
-                    pbs2 = ProportionalBandSpectrum(cbands2, rand(length(cbands2)))
+                    pbs2 = ProportionalBandSpectrum(rand(length(cbands2)), cbands2)
                     @test has_observer_time(pbs2) == false
                     @test observer_time(pbs2) ≈ 0
 
