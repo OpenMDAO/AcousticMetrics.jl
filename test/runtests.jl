@@ -3046,40 +3046,84 @@ end
             end
         end
 
-        # @testset "input 3rd-octave, output octave, not aligned, scaled down" begin
-        #     cbands1 = ExactProportionalBands{3,:center}(32, 49)
-        #     pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
-        #     cbands2 = ExactProportionalBands{1,:center}(11, 16, 0.99)
-        #     # pbs2 = LazyPBSProportionalBandSpectrum(ExactProportionalBands{1}, pbs1, 1.01)
-        #     pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
-        #     lbands1 = lower_bands(pbs1)
-        #     ubands1 = upper_bands(pbs1)
-        #     lbands2 = lower_bands(pbs2)
-        #     ubands2 = upper_bands(pbs2)
-        #     for i in 1:length(pbs2)
-        #         if i > 1
-        #             #  |  .    . |   .    .  |
-        #             # |         |           |
-        #             j = (i-1)*3 + 1
-        #             # amp2_left = (pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - lbands2[i])
-        #             #              + pbs1[j+1]
-        #             #              + pbs1[j+2])
+        @testset "input 3rd-octave, output octave, not aligned, scaled down" begin
+            cbands1 = ExactProportionalBands{3,:center}(32, 49)
+            pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+            cbands2 = ExactProportionalBands{1,:center}(11, 16, 0.99)
+            pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+            lbands1 = lower_bands(pbs1)
+            ubands1 = upper_bands(pbs1)
+            lbands2 = lower_bands(pbs2)
+            ubands2 = upper_bands(pbs2)
+            for i in 1:length(pbs2)
+                j = (i-1)*3 + 1
+                if i > 1
+                    #  |  .    . |   .    .  |
+                    # |         |           |
+                    amp2_left = pbs1[j-1]/(ubands1[j-1] - lbands1[j-1])*(ubands1[j-1] - lbands2[i])
+                    amp2_right = pbs1[j] + pbs1[j+1] + pbs1[j+2]/(ubands1[j+2] - lbands1[j+2])*(ubands2[i] - lbands1[j+2])
+                    amp2_check = amp2_left + amp2_right
+                else
+                    amp2_right = pbs1[j] + pbs1[j+1] + pbs1[j+2]/(ubands1[j+2] - lbands1[j+2])*(ubands2[i] - lbands1[j+2])
+                    amp2_check = amp2_right
+                end
+                @test pbs2[i] ≈ amp2_check
+            end
+        end
 
-        #             # j = (i)*3 + 1
-        #             # amp2_right = pbs1[j]/(ubands1[j] - lbands1[j])*(ubands2[i] - lbands1[j])
+        @testset "input octave, output 3rd-octave, not aligned, scaled up" begin
+            cbands1 = ExactProportionalBands{1,:center}(11, 16)
+            pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+            cbands2 = ExactProportionalBands{3, :center}(32, 49, 1.01)
+            pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
 
-        #             amp2_check = amp2_left + amp2_right
-        #         else
-        #             j = (i-1)*3 + 1
-        #             amp2_check = (pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - lbands2[i])
-        #                          + pbs1[j+1]
-        #                          + pbs1[j+2])
+            lbands1 = lower_bands(pbs1)
+            ubands1 = upper_bands(pbs1)
+            lbands2 = lower_bands(pbs2)
+            ubands2 = upper_bands(pbs2)
 
+            for i in 1:length(pbs1)
+                # |         |           |
+                #  |  .    . |   .    .  |
+                j = 3*(i - 1) + 1
+                @test pbs2[j] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j] - lbands2[j])
+                @test pbs2[j+1] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j+1] - lbands2[j+1])
+                if i < length(pbs1)
+                    @test pbs2[j+2] ≈ (
+                        pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - lbands2[j+2])
+                        + pbs1[i+1]/(ubands1[i+1] - lbands1[i+1])*(ubands2[j+2] - lbands1[i+1]))
+                else
+                    @test pbs2[j+2] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - lbands2[j+2])
+                end
+            end
+        end
 
-        #         end
-        #         @test pbs2[i] ≈ amp2_check
-        #     end
-        # end
+        @testset "input octave, output 3rd-octave, not aligned, scaled down" begin
+            cbands1 = ExactProportionalBands{1,:center}(11, 16)
+            pbs1 = ProportionalBandSpectrum(rand(length(cbands1)), cbands1)
+            cbands2 = ExactProportionalBands{3, :center}(32, 49, 0.99)
+            pbs2 = LazyPBSProportionalBandSpectrum(pbs1, cbands2)
+
+            lbands1 = lower_bands(pbs1)
+            ubands1 = upper_bands(pbs1)
+            lbands2 = lower_bands(pbs2)
+            ubands2 = upper_bands(pbs2)
+
+            for i in 1:length(pbs1)
+                #  |         |           |
+                # |  .    . |   .    .  |
+                j = 3*(i - 1) + 1
+                if i > 1
+                    @test pbs2[j] ≈ (
+                        pbs1[i-1]/(ubands1[i-1] - lbands1[i-1])*(ubands1[i-1] - lbands2[j])
+                        + pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j] - lbands1[i]))
+                else
+                    @test pbs2[j] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j] - lbands1[i])
+                end
+                @test pbs2[j+1] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j+1] - lbands2[j+1])
+                @test pbs2[j+2] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands2[j+2] - lbands2[j+2])
+            end
+        end
 
     end
 
