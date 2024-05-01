@@ -639,6 +639,10 @@ LazyNBApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum, scaler=1) =
 
 frequency_nb(pbs::LazyNBProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.msp_amp)-1).*pbs.df_nb
 
+function lazy_pbs(pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,IsTonal,NO}
+    return LazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.f1_nb, pbs.df_nb, pbs.msp_amp, cbands)
+end
+
 """
     Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,false}, i::Int)
 
@@ -797,6 +801,10 @@ end
 @inline lower_bands(pbs::ProportionalBandSpectrum) = pbs.lbands
 @inline upper_bands(pbs::ProportionalBandSpectrum) = pbs.ubands
 
+function lazy_pbs(pbs::ProportionalBandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
+    return LazyPBSProportionalBandSpectrum(pbs, cbands)
+end
+
 """
     ProportionalBandSpectrum(TBandsC, cfreq_start, pbs, scaler=1)
 
@@ -836,6 +844,10 @@ end
 @inline timestep(pbs::ProportionalBandSpectrumWithTime{NO,TF}) where {NO,TF} = pbs.dt
 @inline time_scaler(pbs::ProportionalBandSpectrumWithTime, period) = timestep(pbs)/period
 
+function lazy_pbs(pbs::ProportionalBandSpectrumWithTime, cbands::AbstractProportionalBands{NO,:center}) where {NO}
+    return LazyPBSProportionalBandSpectrum(pbs, cbands)
+end
+
 
 struct LazyPBSProportionalBandSpectrum{NO,TF,TPBS<:AbstractProportionalBandSpectrum,TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
@@ -860,6 +872,10 @@ end
 @inline observer_time(pbs::LazyPBSProportionalBandSpectrum) = observer_time(pbs.pbs)
 @inline timestep(pbs::LazyPBSProportionalBandSpectrum{NO,TF}) where {NO,TF} = timestep(pbs.pbs)
 @inline time_scaler(pbs::LazyPBSProportionalBandSpectrum, period) = time_scaler(pbs.pbs, period)
+
+function lazy_pbs(pbs::LazyPBSProportionalBandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
+    return LazyPBSProportionalBandSpectrum(pbs.pbs, cbands)
+end
 
 @inline function Base.getindex(pbs::LazyPBSProportionalBandSpectrum, i::Int)
     @boundscheck checkbounds(pbs, i)
@@ -956,6 +972,117 @@ end
     return pbs_out
 end
 
+#"""
+#    combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
+
+#Combine each input proportional band spectrum of `pbs` into one output proportional band spectrum using the proportional center bands indicated by `outcbands`.
+#"""
+#function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},Base.RefValue{<:AbstractProportionalBandSpectrum}}, outcbands::AbstractProportionalBands{NO,:center}) where {N,NO}
+#   # Create the vector that will contain the new PBS.
+#   # An <:AbstractProportionalBandSpectrum is <:AbstractVector{TF}, so AbstractArray{<:AbstractProportionalBandSpectrum,N} is actually an Array of AbstractVectors.
+#   # So `eltype(eltype(pbs))` should give me the element type of the PBS.
+#   TFOut = promote_type(eltype(eltype(pbs)), eltype(outcbands))
+#   pbs_out = zeros(TFOut, length(outcbands))
+
+#   # Get the lower and upper edges of the output band spectrum.
+#   outbands_lower = lower_bands(outcbands)
+#   outbands_upper = upper_bands(outcbands)
+
+#   # Get the time period for this collection of PBSs.
+#   period = time_period(pbs)
+
+#   # Now start looping over each input PBS.
+#   for pbs_in in pbs
+
+#       # Get the lower and upper edges of this input band's spectrum.
+#       inbands_lower = lower_bands(pbs_in)
+#       inbands_upper = upper_bands(pbs_in)
+
+#       # So now I need to loop over each output band.
+#       # This is a lot of loops.
+#       for (idx_out, (fol, fou)) in enumerate(zip(outbands_lower, outbands_upper))
+#           # So now I have the boundaries of the frequencies I'm interested in in `fol` and `fou`.
+#           # What I'm looking for now is:
+#           #
+#           #   * the first input band whose upper edge is greater than `fol`
+#           #   * the last input band whose lower edge is less than `fou`.
+#           #
+#           # So, for the first input band whose upper edge is greater than `fol`, I should be able to do this:
+#           istart = searchsortedfirst(inbands_upper, fol)
+#           # For that, what if
+#           #
+#           #   * All of `inbands_upper` are less than `fol`?
+#           #     That would mean all of the `inband` frequencies are lower than and outside the current `outband`.
+#           #     Then the docs for `searchsortedfirst` say that it will return `length(inbands_upper)+1`.
+#           #     So if I started a view of the data from that index, it would obviously be empty, which is what I'd want.
+#           #   * All of the `inbands_upper` are greater than `fol`?
+#           #     Not necessarily a problem, unless, I guess, the lowest of `inbands_lower` is *also* greater than `fou`.
+#           #     Then the entire input spectrum would be larger than this band.
+#           #     But `searchsortedfirst` should just return `1`, and hopefully that would be the right thing.
+
+#           # Now I want the last input band whose lower edge is less than `fou`.
+#           # I should be able to get that from
+#           iend = searchsortedlast(inbands_lower, fou)
+#           # For that, what if 
+#           #
+#           #   * All of the `inbands_lower` are greater than `fou`?
+#           #     That would mean all of the `inband` frequencies are greater than and outside the current `outband`.
+#           #     The docs indicate `searchsortedlast` would return `firstindex(inbands_lower)-1` for that case, i.e. `0`.
+#           #     That's what I'd want, I think.
+#           #   * All of the `inbands_lower` are lower than `fou`?
+#           #     Not necessarily a problem, unless the highest of `inbands_upper` are also lower than `fou`, which would mean the entire input spectrum is lower than this output band.
+           
+           
+#           # Now I have the first and last input bands relevant to this output band, and so I can start adding up the input PBS's contributions to this output band.
+#           # First, we need to check that there's something to do:
+#           # if (istart > n_inbands) || (iend < 1)
+#           #     continue
+#           # else
+#           if (istart <= lastindex(pbs_in)) && (iend >= firstindex(pbs_in))
+#               # Get the time scaler associated with this PBS.
+#               scaler = time_scaler(pbs_in, period)
+
+#               # First, get the bandwidth of the first input band associated with this output band.
+#               fil_start = inbands_lower[istart]
+#               fiu_start = inbands_upper[istart]
+#               dfin_start = fiu_start - fil_start
+
+#               # Next, need to get the frequency overlap of the first input band and this output band.
+#               # For the lower edge of the overlap, it will usually be `fol`, unless there's a gap where `inbands_lower[istart]` is greater than `fol`.
+#               foverlapl_start = max(fol, fil_start)
+#               # For the upper edge of the overlap, it will usually be `fiu_start`, unless there's a gap where `inbands_upper[istart]` is less than `fou`.
+#               foverlapu_start = min(fou, fiu_start)
+
+#               # Now get the first band's contribution to the PBS.
+#               pbs_out[idx_out] += pbs_in[istart]/dfin_start*(foverlapu_start - foverlapl_start)*scaler
+
+#               # Now, think about the last band's contribution to the PBS.
+#               # First, we need to check if the first and last band are identicial, which would indicate that there's only one input band in this output band.
+#               if iend > istart
+#                   # Now need to get the bandwidth associated with this input band.
+#                   fil_end = inbands_lower[iend]
+#                   fiu_end = inbands_upper[iend]
+#                   dfin_end = fiu_end - fil_end
+
+#                   # Next, need to get the frequency overlap of the last input band and this output band.
+#                   foverlapl_end = max(fol, fil_end)
+#                   foverlapu_end = min(fou, fiu_end)
+
+#                   # Now we can get the last band's contribution to the PBS.
+#                   pbs_out[idx_out] += pbs_in[iend]/dfin_end*(foverlapu_end - foverlapl_end)*scaler
+
+#                   # Now we need the contribution of the input bands between `istart+1` and `iend-1`, inclusive.
+#                   # Don't need to worry about incomplete overlap of the bands since these are "inside" this output band, so we can just directly sum them.
+#                   pbs_in_v = @view pbs_in[istart+1:iend-1]
+#                   pbs_out[idx_out] += sum(pbs_in_v)*scaler
+#               end
+#           end
+#       end
+#   end
+
+#   return ProportionalBandSpectrum(pbs_out, outcbands)
+#end
+
 """
     combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
 
@@ -968,99 +1095,21 @@ function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},
    TFOut = promote_type(eltype(eltype(pbs)), eltype(outcbands))
    pbs_out = zeros(TFOut, length(outcbands))
 
-   # Get the lower and upper edges of the output band spectrum.
-   outbands_lower = lower_bands(outcbands)
-   outbands_upper = upper_bands(outcbands)
-
    # Get the time period for this collection of PBSs.
    period = time_period(pbs)
 
    # Now start looping over each input PBS.
    for pbs_in in pbs
 
-       # Get the lower and upper edges of this input band's spectrum.
-       inbands_lower = lower_bands(pbs_in)
-       inbands_upper = upper_bands(pbs_in)
+       # Get the time scaler associated with this particular input PBS.
+       scaler = time_scaler(pbs_in, period)
 
-       # So now I need to loop over each output band.
-       # This is a lot of loops.
-       for (idx_out, (fol, fou)) in enumerate(zip(outbands_lower, outbands_upper))
-           # So now I have the boundaries of the frequencies I'm interested in in `fol` and `fou`.
-           # What I'm looking for now is:
-           #
-           #   * the first input band whose upper edge is greater than `fol`
-           #   * the last input band whose lower edge is less than `fou`.
-           #
-           # So, for the first input band whose upper edge is greater than `fol`, I should be able to do this:
-           istart = searchsortedfirst(inbands_upper, fol)
-           # For that, what if
-           #
-           #   * All of `inbands_upper` are less than `fol`?
-           #     That would mean all of the `inband` frequencies are lower than and outside the current `outband`.
-           #     Then the docs for `searchsortedfirst` say that it will return `length(inbands_upper)+1`.
-           #     So if I started a view of the data from that index, it would obviously be empty, which is what I'd want.
-           #   * All of the `inbands_upper` are greater than `fol`?
-           #     Not necessarily a problem, unless, I guess, the lowest of `inbands_lower` is *also* greater than `fou`.
-           #     Then the entire input spectrum would be larger than this band.
-           #     But `searchsortedfirst` should just return `1`, and hopefully that would be the right thing.
+       # Create a lazy version of the input proportional band spectrum using the output center bands.
+       pbs_in_lazy = lazy_pbs(pbs_in, outcbands)
 
-           # Now I want the last input band whose lower edge is less than `fou`.
-           # I should be able to get that from
-           iend = searchsortedlast(inbands_lower, fou)
-           # For that, what if 
-           #
-           #   * All of the `inbands_lower` are greater than `fou`?
-           #     That would mean all of the `inband` frequencies are greater than and outside the current `outband`.
-           #     The docs indicate `searchsortedlast` would return `firstindex(inbands_lower)-1` for that case, i.e. `0`.
-           #     That's what I'd want, I think.
-           #   * All of the `inbands_lower` are lower than `fou`?
-           #     Not necessarily a problem, unless the highest of `inbands_upper` are also lower than `fou`, which would mean the entire input spectrum is lower than this output band.
-           
-           
-           # Now I have the first and last input bands relevant to this output band, and so I can start adding up the input PBS's contributions to this output band.
-           # First, we need to check that there's something to do:
-           # if (istart > n_inbands) || (iend < 1)
-           #     continue
-           # else
-           if (istart <= lastindex(pbs_in)) && (iend >= firstindex(pbs_in))
-               # Get the time scaler associated with this PBS.
-               scaler = time_scaler(pbs_in, period)
-
-               # First, get the bandwidth of the first input band associated with this output band.
-               fil_start = inbands_lower[istart]
-               fiu_start = inbands_upper[istart]
-               dfin_start = fiu_start - fil_start
-
-               # Next, need to get the frequency overlap of the first input band and this output band.
-               # For the lower edge of the overlap, it will usually be `fol`, unless there's a gap where `inbands_lower[istart]` is greater than `fol`.
-               foverlapl_start = max(fol, fil_start)
-               # For the upper edge of the overlap, it will usually be `fiu_start`, unless there's a gap where `inbands_upper[istart]` is less than `fou`.
-               foverlapu_start = min(fou, fiu_start)
-
-               # Now get the first band's contribution to the PBS.
-               pbs_out[idx_out] += pbs_in[istart]/dfin_start*(foverlapu_start - foverlapl_start)*scaler
-
-               # Now, think about the last band's contribution to the PBS.
-               # First, we need to check if the first and last band are identicial, which would indicate that there's only one input band in this output band.
-               if iend > istart
-                   # Now need to get the bandwidth associated with this input band.
-                   fil_end = inbands_lower[iend]
-                   fiu_end = inbands_upper[iend]
-                   dfin_end = fiu_end - fil_end
-
-                   # Next, need to get the frequency overlap of the last input band and this output band.
-                   foverlapl_end = max(fol, fil_end)
-                   foverlapu_end = min(fou, fiu_end)
-
-                   # Now we can get the last band's contribution to the PBS.
-                   pbs_out[idx_out] += pbs_in[iend]/dfin_end*(foverlapu_end - foverlapl_end)*scaler
-
-                   # Now we need the contribution of the input bands between `istart+1` and `iend-1`, inclusive.
-                   # Don't need to worry about incomplete overlap of the bands since these are "inside" this output band, so we can just directly sum them.
-                   pbs_in_v = @view pbs_in[istart+1:iend-1]
-                   pbs_out[idx_out] += sum(pbs_in_v)*scaler
-               end
-           end
+       # Now loop over each output band, adding in the current input PBS to each frequency bin.
+       for idx_out in eachindex(pbs_out)
+           pbs_out[idx_out] += pbs_in_lazy[idx_out]*scaler
        end
    end
 
