@@ -3567,296 +3567,7 @@ end
             end
         end
 
-        # @testset "non-aligned wide outbands, multiple input spectrums, all same length, lazy PBS" begin
-        #     for TPB in [ExactProportionalBands{1}]
-
-        #         # cbands1 = TPB{:center}(10, 16)
-        #         # lbands1 = lower_bands(cbands1)
-        #         # ubands1 = upper_bands(cbands1)
-        #         # # Create some random msp corresponding to the proportional bands defined by lbands1, cbands1, ubands1.
-        #         # # nfreq_nb = 800
-        #         # # freq_min_nb = lbands1[1] + 0.1*(ubands1[1] - lbands1[1])
-        #         # # freq_max_nb = ubands1[end] - 0.1*(ubands1[end] - lbands1[end])
-        #         # # @test (freq_min_nb - 0.5*df_nb) > lbands1[1]
-        #         # # @test (freq_max_nb + 0.5*df_nb) < ubands1[end]
-        #         # # f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
-        #         # # freq_min_nb_m_half_df_nb = lbands1[1]
-        #         # # freq_max_nb_p_half_df_nb = ubands1[end]
-        #         # # f_nb_edges = range(freq_min_nb_m_half_df_nb, freq_max_nb_p_half_df_nb; length=nfreq_nb+1)
-        #         # # f_nb = 0.5 .* (f_nb_edges[1:end-1] .+ f_nb_edges[2:end])
-        #         # # df_nb = step(f_nb)
-        #         # nfreqs_nb_1band = 10
-        #         # freq_min_nb_m_half_df_nb_1band = lbands1[1]
-        #         # freq_max_nb_p_half_df_nb_1band = ubands1[1]
-        #         # df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
-        #         # freq_min_nb_m_half_df_nb = lbands1[1]
-        #         # freq_max_nb_p_half_df_nb = ubands1[end]
-        #         # f_nb = (freq_min_nb_m_half_df_nb + 0.5*df_nb):df_nb:(freq_max_nb_p_half_df_nb - 0.5*df_nb)
-        #         # @test step(f_nb) ≈ df_nb
-        #         # msp1 = rand(length(f_nb))
-        #         # pbs1 = LazyNBProportionalBandSpectrum(TPB, f_nb[1], df_nb, msp1)
-
-        #         # scaler = cbands1[2]/cbands1[1]
-        #         # cbands2 = TPB{:center}(10, 16, scaler)
-        #         # lbands2 = lower_bands(cbands2)
-        #         # ubands2 = upper_bands(cbands2)
-        #         # # # Create some random msp corresponding to the proportional bands defined by lbands2, cbands2, ubands2.
-        #         # # nfreq_nb = 800
-        #         # # freq_min_nb = lbands2[1] + 0.1*(ubands2[1] - lbands2[1])
-        #         # # freq_max_nb = ubands2[end] - 0.1*(ubands2[end] - lbands2[end])
-        #         # # df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
-        #         # # @test (freq_min_nb - 0.5*df_nb) > lbands2[1]
-        #         # # @test (freq_max_nb + 0.5*df_nb) < ubands2[end]
-        #         # # f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
-        #         # nfreqs_nb_1band = 10
-        #         # freq_min_nb_m_half_df_nb_1band = lbands2[1]
-        #         # freq_max_nb_p_half_df_nb_1band = ubands2[1]
-        #         # df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
-        #         # freq_min_nb_m_half_df_nb = lbands2[1]
-        #         # freq_max_nb_p_half_df_nb = ubands2[end]
-        #         # f_nb = (freq_min_nb_m_half_df_nb + 0.5*df_nb):df_nb:(freq_max_nb_p_half_df_nb - 0.5*df_nb)
-        #         # @test step(f_nb) ≈ df_nb
-        #         # msp2 = rand(length(f_nb))
-        #         # pbs2 = LazyNBProportionalBandSpectrum(TPB, f_nb[1], df_nb, msp2, freq_scaler(cbands2))
-
-        #         # scaler = cbands1[3]/cbands1[1]
-        #         # cbands3 = TPB{:center}(10, 16, scaler)
-        #         # lbands3 = lower_bands(cbands3)
-        #         # ubands3 = upper_bands(cbands3)
-        #         # # Create some random msp corresponding to the proportional bands defined by lbands3, cbands3, ubands3.
-        #         # # nfreq_nb = 800
-        #         # # freq_min_nb = lbands3[1] + 0.1*(ubands3[1] - lbands3[1])
-        #         # # freq_max_nb = ubands3[end] - 0.1*(ubands3[end] - lbands3[end])
-        #         # # df_nb = (freq_max_nb - freq_min_nb)/(nfreq_nb - 1)
-        #         # # @test (freq_min_nb - 0.5*df_nb) > lbands3[1]
-        #         # # @test (freq_max_nb + 0.5*df_nb) < ubands3[end]
-        #         # # f_nb = freq_min_nb .+ (0:(nfreq_nb-1)).*df_nb
-        #         # nfreqs_nb_1band = 10
-        #         # freq_min_nb_m_half_df_nb_1band = lbands3[1]
-        #         # freq_max_nb_p_half_df_nb_1band = ubands3[1]
-        #         # df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
-        #         # freq_min_nb_m_half_df_nb = lbands3[1]
-        #         # freq_max_nb_p_half_df_nb = ubands3[end]
-        #         # f_nb = (freq_min_nb_m_half_df_nb + 0.5*df_nb):df_nb:(freq_max_nb_p_half_df_nb - 0.5*df_nb)
-        #         # @test step(f_nb) ≈ df_nb
-        #         # msp3 = rand(length(f_nb))
-        #         # pbs3 = LazyNBProportionalBandSpectrum(TPB, f_nb[1], df_nb, msp3, freq_scaler(cbands3))
-
-
-        #         outcbands = TPB{:center}(5, 30, 1.05)
-        #         outlbands = lower_bands(outcbands)
-        #         outubands = upper_bands(outcbands)
-
-        #         cbands1 = TPB{:center}(10, 16)
-        #         lbands1 = lower_bands(cbands1)
-        #         ubands1 = upper_bands(cbands1)
-        #         # Find a narrowband frequency spacing that will fit in the first outband.
-        #         nfreqs_nb_1band = 10
-        #         freq_min_nb_m_half_df_nb_1band = outlbands[band_start(cbands1) - band_start(outcbands) + 1]
-        #         freq_max_nb_p_half_df_nb_1band = outubands[band_start(cbands1) - band_start(outcbands) + 1]
-        #         df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
-        #         # Now construct a narrowband frequency that spans the bands I'm interested in.
-        #         freq_min_nb_m_half_df_nb = outlbands[band_start(cbands1) - band_start(outcbands) + 1]
-        #         # shifting the output bands up, so have to skip the last band.
-        #         freq_max_nb_p_half_df_nb = outubands[band_end(cbands1) - band_start(outcbands)]
-        #         f_nb = (freq_min_nb_m_half_df_nb + 0.5*df_nb):df_nb:(freq_max_nb_p_half_df_nb - 0.5*df_nb)
-        #         @test step(f_nb) ≈ df_nb
-        #         @test f_nb[1] > lbands1[1]
-        #         @test f_nb[end] < ubands1[end]
-        #         @test (f_nb[1] - 0.5*step(f_nb)) ≈ outlbands[band_start(cbands1) - band_start(outcbands) + 1]
-        #         @test (f_nb[end] + 0.5*step(f_nb)) ≈ outubands[band_end(cbands1) - band_start(outcbands)]
-        #         msp1 = rand(length(f_nb))
-        #         pbs1 = LazyNBProportionalBandSpectrum(f_nb[1], df_nb, msp1, cbands1)
-
-        #         scaler = cbands1[2]/cbands1[1]
-        #         cbands2 = TPB{:center}(10, 16, scaler)
-        #         lbands2 = lower_bands(cbands2)
-        #         ubands2 = upper_bands(cbands2)
-        #         # Find a narrowband frequency spacing that will fit in the second outband.
-        #         nfreqs_nb_1band = 10
-        #         freq_min_nb_m_half_df_nb_1band = outlbands[band_start(cbands2) - band_start(outcbands) + 2]
-        #         freq_max_nb_p_half_df_nb_1band = outubands[band_start(cbands2) - band_start(outcbands) + 2]
-        #         df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
-        #         # Now construct a narrowband frequency that spans the bands I'm interested in.
-        #         freq_min_nb_m_half_df_nb = outlbands[band_start(cbands2) - band_start(outcbands) + 2]
-        #         # shifting the output bands up, so have to skip the last band.
-        #         freq_max_nb_p_half_df_nb = outubands[band_end(cbands2) - band_start(outcbands) + 1]
-        #         f_nb = (freq_min_nb_m_half_df_nb + 0.5*df_nb):df_nb:(freq_max_nb_p_half_df_nb - 0.5*df_nb)
-        #         @test step(f_nb) ≈ df_nb
-        #         @test f_nb[1] > lbands2[1]
-        #         @test f_nb[end] < ubands2[end]
-        #         @test (f_nb[1] - 0.5*step(f_nb)) ≈ outlbands[band_start(cbands2) - band_start(outcbands) + 2]
-        #         @test (f_nb[end] + 0.5*step(f_nb)) ≈ outubands[band_end(cbands2) - band_start(outcbands) + 1]
-        #         msp2 = rand(length(f_nb))
-        #         pbs2 = LazyNBProportionalBandSpectrum(f_nb[1], df_nb, msp2, cbands2)
-
-        #         scaler = cbands1[3]/cbands1[1]
-        #         cbands3 = TPB{:center}(10, 16, scaler)
-        #         lbands3 = lower_bands(cbands3)
-        #         ubands3 = upper_bands(cbands3)
-        #         # Find a narrowband frequency spacing that will fit in the second outband.
-        #         nfreqs_nb_1band = 10
-        #         freq_min_nb_m_half_df_nb_1band = outlbands[band_start(cbands3) - band_start(outcbands) + 3]
-        #         freq_max_nb_p_half_df_nb_1band = outubands[band_start(cbands3) - band_start(outcbands) + 3]
-        #         df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
-        #         # Now construct a narrowband frequency that spans the bands I'm interested in.
-        #         freq_min_nb_m_half_df_nb = outlbands[band_start(cbands3) - band_start(outcbands) + 3]
-        #         # shifting the output bands up, so have to skip the last band.
-        #         freq_max_nb_p_half_df_nb = outubands[band_end(cbands3) - band_start(outcbands) + 2]
-        #         f_nb = (freq_min_nb_m_half_df_nb + 0.5*df_nb):df_nb:(freq_max_nb_p_half_df_nb - 0.5*df_nb)
-        #         @test step(f_nb) ≈ df_nb
-        #         @test f_nb[1] > lbands3[1]
-        #         @test f_nb[end] < ubands3[end]
-        #         @test (f_nb[1] - 0.5*step(f_nb)) ≈ outlbands[band_start(cbands3) - band_start(outcbands) + 3]
-        #         @test (f_nb[end] + 0.5*step(f_nb)) ≈ outubands[band_end(cbands3) - band_start(outcbands) + 2]
-        #         msp3 = rand(length(f_nb))
-        #         pbs3 = LazyNBProportionalBandSpectrum(f_nb[1], df_nb, msp3, cbands3)
-
-        #         pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
-
-        #         f1_nb = frequency_nb(pbs1)
-        #         df1_nb = step(f1_nb)
-        #         f1_nb_l = f1_nb .- 0.5*df1_nb
-        #         f1_nb_u = f1_nb .+ 0.5*df1_nb
-
-        #         f2_nb = frequency_nb(pbs2)
-        #         df2_nb = step(f2_nb)
-        #         f2_nb_l = f2_nb .- 0.5*df2_nb
-        #         f2_nb_u = f2_nb .+ 0.5*df2_nb
-
-        #         f3_nb = frequency_nb(pbs3)
-        #         df3_nb = step(f3_nb)
-        #         f3_nb_l = f3_nb .- 0.5*df3_nb
-        #         f3_nb_u = f3_nb .+ 0.5*df3_nb
-
-        #         @test all(pbs_combined[1:4] .≈ 0)
-
-        #         # i = 5
-        #         # j = 1
-        #         # @test pbs_combined[i] ≈ (
-        #         #      pbs1[j]/(ubands1[j] - lbands1[j])*(outubands[i] - lbands1[j])
-        #         # )
-        #         # i = 5
-
-        #         for i in 5:14
-        #             jstart = searchsortedfirst(f1_nb_l, outlbands[i])
-        #             jend = searchsortedlast(f1_nb_u, outubands[i])
-        #             if jstart >= 1 && jstart <= length(f1_nb_l)
-        #                 @test f1_nb_l[jstart] ≈ outlbands[i]
-        #             end
-        #             if jend >= 1 && jend < length(f1_nb_u)
-        #                 @test f1_nb_u[jend] ≈ outubands[i]
-        #             end
-        #             pbs1_i = sum(msp1[jstart:jend])
-                    
-        #             jstart = searchsortedfirst(f2_nb_l, outlbands[i])
-        #             jend = searchsortedlast(f2_nb_u, outubands[i])
-        #             if jstart >= 1 && jstart <= length(f2_nb_l)
-        #                 @test f2_nb_l[jstart] ≈ outlbands[i]
-        #             end
-        #             if jend >= 1 && jend <= length(f2_nb_u)
-        #                 @test f2_nb_u[jend] ≈ outubands[i]
-        #             end
-        #             pbs2_i = sum(msp2[jstart:jend])
-                    
-        #             jstart = searchsortedfirst(f3_nb_l, outlbands[i])
-        #             jend = searchsortedlast(f3_nb_u, outubands[i])
-        #             if jstart >= 1 && jstart <= length(f3_nb_l)
-        #                 @test f3_nb_l[jstart] ≈ outlbands[i]
-        #             end
-        #             if jend >= 1 && jend < length(f3_nb_u)
-        #                 @test f3_nb_u[jend] ≈ outubands[i]
-        #             end
-        #             pbs3_i = sum(msp3[jstart:jend])
-                    
-        #             @show i pbs1_i pbs2_i pbs3_i (pbs1_i + pbs2_i + pbs3_i) pbs_combined[i]
-        #             @test pbs_combined[i] ≈ pbs1_i + pbs2_i + pbs3_i
-        #         end
-                
-        #         # i = 6
-        #         # j = 1
-        #         # @test pbs_combined[i] ≈ (
-        #         #      pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #      pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #      pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j])
-        #         # )
-        #         # i = 7
-        #         # j = 2
-        #         # @test pbs_combined[i] ≈ (
-        #         #      pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #      pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #      pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #      pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #      pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
-        #         # )
-        #         # for i in 8:11
-        #         #     j += 1
-        #         #     if TPB == ApproximateThirdOctaveBands && j == 6
-        #         #         @test pbs_combined[i] ≈ (
-        #         #              pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #              pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #              pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #              pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #              pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(outubands[i] - outlbands[i])
-        #         #         )
-        #         #     else
-        #         #         @test pbs_combined[i] ≈ (
-        #         #              pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #              pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #              pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #              pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #              pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) +
-        #         #              pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
-        #         #         )
-        #         #     end
-        #         # end
-        #         # i = 12
-        #         # j = 7
-        #         # if TPB == ApproximateThirdOctaveBands
-        #         #     @test pbs_combined[i] ≈ (
-        #         #          pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #          # pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #          pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #          pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #          pbs3[j-3]/(ubands3[j-3] - lbands3[j-3])*(ubands3[j-3] - outlbands[i]) + 
-        #         #          pbs3[j-2] +
-        #         #          pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
-        #         #     )
-        #         # else
-        #         #     @test pbs_combined[i] ≈ (
-        #         #          pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #          # pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #          pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #          pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #          pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) + 
-        #         #          pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
-        #         #     )
-        #         # end
-        #         # i = 13
-        #         # j = 8
-        #         # @test pbs_combined[i] ≈ (
-        #         #      # pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #      # pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #      pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #      # pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #      pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) + 
-        #         #      pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
-        #         # )
-        #         # i = 14
-        #         # j = 9
-        #         # @test pbs_combined[i] ≈ (
-        #         #      # pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
-        #         #      # pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
-        #         #      # pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
-        #         #      # pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
-        #         #      pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) #+ 
-        #         #      # pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
-        #         # )
-        #         # @test all(pbs_combined[15:end] .≈ 0)
-        #     end
-        # end
-
-        @testset "non-aligned wide outbands, multiple input spectrums, all same length, lazy PBS, v2" begin
+        @testset "aligned inbands and outbands, multiple input spectrums, lazy PBS" begin
             outcbands = ExactProportionalBands{1}{:center}(5, 30)
             outlbands = lower_bands(outcbands)
             outubands = upper_bands(outcbands)
@@ -3959,6 +3670,103 @@ end
                 pbs3_i = sum(msp3[jstart:jend])
                 
                 @test isapprox(pbs_combined[i], pbs1_i + pbs2_i + pbs3_i; atol=1e-12)
+            end
+        end
+
+        @testset "non-aligned inbands, aligned outbands, multiple input spectrums, lazy PBS" begin
+            outcbands = ExactProportionalBands{1}{:center}(5, 30)
+            outlbands = lower_bands(outcbands)
+            outubands = upper_bands(outcbands)
+
+            # Find a narrowband frequency spacing that will fit in one of the output bands.
+            istart = 1
+            iend = length(outcbands)
+            nfreqs_nb_1band = 10
+            freq_min_nb_m_half_df_nb_1band = outlbands[istart]
+            freq_max_nb_p_half_df_nb_1band = outubands[istart]
+            df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
+            # Now construct a narrowband frequency that spans the bands I'm interested in.
+            freq_min_nb_m_half_df_nb = outlbands[istart]
+            freq_max_nb_p_half_df_nb = outubands[iend]
+            n = Int(round((freq_max_nb_p_half_df_nb - freq_min_nb_m_half_df_nb)/df_nb)) + 1
+            f_lu = range(freq_min_nb_m_half_df_nb, freq_max_nb_p_half_df_nb; length=n)
+            f_nb = 0.5.*(f_lu[2:end] .+ f_lu[1:end-1])
+            @test step(f_nb) ≈ df_nb
+            @test (f_nb[1] - 0.5*step(f_nb)) ≈ outlbands[istart]
+            @test (f_nb[end] + 0.5*step(f_nb)) ≈ outubands[iend]
+            msp1 = rand(length(f_nb))
+            pbs1 = LazyNBProportionalBandSpectrum(ExactProportionalBands{1}, f_nb[1], df_nb, msp1)
+
+            # Find a narrowband frequency spacing that will fit in one of the output bands.
+            istart = 2
+            iend = length(outcbands) - 1
+            nfreqs_nb_1band = 10
+            freq_min_nb_m_half_df_nb_1band = outlbands[istart]
+            freq_max_nb_p_half_df_nb_1band = outubands[istart]
+            df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
+            # Now construct a narrowband frequency that spans the bands I'm interested in.
+            freq_min_nb_m_half_df_nb = outlbands[istart]
+            freq_max_nb_p_half_df_nb = outubands[iend]
+            n = Int(round((freq_max_nb_p_half_df_nb - freq_min_nb_m_half_df_nb)/df_nb)) + 1
+            f_lu = range(freq_min_nb_m_half_df_nb, freq_max_nb_p_half_df_nb; length=n)
+            f_nb = 0.5.*(f_lu[2:end] .+ f_lu[1:end-1])
+            @test step(f_nb) ≈ df_nb
+            @test (f_nb[1] - 0.5*step(f_nb)) ≈ outlbands[istart]
+            @test (f_nb[end] + 0.5*step(f_nb)) ≈ outubands[iend]
+            msp2 = rand(length(f_nb))
+            pbs2 = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, f_nb[1], df_nb, msp2)
+
+            # Find a narrowband frequency spacing that will fit in one of the output bands.
+            istart = 3
+            iend = length(outcbands) - 2
+            nfreqs_nb_1band = 10
+            freq_min_nb_m_half_df_nb_1band = outlbands[istart]
+            freq_max_nb_p_half_df_nb_1band = outubands[istart]
+            df_nb = (freq_max_nb_p_half_df_nb_1band - freq_min_nb_m_half_df_nb_1band)/(nfreqs_nb_1band + 1)
+            # Now construct a narrowband frequency that spans the bands I'm interested in.
+            freq_min_nb_m_half_df_nb = outlbands[istart]
+            freq_max_nb_p_half_df_nb = outubands[iend]
+            n = Int(round((freq_max_nb_p_half_df_nb - freq_min_nb_m_half_df_nb)/df_nb)) + 1
+            f_lu = range(freq_min_nb_m_half_df_nb, freq_max_nb_p_half_df_nb; length=n)
+            f_nb = 0.5.*(f_lu[2:end] .+ f_lu[1:end-1])
+            @test step(f_nb) ≈ df_nb
+            @test (f_nb[1] - 0.5*step(f_nb)) ≈ outlbands[istart]
+            @test (f_nb[end] + 0.5*step(f_nb)) ≈ outubands[iend]
+            msp3 = rand(length(f_nb))
+            pbs3 = LazyNBProportionalBandSpectrum(ExactProportionalBands{12}, f_nb[1], df_nb, msp3)
+
+            pbs_combined = combine([pbs1, pbs2, pbs3], outcbands)
+
+            f1_nb = frequency_nb(pbs1)
+            df1_nb = step(f1_nb)
+            f1_nb_l = f1_nb .- 0.5*df1_nb
+            f1_nb_u = f1_nb .+ 0.5*df1_nb
+
+            f2_nb = frequency_nb(pbs2)
+            df2_nb = step(f2_nb)
+            f2_nb_l = f2_nb .- 0.5*df2_nb
+            f2_nb_u = f2_nb .+ 0.5*df2_nb
+
+            f3_nb = frequency_nb(pbs3)
+            df3_nb = step(f3_nb)
+            f3_nb_l = f3_nb .- 0.5*df3_nb
+            f3_nb_u = f3_nb .+ 0.5*df3_nb
+
+            for i in 1:length(pbs_combined)
+                tol = 1e-6
+                jstart = searchsortedfirst(f1_nb_l, outlbands[i]-tol)
+                jend = searchsortedlast(f1_nb_u, outubands[i]+tol)
+                pbs1_i = sum(msp1[jstart:jend])
+                
+                jstart = searchsortedfirst(f2_nb_l, outlbands[i]-tol)
+                jend = searchsortedlast(f2_nb_u, outubands[i]+tol)
+                pbs2_i = sum(msp2[jstart:jend])
+                
+                jstart = searchsortedfirst(f3_nb_l, outlbands[i]-tol)
+                jend = searchsortedlast(f3_nb_u, outubands[i]+tol)
+                pbs3_i = sum(msp3[jstart:jend])
+                
+                @test isapprox(pbs_combined[i], pbs1_i + pbs2_i + pbs3_i; rtol=1e-12)
             end
         end
     end
