@@ -834,6 +834,7 @@ struct ProportionalBandSpectrumWithTime{NO,TF,TPBS<:AbstractVector{TF},TBandsC<:
 
     function ProportionalBandSpectrumWithTime(pbs, cbands::AbstractProportionalBands{NO,:center}, dt, t) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
+        dt > zero(dt) || throw(ArgumentError("dt must be positive"))
 
         return new{NO,eltype(pbs),typeof(pbs),typeof(cbands),typeof(dt),typeof(t)}(pbs, cbands, dt, t)
     end
