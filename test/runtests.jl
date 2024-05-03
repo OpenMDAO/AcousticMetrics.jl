@@ -3841,7 +3841,7 @@ end
                     ubands1 = upper_bands(cbands1)
                     t1 = 2.0
                     dt1 = 0.2
-                    pbs1 = ProportionalBandSpectrumWithTime(t1, dt1, cbands1, rand(length(cbands1)))
+                    pbs1 = ProportionalBandSpectrumWithTime(rand(length(cbands1)), cbands1, dt1, t1)
                     @test has_observer_time(pbs1) == true
                     @test observer_time(pbs1) ≈ t1
                     @test timestep(pbs1) ≈ dt1
@@ -3852,7 +3852,7 @@ end
                     ubands2 = upper_bands(cbands2)
                     t2 = 2.1
                     dt2 = 0.2
-                    pbs2 = ProportionalBandSpectrumWithTime(t2, dt2, cbands2, rand(length(cbands2)))
+                    pbs2 = ProportionalBandSpectrumWithTime(rand(length(cbands2)), cbands2, dt2, t2)
                     @test has_observer_time(pbs2) == true
                     @test observer_time(pbs2) ≈ t2
                     @test timestep(pbs2) ≈ dt2
@@ -3863,7 +3863,7 @@ end
                     ubands3 = upper_bands(cbands3)
                     t3 = 2.3
                     dt3 = 0.2
-                    pbs3 = ProportionalBandSpectrumWithTime(t3, dt3, cbands3, rand(length(cbands3)))
+                    pbs3 = ProportionalBandSpectrumWithTime(rand(length(cbands3)), cbands3, dt3, t3)
                     @test has_observer_time(pbs3) == true
                     @test observer_time(pbs3) ≈ t3
                     @test timestep(pbs3) ≈ dt3
@@ -3981,7 +3981,7 @@ end
                     ubands1 = upper_bands(cbands1)
                     t1 = 2.0
                     dt1 = 0.2
-                    pbs1 = ProportionalBandSpectrumWithTime(t1, dt1, cbands1, rand(length(cbands1)))
+                    pbs1 = ProportionalBandSpectrumWithTime(rand(length(cbands1)), cbands1, dt1, t1)
                     @test has_observer_time(pbs1) == true
                     @test observer_time(pbs1) ≈ t1
 
@@ -3991,7 +3991,7 @@ end
                     ubands2 = upper_bands(cbands2)
                     t2 = 2.1
                     dt2 = 0.3
-                    pbs2 = ProportionalBandSpectrumWithTime(t2, dt2, cbands2, rand(length(cbands2)))
+                    pbs2 = ProportionalBandSpectrumWithTime(rand(length(cbands2)), cbands2, dt2, t2)
                     @test has_observer_time(pbs2) == true
                     @test observer_time(pbs2) ≈ t2
 
@@ -4001,7 +4001,7 @@ end
                     ubands3 = upper_bands(cbands3)
                     t3 = 2.3
                     dt3 = 0.4
-                    pbs3 = ProportionalBandSpectrumWithTime(t3, dt3, cbands3, rand(length(cbands3)))
+                    pbs3 = ProportionalBandSpectrumWithTime(rand(length(cbands3)), cbands3, dt3, t3)
                     @test has_observer_time(pbs3) == true
                     @test observer_time(pbs3) ≈ t3
 
@@ -4118,7 +4118,7 @@ end
                     ubands1 = upper_bands(cbands1)
                     t1 = 2.0
                     dt1 = 0.2
-                    pbs1 = ProportionalBandSpectrumWithTime(t1, dt1, cbands1, rand(length(cbands1)))
+                    pbs1 = ProportionalBandSpectrumWithTime(rand(length(cbands1)), cbands1, dt1, t1)
                     @test has_observer_time(pbs1) == true
                     @test observer_time(pbs1) ≈ t1
 
@@ -4138,7 +4138,7 @@ end
                     ubands3 = upper_bands(cbands3)
                     t3 = 2.3
                     dt3 = 0.4
-                    pbs3 = ProportionalBandSpectrumWithTime(t3, dt3, cbands3, rand(length(cbands3)))
+                    pbs3 = ProportionalBandSpectrumWithTime(rand(length(cbands3)), cbands3, dt3, t3)
                     @test has_observer_time(pbs3) == true
                     @test observer_time(pbs3) ≈ t3
 

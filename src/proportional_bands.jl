@@ -826,16 +826,16 @@ end
 
 Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`, but with an observer time.
 """
-struct ProportionalBandSpectrumWithTime{NO,TF,TPBS<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center},TTime,TDTime} <: AbstractProportionalBandSpectrum{NO,TF}
-    t::TTime
-    dt::TDTime
+struct ProportionalBandSpectrumWithTime{NO,TF,TPBS<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center},TDTime,TTime} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
     cbands::TBandsC
+    dt::TDTime
+    t::TTime
 
-    function ProportionalBandSpectrumWithTime(t, dt, cbands::AbstractProportionalBands{NO,:center}, pbs) where {NO}
+    function ProportionalBandSpectrumWithTime(pbs, cbands::AbstractProportionalBands{NO,:center}, dt, t) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
 
-        return new{NO,eltype(pbs),typeof(pbs),typeof(cbands),typeof(t),typeof(dt)}(t, dt, pbs, cbands)
+        return new{NO,eltype(pbs),typeof(pbs),typeof(cbands),typeof(dt),typeof(t)}(pbs, cbands, dt, t)
     end
 end
 
@@ -847,7 +847,6 @@ end
 function lazy_pbs(pbs::ProportionalBandSpectrumWithTime, cbands::AbstractProportionalBands{NO,:center}) where {NO}
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
 end
-
 
 struct LazyPBSProportionalBandSpectrum{NO,TF,TPBS<:AbstractProportionalBandSpectrum,TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
