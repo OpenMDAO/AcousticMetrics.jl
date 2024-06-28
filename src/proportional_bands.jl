@@ -11,31 +11,94 @@ The `LCU` parameter can take one of three values:
 """
 abstract type AbstractProportionalBands{NO,LCU,TF} <: AbstractVector{TF} end
 
-octave_fraction(::Type{<:AbstractProportionalBands{NO}}) where {NO} = NO
-octave_fraction(bands::AbstractProportionalBands{NO}) where {NO} = octave_fraction(typeof(bands))
-lower_center_upper(::Type{<:AbstractProportionalBands{NO,LCU,TF}}) where {NO,LCU,TF} = LCU
-lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = lower_center_upper(typeof(bands))
+"""
+    octave_fraction(bands::AbstractProportionalBands{NO}) where {NO}
 
+Return `NO`, the "octave fraction," e.g. `1` for octave bands, `3` for third-octave, `12` for twelfth-octave.
+"""
+octave_fraction(::AbstractProportionalBands{NO}) where {NO} = NO
+octave_fraction(::Type{<:AbstractProportionalBands{NO}}) where {NO} = NO
+
+"""
+    lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF}
+
+Return `LCU`, which can be either `:lower`, `:center`, `:upper`, indicating if `bands` represents the lower edges, centers, or upper edges of proportional bands, respectively.
+"""
+lower_center_upper(bands::AbstractProportionalBands{NO,LCU,TF}) where {NO,LCU,TF} = lower_center_upper(typeof(bands))
+lower_center_upper(::Type{<:AbstractProportionalBands{NO,LCU,TF}}) where {NO,LCU,TF} = LCU
+
+"""
+    freq_scaler(bands::AbstractProportionalBands)
+
+Return the factor each "standard" frequency band is scaled by.
+
+For example, the approximate octave center bands include 1000 Hz, 2000 Hz, and 4000 Hz.
+If `freq_scaler(bands) == 1.0`, then these frequencies would be unchanged.
+If `freq_scaler(bands) == 1.5`, then `bands` would include 1500 Hz, 3000 Hz, and 6000 Hz instead.
+If `freq_scaler(bands) == 0.5`, then `bands` would include 500 Hz, 1000 Hz, and 2000 Hz in place of 1000 Hz, 2000 Hz, and 4000 Hz.
+"""
 @inline freq_scaler(bands::AbstractProportionalBands) = bands.scaler
+
+"""
+    band_start(bands::AbstractProportionalBands)
+
+Return the standard band index number for the first band in `bands`.
+
+For example, it happens that the approximate octave center bands includes 1000 Hz, and that particular band is numbered `10`.
+So if the first band contained in `bands` happens to be 1000 Hz (and `freq_scaler(bands) == 1.0`), then `band_start(bands) == 10`.
+Not particularly useful to a user.
+"""
 @inline band_start(bands::AbstractProportionalBands) = bands.bstart
+
+"""
+    band_end(bands::AbstractProportionalBands)
+
+Return the standard band index number for the last band in `bands`.
+
+For example, it happens that the approximate octave center bands includes 1000 Hz, and that particular band is numbered `10`.
+So if the last band contained in `bands` happens to be 1000 Hz (and `freq_scaler(bands) == 1.0`), then `band_end(bands) == 10`.
+Not particularly useful to a user.
+"""
 @inline band_end(bands::AbstractProportionalBands) = bands.bend
 
 @inline function Base.size(bands::AbstractProportionalBands)
     return (band_end(bands) - band_start(bands) + 1,)
 end
 
+"""
+   lower_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF} 
+
+Construct and return the lower edges of the proportional bands `TBands`, scaled by `scaler`, that would fully encompass a frequency range beginning with `fstart` and ending with `fend`.
+"""
 function lower_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF}
     return TBands{:lower}(fstart, fend, scaler)
 end
 
+"""
+   upper_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF} 
+
+Construct and return the upper edges of the proportional bands `TBands`, scaled by `scaler`, that would fully encompass a frequency range beginning with `fstart` and ending with `fend`.
+"""
 function upper_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF}
     return TBands{:upper}(fstart, fend, scaler)
 end
 
+"""
+   center_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF} 
+
+Construct and return the centers of the proportional bands `TBands`, scaled by `scaler`, that would fully encompass a frequency range beginning with `fstart` and ending with `fend`.
+"""
 function center_bands(TBands::Type{<:AbstractProportionalBands{NO}}, fstart::TF, fend::TF, scaler=1) where {NO,TF}
     return TBands{:center}(fstart, fend, scaler)
 end
 
+"""
+    cband_number(bands::AbstractProportionalBands, fc)
+
+Return the standard band index number of the band with center frequency `fc` for proportional bands `bands`.
+
+For example, if `bands` is a subtype of `ApproximateOctaveBands` and `freq_scaler(bands) == 1.0`, then `cband_number(bands, 1000.0) == 10`.
+"""
 cband_number(bands::AbstractProportionalBands, fc) = cband_number(typeof(bands), fc, freq_scaler(bands))
 
 const f0_exact = 1000
@@ -54,13 +117,6 @@ The `LCU` parameter can take one of three values:
 """
 ExactProportionalBands
 
-"""
-    ExactProportionalBands{NO,LCU}(TF=Float64, bstart::Int, bend::Int, scaler=1)
-
-Construct an `ExactProportionalBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
-
-The "standard" band frequencies will be scaled by `scaler`, e.g. if `scaler = 0.5` then what would normally be the `1000 Hz` frequency will be `500 Hz`.
-"""
 struct ExactProportionalBands{NO,LCU,TF} <: AbstractProportionalBands{NO,LCU,TF}
     bstart::Int
     bend::Int
@@ -75,10 +131,16 @@ struct ExactProportionalBands{NO,LCU,TF} <: AbstractProportionalBands{NO,LCU,TF}
     end
 end
 
+"""
+    ExactProportionalBands{NO,LCU}(TF=Float64, bstart::Int, bend::Int, scaler=1)
+
+Construct an `ExactProportionalBands` with `eltype` `TF` encomposing band index numbers from `bstart` to `bend`.
+
+The "standard" band frequencies will be scaled by `scaler`, e.g. if `scaler = 0.5` then what would normally be the `1000 Hz` frequency will be `500 Hz`, etc..
+"""
 function ExactProportionalBands{NO,LCU}(TF::Type, bstart::Int, bend::Int, scalar=1) where {NO,LCU}
     return ExactProportionalBands{NO,LCU,TF}(bstart, bend, scalar)
 end
-
 function ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int, scaler=1) where {NO,LCU} 
     return ExactProportionalBands{NO,LCU}(Float64, bstart, bend, scaler)
 end
@@ -86,8 +148,7 @@ end
 @inline band_exact_lower_limit(NO, fl, scaler) = floor(Int, 1/2 + NO*log2(fl/(f0_exact*scaler)) + 10*NO)
 @inline band_exact_upper_limit(NO, fu, scaler) = ceil(Int, -1/2 + NO*log2(fu/(f0_exact*scaler)) + 10*NO)
 
-function cband_exact(NO, fc, scaler)
-    tol = 10*eps(fc)
+function _cband_exact(NO, fc, scaler)
     # f = 2^((b - 10*NO)/NO)*f0
     # f/f0 = 2^((b - 10*NO)/NO)
     # log2(f/f0) = log2(2^((b - 10*NO)/NO))
@@ -95,23 +156,27 @@ function cband_exact(NO, fc, scaler)
     # log2(f/f0)*NO = b - 10*NO
     # log2(f/f0)*NO + 10*NO = b
     # b = log2(f/f0)*NO + 10*NO
+
     # Get the band number from a center band frequency `fc`.
     log2_fc_over_f0_exact_NO = log2(fc/(f0_exact*scaler))*NO
+
     # Check that the result will be very close to an integer.
     rounded = round(Int, log2_fc_over_f0_exact_NO)
-    abs_cs_safe(log2_fc_over_f0_exact_NO - rounded) < tol  || throw(ArgumentError("fc does not correspond to a center-band frequency"))
+    tol = 10*eps(fc)
+    abs_cs_safe(log2_fc_over_f0_exact_NO - rounded) < tol || throw(ArgumentError("fc does not correspond to a center-band frequency"))
+
     b = rounded + 10*NO
     return b
 end
 
 function cband_number(::Type{<:ExactProportionalBands{NO}}, fc, scaler) where {NO}
-    return cband_exact(NO, fc, scaler)
+    return _cband_exact(NO, fc, scaler)
 end
 
 """
     ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF, scaler)
 
-Construct an `ExactProportionalBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
+Construct an `ExactProportionalBands` with `eltype` `TF`, scaled by `scaler`, encomposing the bands needed to completely extend over minimum frequency `fstart` and maximum frequency `fend`.
 """
 ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF, scaler=1) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(fstart, fend, scaler)
 ExactProportionalBands{NO,LCU,TF}(fstart::TF, fend::TF, scaler=1) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(band_exact_lower_limit(NO, fstart, scaler), band_exact_upper_limit(NO, fend, scaler), scaler)
@@ -157,47 +222,64 @@ end
 """
     ExactOctaveCenterBands{TF}
 
-Alias for ExactProportionalBands{1,:center,TF}
+Alias for `ExactProportionalBands{1,:center,TF}`
 """
 const ExactOctaveCenterBands{TF} = ExactProportionalBands{1,:center,TF}
 
 """
     ExactThirdOctaveCenterBands{TF}
 
-Alias for ExactProportionalBands{3,:center,TF}
+Alias for `ExactProportionalBands{3,:center,TF}`
 """
 const ExactThirdOctaveCenterBands{TF} = ExactProportionalBands{3,:center,TF}
 
 """
     ExactOctaveLowerBands{TF}
 
-Alias for ExactProportionalBands{1,:lower,TF}
+Alias for `ExactProportionalBands{1,:lower,TF}`
 """
 const ExactOctaveLowerBands{TF} = ExactProportionalBands{1,:lower,TF}
 
 """
     ExactThirdOctaveLowerBands{TF}
 
-Alias for ExactProportionalBands{3,:lower,TF}
+Alias for `ExactProportionalBands{3,:lower,TF}`
 """
 const ExactThirdOctaveLowerBands{TF} = ExactProportionalBands{3,:lower,TF}
 
 """
     ExactOctaveUpperBands{TF}
 
-Alias for ExactProportionalBands{1,:upper,TF}
+Alias for `ExactProportionalBands{1,:upper,TF}`
 """
 const ExactOctaveUpperBands{TF} = ExactProportionalBands{1,:upper,TF}
 
 """
     ExactThirdOctaveUpperBands{TF}
 
-Alias for ExactProportionalBands{3,:upper,TF}
+Alias for `ExactProportionalBands{3,:upper,TF}`
 """
 const ExactThirdOctaveUpperBands{TF} = ExactProportionalBands{3,:upper,TF}
 
+"""
+   lower_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,TF} 
+
+Construct and return the lower edges of the proportional bands `bands` scaled by `scaler`.
+"""
 lower_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,LCU,TF} = ExactProportionalBands{NO,:lower,TF}(band_start(bands), band_end(bands), scaler)
+
+"""
+   center_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,TF} 
+
+Construct and return the centers of the proportional bands `bands` scaled by `scaler`.
+"""
 center_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,LCU,TF} = ExactProportionalBands{NO,:center,TF}(band_start(bands), band_end(bands), scaler)
+
+"""
+   upper_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,TF} 
+
+Construct and return the upper edges of the proportional bands `bands` scaled by `scaler`.
+"""
 upper_bands(bands::ExactProportionalBands{NO,LCU,TF}, scaler=freq_scaler(bands)) where {NO,LCU,TF} = ExactProportionalBands{NO,:upper,TF}(band_start(bands), band_end(bands), scaler)
 
 const approx_3rd_octave_cbands_pattern = [1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0]
@@ -229,16 +311,15 @@ struct ApproximateThirdOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF
 end
 
 """
-    ApproximateThirdOctaveBands{LCU,TF}(bstart::Int, bend::Int, scaler=1)
+    ApproximateThirdOctaveBands{LCU}(TF=Float64, bstart::Int, bend::Int, scaler=1)
 
-Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`, scaling the standard frequencies by `scaler`.
+Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing band index numbers from `bstart` to `bend`.
 
-`TF` defaults to `Float64`.
+The "standard" band frequencies will be scaled by `scaler`, e.g. if `scaler = 0.5` then what would normally be the `1000 Hz` frequency will be `500 Hz`, etc..
 """
 function ApproximateThirdOctaveBands{LCU}(TF::Type, bstart::Int, bend::Int, scaler=1) where {LCU}
     return ApproximateThirdOctaveBands{LCU,TF}(bstart, bend, scaler)
 end
-
 function ApproximateThirdOctaveBands{LCU}(bstart::Int, bend::Int, scaler=1) where {LCU} 
     return ApproximateThirdOctaveBands{LCU}(Float64, bstart, bend, scaler)
 end
@@ -323,17 +404,51 @@ end
 """
     ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1)
 
-Construct an `ApproximateThirdOctaveBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
+Construct an `ApproximateThirdOctaveBands` with `eltype` `TF`, scaled by `scaler`, encomposing the bands needed to completely extend over minimum frequency `fstart` and maximum frequency `fend`.
 """
 ApproximateThirdOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(fstart, fend, scaler)
 ApproximateThirdOctaveBands{LCU,TF}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateThirdOctaveBands{LCU,TF}(band_approx_3rd_octave_lower_limit(fstart, scaler), band_approx_3rd_octave_upper_limit(fend, scaler), scaler)
 
+"""
+    ApproximateThirdOctaveCenterBands{TF}
+
+Alias for `ApproximateThirdOctaveBands{:center,TF}`
+"""
 const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:center,TF}
+
+"""
+    ApproximateThirdOctaveLowerBands{TF}
+
+Alias for `ApproximateThirdOctaveBands{:lower,TF}`
+"""
 const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,TF}
+
+"""
+    ApproximateThirdOctaveUpperBands{TF}
+
+Alias for `ApproximateThirdOctaveBands{:upper,TF}`
+"""
 const ApproximateThirdOctaveUpperBands{TF} = ApproximateThirdOctaveBands{:upper,TF}
 
+"""
+   lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF}
+
+Construct and return the lower edges of the proportional bands `bands` scaled by `scaler`.
+"""
 lower_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateThirdOctaveBands{:lower,TF}(band_start(bands), band_end(bands), scaler)
+
+"""
+   center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF}
+
+Construct and return the centers of the proportional bands `bands` scaled by `scaler`.
+"""
 center_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateThirdOctaveBands{:center,TF}(band_start(bands), band_end(bands), scaler)
+
+"""
+   upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF}
+
+Construct and return the upper edges of the proportional bands `bands` scaled by `scaler`.
+"""
 upper_bands(bands::ApproximateThirdOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateThirdOctaveBands{:upper,TF}(band_start(bands), band_end(bands), scaler)
 
 const approx_octave_cbands_pattern = [1.0, 2.0, 4.0, 8.0, 16.0, 31.5, 63.0, 125.0, 250.0, 500.0]
@@ -341,7 +456,7 @@ const approx_octave_lbands_pattern = [0.71, 1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 
 const approx_octave_ubands_pattern = [1.42, 2.84, 5.68, 11.0, 22.0, 44.0, 88.0, 177.0, 355.0, 710.0]
 
 """
-    ApproximateOctaveBands{LCU,TF} <: AbstractProportionalBands{3,LCU,TF}
+    ApproximateOctaveBands{LCU,TF} <: AbstractProportionalBands{1,LCU,TF}
 
 Representation of the approximate octave proportional frequency bands with `eltype` `TF`.
 
@@ -367,14 +482,13 @@ end
 """
     ApproximateOctaveBands{LCU,TF}(bstart::Int, bend::Int)
 
-Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing band numbers from `bstart` to `bend`.
+Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing band index numbers from `bstart` to `bend`.
 
-`TF` defaults to `Float64`.
+The "standard" band frequencies will be scaled by `scaler`, e.g. if `scaler = 0.5` then what would normally be the `1000 Hz` frequency will be `500 Hz`, etc..
 """
 function ApproximateOctaveBands{LCU}(TF::Type, bstart::Int, bend::Int, scaler=1) where {LCU}
     return ApproximateOctaveBands{LCU,TF}(bstart, bend, scaler)
 end
-
 function ApproximateOctaveBands{LCU}(bstart::Int, bend::Int, scaler=1) where {LCU} 
     return ApproximateOctaveBands{LCU}(Float64, bstart, bend, scaler)
 end
@@ -454,43 +568,149 @@ function cband_number(::Type{<:ApproximateOctaveBands}, fc, scaler)
 end
 
 """
-    ApproximateOctaveBands{LCU}(fstart::TF, fend::TF)
+    ApproximateOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1)
 
-Construct an `ApproximateOctaveBands` with `eltype` `TF` encomposing the bands needed to completly extend over minimum frequency `fstart` and maximum frequency `fend`.
+Construct an `ApproximateOctaveBands` with `eltype` `TF`, scaled by `scaler`, encomposing the bands needed to completely extend over minimum frequency `fstart` and maximum frequency `fend`.
 """
 ApproximateOctaveBands{LCU}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(fstart, fend, scaler)
 ApproximateOctaveBands{LCU,TF}(fstart::TF, fend::TF, scaler=1) where {LCU,TF} = ApproximateOctaveBands{LCU,TF}(band_approx_octave_lower_limit(fstart, scaler), band_approx_octave_upper_limit(fend, scaler), scaler)
 
+"""
+    ApproximateOctaveCenterBands{TF}
+
+Alias for `ApproximateOctaveBands{:center,TF}`
+"""
 const ApproximateOctaveCenterBands{TF} = ApproximateOctaveBands{:center,TF}
+
+"""
+    ApproximateOctaveLowerBands{TF}
+
+Alias for `ApproximateOctaveBands{:lower,TF}`
+"""
 const ApproximateOctaveLowerBands{TF} = ApproximateOctaveBands{:lower,TF}
+
+"""
+    ApproximateOctaveUpperBands{TF}
+
+Alias for `ApproximateOctaveBands{:upper,TF}`
+"""
 const ApproximateOctaveUpperBands{TF} = ApproximateOctaveBands{:upper,TF}
 
+"""
+    lower_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands))
+
+Construct and return the lower edges of the proportional bands `bands` scaled by `scaler`.
+"""
 lower_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateOctaveBands{:lower,TF}(band_start(bands), band_end(bands), scaler)
+
+"""
+    center_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands))
+
+Construct and return the centers of the proportional bands `bands` scaled by `scaler`.
+"""
 center_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateOctaveBands{:center,TF}(band_start(bands), band_end(bands), scaler)
+
+"""
+    upper_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands))
+
+Construct and return the upper edges of the proportional bands `bands` scaled by `scaler`.
+"""
 upper_bands(bands::ApproximateOctaveBands{LCU,TF}, scaler=freq_scaler(bands)) where {LCU,TF} = ApproximateOctaveBands{:upper,TF}(band_start(bands), band_end(bands), scaler)
 
+"""
+    AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF}
+
+Abstract type representing a proportional band spectrum with band fraction `NO` and `eltype` `TF`.
+"""
 abstract type AbstractProportionalBandSpectrum{NO,TF} <: AbstractVector{TF} end
 
+"""
+    octave_fraction(pbs::AbstractProportionalBandSpectrum{NO}) where {NO}
+
+Return `NO`, the "octave fraction," e.g. `1` for octave bands, `3` for third-octave, `12` for twelfth-octave.
+"""
+octave_fraction(::AbstractProportionalBandSpectrum{NO}) where {NO} = NO
 octave_fraction(::Type{<:AbstractProportionalBandSpectrum{NO}}) where {NO} = NO
+
+"""
+    lower_bands(pbs::AbstractProportionalBandSpectrum)
+
+Return the lower edges of the proportional bands associated with the proportional band spectrum `pbs`.
+"""
 @inline lower_bands(pbs::AbstractProportionalBandSpectrum) = lower_bands(pbs.cbands)
+
+"""
+    center_bands(pbs::AbstractProportionalBandSpectrum)
+
+Return the centers of the proportional bands associated with the proportional band spectrum `pbs`.
+"""
 @inline center_bands(pbs::AbstractProportionalBandSpectrum) = pbs.cbands
+
+"""
+    upper_bands(pbs::AbstractProportionalBandSpectrum)
+
+Return the upper edges of the proportional bands associated with the proportional band spectrum `pbs`.
+"""
 @inline upper_bands(pbs::AbstractProportionalBandSpectrum) = upper_bands(pbs.cbands)
+
+
+"""
+    freq_scaler(pbs::AbstractProportionalBandSpectrum)
+
+Return the factor each "standard" frequency band associated with the proportional band spectrum `pbs` is scaled by.
+
+For example, the approximate octave center bands include 1000 Hz, 2000 Hz, and 4000 Hz.
+If `freq_scaler(pbs) == 1.0`, then these frequencies would be unchanged.
+If `freq_scaler(pbs) == 1.5`, then `bands` would include 1500 Hz, 3000 Hz, and 6000 Hz instead.
+If `freq_scaler(pbs) == 0.5`, then `bands` would include 500 Hz, 1000 Hz, and 2000 Hz in place of 1000 Hz, 2000 Hz, and 4000 Hz.
+"""
 @inline freq_scaler(pbs::AbstractProportionalBandSpectrum) = freq_scaler(center_bands(pbs))
+
+"""
+    has_observer_time(pbs::AbstractProportionalBandSpectrum)
+
+Return `true` if the proportional band spectrum is defined to exist over a limited time, `false` otherwise.
+"""
 @inline has_observer_time(pbs::AbstractProportionalBandSpectrum) = false
+
+"""
+    observer_time(pbs::AbstractProportionalBandSpectrum)
+
+Return the observer time at which the proportional band spectrum is defined to exist.
+"""
 @inline observer_time(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = zero(TF)
+
+"""
+    timestep(pbs::AbstractProportionalBandSpectrum)
+
+Return the time range over which the proportional band spectrum is defined to exist.
+"""
 @inline timestep(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = Inf*one(TF)
+
+"""
+    amplitude(pbs::AbstractProportionalBandSpectrum)
+
+Return the underlying `Vector` containing the proportional band spectrum amplitudes contained in `pbs`.
+"""
 @inline amplitude(pbs::AbstractProportionalBandSpectrum) = pbs.pbs
 
 """
-    time_period(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N})
+    time_period(pbs::AbstractArray{<:AbstractProportionalBandSpectrum})
 
 Find the period of time over which the collection of proportional band spectrum `pbs` exists.
 """
-function time_period(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum},Base.RefValue{<:AbstractProportionalBandSpectrum}})
+function time_period(pbs::AbstractArray{<:AbstractProportionalBandSpectrum})
     tmin, tmax = extrema(observer_time, Iterators.filter(has_observer_time, pbs); init=(Inf, -Inf))
     return tmax - tmin
 end
 
+"""
+    time_scaler(pbs::AbstractProportionalBandSpectrum{NO,TF}, period)
+
+Find the scaling factor appropriate to multiply the proportional band spectrum `pbs` by that accounts for the duration of time the spectrum exists.
+
+This is used when combining multiple proportional band spectra with the [combine](@ref) function.
+"""
 time_scaler(pbs::AbstractProportionalBandSpectrum{NO,TF}, period) where {NO,TF} = one(TF)
 
 @inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
@@ -506,37 +726,78 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
 end
 
 """
-    LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsL,TBandsC,TBandsU}
+    LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsC}
 
-Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a narrowband spectrum.
+Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a narrowband (`NB`) spectrum.
+
+`IsTonal` indicates how the acoustic energy is distributed through the narrow frequency bands:
+
+  * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
-struct LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp<:AbstractVector{TF},TBandsL<:AbstractProportionalBands{NO,:lower},TBandsC<:AbstractProportionalBands{NO,:center},TBandsU<:AbstractProportionalBands{NO,:upper}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
     f1_nb::TF
     df_nb::TF
     msp_amp::TAmp
-    lbands::TBandsL
     cbands::TBandsC
-    ubands::TBandsU
 
     function LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(f1_nb::TF, df_nb::TF, msp_amp::TAmp, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsTonal,TF,TAmp<:AbstractVector{TF}}
         f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
         df_nb > zero(df_nb) || throw(ArgumentError("df_nb must be > 0"))
-        lbands = lower_bands(cbands)
-        ubands = upper_bands(cbands)
-        return new{NO,IsTonal,TF,TAmp,typeof(lbands),typeof(cbands),typeof(ubands)}(f1_nb, df_nb, msp_amp, lbands, cbands, ubands)
+        return new{NO,IsTonal,TF,TAmp,typeof(cbands)}(f1_nb, df_nb, msp_amp, cbands)
     end
 end
 
+"""
+    LazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center})
+
+Construct a lazy representation of a proportional band spectrum with proportional center bands `cbands` from a narrowband spectrum.
+
+The narrowband frequencies are defined by the first narrowband frequency `f1_nb` and the narrowband frequency spacing `df_nb`.
+`msp_amp` is the spectrum of narrowband mean squared pressure amplitude.
+
+`IsTonal` indicates how the acoustic energy is distributed through the narrow frequency bands:
+
+  * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
+"""
 function LazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsTonal}
     TF = eltype(msp_amp)
     TAmp = typeof(msp_amp)
     return LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
 end
 
+"""
+    LazyNBProportionalBandSpectrum(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}, istonal=false)
+
+Construct a lazy representation of a proportional band spectrum with proportional center bands `cbands` from a narrowband spectrum.
+
+The narrowband frequencies are defined by the first narrowband frequency `f1_nb` and the narrowband frequency spacing `df_nb`.
+`msp_amp` is the spectrum of narrowband mean squared pressure amplitude.
+
+`istonal` indicates how the acoustic energy is distributed through the narrow frequency bands:
+
+  * `istonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `istonal == true` means the acoustic energy is assumed to be concentrated at each band center
+"""
 function LazyNBProportionalBandSpectrum(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}, istonal::Bool=false) where {NO}
     return LazyNBProportionalBandSpectrum{NO,istonal}(f1_nb, df_nb, msp_amp, cbands)
 end
 
+"""
+    LazyNBProportionalBandSpectrum{NO,IsTonal}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1)
+
+Construct a lazy representation of a proportional band spectrum with proportional band type `TBands` from a narrowband spectrum.
+
+The narrowband frequencies are defined by the first narrowband frequency `f1_nb` and the narrowband frequency spacing `df_nb`.
+`msp_amp` is the spectrum of narrowband mean squared pressure amplitude.
+The proportional band frequencies will be scaled by `scaler`.
+
+`IsTonal` is a `Bool` indicating how the acoustic energy is distributed through the narrow frequency bands:
+
+  * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
+"""
 function LazyNBProportionalBandSpectrum{NO,false}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1) where {NO}
     TF = eltype(msp_amp)
     TAmp = typeof(msp_amp)
@@ -548,7 +809,6 @@ function LazyNBProportionalBandSpectrum{NO,false}(TBands::Type{<:AbstractProport
 
     return LazyNBProportionalBandSpectrum{NO,false,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
 end
-
 function LazyNBProportionalBandSpectrum{NO,true}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1) where {NO}
     TF = eltype(msp_amp)
     TAmp = typeof(msp_amp)
@@ -564,11 +824,12 @@ end
 """
     LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, msp_amp, scaler=1, istonal::Bool=false)
 
-Construct a `LazyNBProportionalBandSpectrum` using a proportional band `TBands` and narrowband mean squared pressuree amplitude vector `msp_amp` and optional proportional band frequency scaler `scaler`.
+Construct a `LazyNBProportionalBandSpectrum` using proportional bands `TBands` and narrowband mean squared pressure amplitude vector `msp_amp` and optional proportional band frequency scaler `scaler`.
 
 `f1_nb` is the first non-zero narrowband frequency, and `df_nb` is the narrowband frequency spacing.
 The `istonal` `Bool` argument, if `true`, indicates the narrowband spectrum is tonal and thus concentrated at discrete frequencies.
-If `false`, the spectrum is assumed to be constant over each frequency band.
+If `false`, the spectrum is assumed to be constant over each narrow frequency band.
+The proportional band frequencies will be scaled by `scaler`.
 """
 function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1, istonal::Bool=false) where {NO}
     return LazyNBProportionalBandSpectrum{NO,istonal}(TBands, f1_nb, df_nb, msp_amp, scaler)
@@ -578,6 +839,7 @@ end
     LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum, scaler=1)
 
 Construct a `LazyNBProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`, and optional frequency scaler `scaler`.
+The proportional band frequencies will be scaled by `scaler`.
 """
 function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}, scaler=1) where {NO,IsEven,IsTonal}
     msp = MSPSpectrumAmplitude(sm)
@@ -593,6 +855,7 @@ end
     LazyNBProportionalBandSpectrum(sm::AbstractNarrowbandSpectrum, cbands::AbstractProportionalBands{NO,:center})
 
 Construct a `LazyNBProportionalBandSpectrum` using proportional centerbands `cbands` and narrowband spectrum `sm`.
+The proportional band frequencies will be scaled by `scaler`.
 """
 function LazyNBProportionalBandSpectrum(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsEven,IsTonal}
     msp = MSPSpectrumAmplitude(sm)
@@ -606,38 +869,19 @@ function LazyNBProportionalBandSpectrum(sm::AbstractNarrowbandSpectrum{IsEven,Is
     return LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(f1_nb, df_nb, msp_amp, cbands)
 end
 
-@inline lower_bands(pbs::LazyNBProportionalBandSpectrum) = pbs.lbands
-@inline upper_bands(pbs::LazyNBProportionalBandSpectrum) = pbs.ubands
+"""
+    frequency_nb(pbs::LazyNBProportionalBandSpectrum)
 
-const LazyNBExactOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
-                                                              ExactProportionalBands{1,:lower,TF},
-                                                              ExactProportionalBands{1,:center,TF},
-                                                              ExactProportionalBands{1,:upper,TF}}
-LazyNBExactOctaveSpectrum(f1_nb, df_nb, msp_amp, scaler=1, istonal=false) = LazyNBProportionalBandSpectrum(ExactProportionalBands{1}, f1_nb, df_nb, msp_amp, scaler, istonal)
-LazyNBExactOctaveSpectrum(sm::AbstractNarrowbandSpectrum, scaler=1) = LazyNBProportionalBandSpectrum(ExactProportionalBands{1}, sm, scaler)
-
-const LazyNBExactThirdOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{3,TF,TAmp,
-                                                                   ExactProportionalBands{3,:lower,TF},
-                                                                   ExactProportionalBands{3,:center,TF},
-                                                                   ExactProportionalBands{3,:upper,TF}}
-LazyNBExactThirdOctaveSpectrum(f1_nb, df_nb, msp_amp, scaler=1, istonal=false) = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, f1_nb, df_nb, msp_amp, scaler, istonal)
-LazyNBExactThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum, scaler=1) = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, sm, scaler)
-
-const LazyNBApproximateOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
-                                                              ApproximateOctaveBands{:lower,TF},
-                                                              ApproximateOctaveBands{:center,TF},
-                                                              ApproximateOctaveBands{:upper,TF}}
-LazyNBApproximateOctaveSpectrum(f1_nb, df_nb, msp_amp, scaler=1, istonal=false) = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, f1_nb, df_nb, msp_amp, scaler, istonal)
-LazyNBApproximateOctaveSpectrum(sm::AbstractNarrowbandSpectrum, scaler=1) = LazyNBProportionalBandSpectrum(ApproximateOctaveBands, sm, scaler)
-
-const LazyNBApproximateThirdOctaveSpectrum{TF,TAmp} = LazyNBProportionalBandSpectrum{1,TF,TAmp,
-                                                              ApproximateThirdOctaveBands{:lower,TF},
-                                                              ApproximateThirdOctaveBands{:center,TF},
-                                                              ApproximateThirdOctaveBands{:upper,TF}}
-LazyNBApproximateThirdOctaveSpectrum(f1_nb, df_nb, msp_amp, scaler=1, istonal=false) = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, f1_nb, df_nb, msp_amp, scaler, istonal)
-LazyNBApproximateThirdOctaveSpectrum(sm::AbstractNarrowbandSpectrum, scaler=1) = LazyNBProportionalBandSpectrum(ApproximateThirdOctaveBands, sm, scaler)
-
+Return the narrowband frequencies associated with the underlying narrowband spectrum contained in `pbs`.
+"""
 frequency_nb(pbs::LazyNBProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.msp_amp)-1).*pbs.df_nb
+
+"""
+    lazy_pbs(pbs, cbands::AbstractProportionalBands{NO,:center})
+
+Construct a lazy proportional band spectrum on proportional center bands `cbands` using the proportional band spectrum `pbs`.
+"""
+lazy_pbs
 
 function lazy_pbs(pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,IsTonal,NO}
     return LazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.f1_nb, pbs.df_nb, pbs.msp_amp, cbands)
@@ -699,7 +943,6 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
     band_lhs = max(f_nb_v[1] - 0.5*Δf, fl)
     band_rhs = min(f_nb_v[1] + 0.5*Δf, fu)
     res_first_band = msp_amp_v[1]/Δf*(band_rhs - band_lhs)
-    # @show i res_first_band
 
     # Get the contribution of the last band, which might not be a full band.
     if length(msp_amp_v) > 1
@@ -782,24 +1025,15 @@ end
 
 Representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF`.
 """
-struct ProportionalBandSpectrum{NO,TF,TPBS<:AbstractVector{TF},TBandsL<:AbstractProportionalBands{NO,:lower},TBandsC<:AbstractProportionalBands{NO,:center},TBandsU<:AbstractProportionalBands{NO,:upper}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct ProportionalBandSpectrum{NO,TF,TPBS<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
-    lbands::TBandsL
     cbands::TBandsC
-    ubands::TBandsU
 
     function ProportionalBandSpectrum(pbs, cbands::AbstractProportionalBands{NO,:center}) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
-
-        lbands = lower_bands(cbands)
-        ubands = upper_bands(cbands)
-
-        return new{NO,eltype(pbs),typeof(pbs),typeof(lbands), typeof(cbands), typeof(ubands)}(pbs, lbands, cbands, ubands)
+        return new{NO,eltype(pbs),typeof(pbs),typeof(cbands)}(pbs, cbands)
     end
 end
-
-@inline lower_bands(pbs::ProportionalBandSpectrum) = pbs.lbands
-@inline upper_bands(pbs::ProportionalBandSpectrum) = pbs.ubands
 
 function lazy_pbs(pbs::ProportionalBandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
@@ -808,7 +1042,7 @@ end
 """
     ProportionalBandSpectrum(TBandsC, cfreq_start, pbs, scaler=1)
 
-Construct a `ProportionalBandSpectrum` from an array of proportional band amplitudes, `TBandsC::Type{<:AbstractProportionalBands{NO,:center}` and `cfreq_start`.
+Construct a `ProportionalBandSpectrum` from an array of proportional band amplitudes and proportional band type `TBandsC`.
 
 `cfreq_start` is the centerband frequency corresponding to the first entry of `pbs`. 
 The proportional band frequencies indicated by `TBandsC` are multiplied by `scaler`.
@@ -832,6 +1066,11 @@ struct ProportionalBandSpectrumWithTime{NO,TF,TPBS<:AbstractVector{TF},TBandsC<:
     dt::TDTime
     t::TTime
 
+    @doc """
+        ProportionalBandSpectrumWithTime(pbs, cbands::AbstractProportionalBands{NO,:center}, dt, t)
+
+    Construct a proportional band spectrum from mean-squared pressure amplitudes `pbs` and centerband frequencies `cbands`, defined to exist over time range `dt` and at observer time `t`.
+    """
     function ProportionalBandSpectrumWithTime(pbs, cbands::AbstractProportionalBands{NO,:center}, dt, t) where {NO}
         length(pbs) == length(cbands) || throw(ArgumentError("length(pbs) must match length(cbands)"))
         dt > zero(dt) || throw(ArgumentError("dt must be positive"))
@@ -849,6 +1088,11 @@ function lazy_pbs(pbs::ProportionalBandSpectrumWithTime, cbands::AbstractProport
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
 end
 
+"""
+    LazyPBSProportionalBandSpectrum{NO,TF} <: AbstractProportionalBandSpectrum{NO,TF}
+
+Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a different proportional band spectrum.
+"""
 struct LazyPBSProportionalBandSpectrum{NO,TF,TPBS<:AbstractProportionalBandSpectrum,TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
     pbs::TPBS
     cbands::TBandsC
@@ -870,7 +1114,7 @@ end
 
 @inline has_observer_time(pbs::LazyPBSProportionalBandSpectrum) = has_observer_time(pbs.pbs)
 @inline observer_time(pbs::LazyPBSProportionalBandSpectrum) = observer_time(pbs.pbs)
-@inline timestep(pbs::LazyPBSProportionalBandSpectrum{NO,TF}) where {NO,TF} = timestep(pbs.pbs)
+@inline timestep(pbs::LazyPBSProportionalBandSpectrum) = timestep(pbs.pbs)
 @inline time_scaler(pbs::LazyPBSProportionalBandSpectrum, period) = time_scaler(pbs.pbs, period)
 
 function lazy_pbs(pbs::LazyPBSProportionalBandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
@@ -928,9 +1172,6 @@ end
     pbs_out = zero(eltype(pbs))
 
     # First, we need to check that there's something to do:
-    # if (istart > n_inbands) || (iend < 1)
-    #     continue
-    # else
     if (istart <= lastindex(pbs_in)) && (iend >= firstindex(pbs_in))
 
         # First, get the bandwidth of the first input band associated with this output band.
@@ -973,34 +1214,72 @@ end
 end
 
 """
-    combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum,N}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
+    combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum}, outcbands::AbstractProportionalBands{NO,:center}, time_axis=1) where {NO}
 
 Combine each input proportional band spectrum of `pbs` into one output proportional band spectrum using the proportional center bands indicated by `outcbands`.
+
+`time_axis` is an integer indicating the axis of the `pbs` array along which time varies.
+For example, if `time_axis == 1` and `pbs` is a three-dimensional array, then `apth[:, i, j]` would be proportional band spectrum of source `i`, `j`  for all time.
+But if `time_axis == 3`, then `pbs[i, j, :]` would be the proportional band spectrum of source `i`, `j` for all time.
 """
-function combine(pbs::Union{AbstractArray{<:AbstractProportionalBandSpectrum,N},Base.RefValue{<:AbstractProportionalBandSpectrum}}, outcbands::AbstractProportionalBands{NO,:center}) where {N,NO}
-   # Create the vector that will contain the new PBS.
-   # An <:AbstractProportionalBandSpectrum is <:AbstractVector{TF}, so AbstractArray{<:AbstractProportionalBandSpectrum,N} is actually an Array of AbstractVectors.
-   # So `eltype(eltype(pbs))` should give me the element type of the PBS.
-   TFOut = promote_type(eltype(eltype(pbs)), eltype(outcbands))
-   pbs_out = zeros(TFOut, length(outcbands))
+function combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum}, outcbands::AbstractProportionalBands{NO,:center}, time_axis=1) where {NO}
+    # Create the vector that will contain the new PBS.
+    # An <:AbstractProportionalBandSpectrum is <:AbstractVector{TF}, so AbstractArray{<:AbstractProportionalBandSpectrum,N} is actually an Array of AbstractVectors.
+    # So `eltype(eltype(pbs))` should give me the element type of the PBS.
+    TFOut = promote_type(eltype(eltype(pbs)), eltype(outcbands))
+    pbs_out = zeros(TFOut, length(outcbands))
 
-   # Get the time period for this collection of PBSs.
-   period = time_period(pbs)
+    dims_in = axes(pbs)
+    ndims_in = ndims(pbs)
+    alldims_in = 1:ndims_in
 
-   # Now start looping over each input PBS.
-   for pbs_in in pbs
+    otherdims = setdiff(alldims_in, time_axis)
+    itershape = tuple(dims_in[otherdims]...)
 
-       # Get the time scaler associated with this particular input PBS.
-       scaler = time_scaler(pbs_in, period)
+    # Create an array we'll use to index pbs_in, with a `Colon()` for the time_axis position and integers of the first value for all the others.
+    idx = [ifelse(d==time_axis, Colon(), first(ind)) for (d, ind) in enumerate(axes(pbs))]
 
-       # Create a lazy version of the input proportional band spectrum using the output center bands.
-       pbs_in_lazy = lazy_pbs(pbs_in, outcbands)
+    nidx = length(otherdims)
+    indices = CartesianIndices(itershape)
 
-       # Now loop over each output band, adding in the current input PBS to each frequency bin.
-       for idx_out in eachindex(pbs_out)
-           pbs_out[idx_out] += pbs_in_lazy[idx_out]*scaler
-       end
-   end
+    # Loop through the indices.
+    for I in indices
+        for i in 1:nidx
+            idx[otherdims[i]] = I.I[i]
+        end
 
-   return ProportionalBandSpectrum(pbs_out, outcbands)
+        # Grab all the elements associated with this time.
+        pbs_v = @view pbs[idx...]
+
+        # Now add this element's contribution to pbs_out.
+        _combine!(pbs_out, pbs_v, outcbands)
+    end
+
+    return ProportionalBandSpectrum(pbs_out, outcbands)
+end
+
+"""
+    _combine!(pbs_out::AbstractVector, pbs::AbstractVector{<:AbstractProportionalBandSpectrum}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
+
+Combine each input proportional band spectrum of `pbs` into one output Vector using the proportional center bands indicated by `outcbands`.
+"""
+function _combine!(pbs_out::AbstractVector, pbs::AbstractVector{<:AbstractProportionalBandSpectrum}, outcbands::AbstractProportionalBands{NO,:center}) where {NO}
+
+    # Get the time period for this collection of PBSs.
+    period = time_period(pbs)
+
+    # Now start looping over each input PBS.
+    for pbs_in in pbs
+
+        # Get the time scaler associated with this particular input PBS.
+        scaler = time_scaler(pbs_in, period)
+
+        # Create a lazy version of the input proportional band spectrum using the output center bands.
+        pbs_in_lazy = lazy_pbs(pbs_in, outcbands)
+
+        # Now add this element's contribution to output pbs.
+        pbs_out .+= pbs_in_lazy .* scaler
+    end
+
+    return nothing
 end

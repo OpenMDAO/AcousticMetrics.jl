@@ -1,5 +1,5 @@
 using AcousticMetrics: p_ref
-using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache, dft_r2hc, dft_hc2r
+using AcousticMetrics: r2rfftfreq, rfft, rfft!, irfft, irfft!, RFFTCache
 using AcousticMetrics: PressureTimeHistory
 using AcousticMetrics: PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
 using AcousticMetrics: starttime, timestep, frequencystep, time, pressure, frequency, halfcomplex, OASPL, istonal
@@ -9,7 +9,7 @@ using AcousticMetrics: ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctav
 using AcousticMetrics: ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 using AcousticMetrics: ExactProportionalBands, lower_bands, center_bands, upper_bands
 using AcousticMetrics: AbstractProportionalBandSpectrum
-using AcousticMetrics: LazyNBProportionalBandSpectrum, LazyNBExactThirdOctaveSpectrum, ProportionalBandSpectrum
+using AcousticMetrics: LazyNBProportionalBandSpectrum, ProportionalBandSpectrum
 using AcousticMetrics: ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
 using AcousticMetrics: combine
@@ -22,6 +22,8 @@ using JLD2
 using Polynomials: Polynomials
 using Random
 using Test
+
+include("dfts.jl")
 
 include(joinpath(@__DIR__, "gen_anopp2_data", "test_functions.jl"))
 
@@ -828,6 +830,8 @@ end
     @testset "exact octave" begin
         @testset "standard" begin
             bands = ExactOctaveCenterBands(6, 16)
+            @test octave_fraction(bands) == 1
+
             bands_expected = [62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0, 32000.0, 64000.0]
             @test all(isapprox.(bands, bands_expected))
 
@@ -843,14 +847,17 @@ end
             @test_throws ArgumentError ExactOctaveCenterBands(5, 4)
 
             lbands = ExactOctaveLowerBands(6, 16)
+            @test octave_fraction(lbands) == 1
             @test all((log2.(bands) .- log2.(lbands)) .≈ 1/2)
 
             ubands = ExactOctaveUpperBands(6, 16)
+            @test octave_fraction(ubands) == 1
             @test all((log2.(ubands) .- log2.(bands)) .≈ 1/2)
 
             @test all((log2.(ubands) .- log2.(lbands)) .≈ 1)
 
             cbands = ExactOctaveCenterBands(700.0, 22000.0)
+            @test octave_fraction(cbands) == 1
             @test cbands.bstart == 9
             @test cbands.bend == 14
 
@@ -862,7 +869,7 @@ end
             @test ubands.bstart == 9
             @test ubands.bend == 14
 
-            # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
+            # Test the `_cband_exact` routine, which goes from an exact centerband frequency to the band number.
             for (i, cband) in enumerate(cbands)
                 @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
             end
@@ -905,7 +912,7 @@ end
                 @test ubands.bstart == 9
                 @test ubands.bend == 14
 
-                # Test the `cband_exact` routine, which goes from an exact centerband frequency to the band number.
+                # Test the `_cband_exact` routine, which goes from an exact centerband frequency to the band number.
                 for (i, cband) in enumerate(cbands)
                     @test cband_number(cbands, cband) == (band_start(cbands) + i - 1)
                 end
@@ -917,6 +924,7 @@ end
     @testset "exact 1/3-octave" begin
         @testset "standard" begin
             bands = ExactThirdOctaveCenterBands(17, 40)
+            @test octave_fraction(bands) == 3
             # These are just from the ANOPP2 manual.
             bands_expected_all = [49.61, 62.50, 78.75, 99.21, 125.00, 157.49, 198.43, 250.00, 314.98, 396.85, 500.00, 629.96, 793.70, 1000.0, 1259.92, 1587.40, 2000.00, 2519.84, 3174.80, 4000.00, 5039.68, 6349.60, 8000.00, 10079.37]
             @test all(isapprox.(bands, bands_expected_all; atol=0.005))
@@ -933,14 +941,17 @@ end
             @test_throws ArgumentError ExactThirdOctaveCenterBands(5, 4)
 
             lbands = ExactThirdOctaveLowerBands(17, 40)
+            @test octave_fraction(lbands) == 3
             @test all((log2.(bands) .- log2.(lbands)) .≈ 1/(2*3))
 
             ubands = ExactThirdOctaveUpperBands(17, 40)
+            @test octave_fraction(ubands) == 3
             @test all((log2.(ubands) .- log2.(bands)) .≈ 1/(2*3))
 
             @test all((log2.(ubands) .- log2.(lbands)) .≈ 1/3)
 
             cbands = ExactThirdOctaveCenterBands(332.0, 7150.0)
+            @test octave_fraction(cbands) == 3
             @test cbands.bstart == 25
             @test cbands.bend == 39
 
@@ -1375,7 +1386,8 @@ end
                         psd = psd_func.(f)
                         # pbs = LazyNBExactThirdOctaveSpectrum(f0, df_nb, psd)
                         msp = psd .* df_nb
-                        pbs = LazyNBExactThirdOctaveSpectrum(f0, df_nb, msp)
+                        # pbs = LazyNBExactThirdOctaveSpectrum(f0, df_nb, msp)
+                        pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, f0, df_nb, msp)
                         if length(pbs) > 1
                             # We tried above to construct the narrowand frequencies
                             # to only cover the current 1/3-octave proportional
@@ -1447,7 +1459,8 @@ end
                         # pbs = ExactLazyNBProportionalBandSpectrum{3}(f[1], df_nb, psd)
                         # pbs = LazyNBExactThirdOctaveSpectrum(f[1], df_nb, psd)
                         msp = psd .* df_nb
-                        pbs = LazyNBExactThirdOctaveSpectrum(f[1], df_nb, msp)
+                        # pbs = LazyNBExactThirdOctaveSpectrum(f[1], df_nb, msp)
+                        pbs = LazyNBProportionalBandSpectrum(ExactProportionalBands{3}, f[1], df_nb, msp)
 
                         # We created a narrowband range that should cover from freq_min to freq_max, so the sizes should be the same.
                         @test length(pbs) == length(cbands)
@@ -3280,9 +3293,6 @@ end
                 i = length(pbs_combined)
                 @test pbs_combined[i] ≈ pbs1[i]/(ubands1[i] - lbands1[i])*(ubands1[i] - outlbands[i])
 
-                # Can I do the `combine` thing with a `Ref`?
-                pbs_combined2 = combine(Ref(pbs1), outcbands)
-                @test all(pbs_combined2 .≈ pbs_combined)
             end
         end
 
@@ -4246,6 +4256,237 @@ end
                     @test all(pbs_combined[15:end] .≈ 0)
                 end
             end
+
+            @testset "different time steps, two dimensional arrays" begin
+                for TPB in [ExactProportionalBands{3}, ExactProportionalBands{1}, ExactProportionalBands{12},
+                            ApproximateThirdOctaveBands, ApproximateOctaveBands]
+                    cbands1 = TPB{:center}(10, 16)
+                    lbands1 = lower_bands(cbands1)
+                    ubands1 = upper_bands(cbands1)
+                    t1 = 2.0
+                    dt1 = 0.2
+                    pbs1 = ProportionalBandSpectrumWithTime(rand(length(cbands1)), cbands1, dt1, t1)
+                    @test has_observer_time(pbs1) == true
+                    @test observer_time(pbs1) ≈ t1
+
+                    scaler = cbands1[2]/cbands1[1]
+                    cbands2 = TPB{:center}(10, 16, scaler)
+                    lbands2 = lower_bands(cbands2)
+                    ubands2 = upper_bands(cbands2)
+                    t2 = 2.1
+                    dt2 = 0.3
+                    pbs2 = ProportionalBandSpectrumWithTime(rand(length(cbands2)), cbands2, dt2, t2)
+                    @test has_observer_time(pbs2) == true
+                    @test observer_time(pbs2) ≈ t2
+
+                    scaler = cbands1[3]/cbands1[1]
+                    cbands3 = TPB{:center}(10, 16, scaler)
+                    lbands3 = lower_bands(cbands3)
+                    ubands3 = upper_bands(cbands3)
+                    t3 = 2.3
+                    dt3 = 0.4
+                    pbs3 = ProportionalBandSpectrumWithTime(rand(length(cbands3)), cbands3, dt3, t3)
+                    @test has_observer_time(pbs3) == true
+                    @test observer_time(pbs3) ≈ t3
+
+                    cbands4 = TPB{:center}(10, 16)
+                    lbands4 = lower_bands(cbands1)
+                    ubands4 = upper_bands(cbands1)
+                    t4 = 2.0
+                    dt4 = 0.2
+                    pbs4 = ProportionalBandSpectrumWithTime(rand(length(cbands4)), cbands4, dt4, t4)
+                    @test has_observer_time(pbs4) == true
+                    @test observer_time(pbs4) ≈ t4
+
+                    scaler = cbands4[2]/cbands4[1]
+                    cbands5 = TPB{:center}(10, 16, scaler)
+                    lbands5 = lower_bands(cbands5)
+                    ubands5 = upper_bands(cbands5)
+                    t5 = 5.3
+                    dt5 = 0.6
+                    pbs5 = ProportionalBandSpectrumWithTime(rand(length(cbands5)), cbands5, dt5, t5)
+                    @test has_observer_time(pbs5) == true
+                    @test observer_time(pbs5) ≈ t5
+
+                    scaler = cbands4[3]/cbands4[1]
+                    cbands6 = TPB{:center}(10, 16, scaler)
+                    lbands6 = lower_bands(cbands6)
+                    ubands6 = upper_bands(cbands6)
+                    t6 = 2.1
+                    dt6 = 0.7
+                    pbs6 = ProportionalBandSpectrumWithTime(rand(length(cbands6)), cbands6, dt6, t6)
+                    @test has_observer_time(pbs6) == true
+                    @test observer_time(pbs6) ≈ t6
+
+                    pbss = hcat([pbs1, pbs2, pbs3], [pbs4, pbs5, pbs6])
+                    @test size(pbss) == (3, 2)
+                    # time period for column 1.
+                    Tc1 = time_period(pbss[:, 1])
+                    @test Tc1 ≈ t3 - t1
+                    # time period for column 2.
+                    Tc2 = time_period(pbss[:, 2])
+                    @test Tc2 ≈ t5 - t4
+                    tscaler1 = dt1/Tc1
+                    tscaler2 = dt2/Tc1
+                    tscaler3 = dt3/Tc1
+                    tscaler4 = dt4/Tc2
+                    tscaler5 = dt5/Tc2
+                    tscaler6 = dt6/Tc2
+                    @test time_scaler(pbs1, Tc1) ≈ tscaler1
+                    @test time_scaler(pbs2, Tc1) ≈ tscaler2
+                    @test time_scaler(pbs3, Tc1) ≈ tscaler3
+                    @test time_scaler(pbs4, Tc2) ≈ tscaler4
+                    @test time_scaler(pbs5, Tc2) ≈ tscaler5
+                    @test time_scaler(pbs6, Tc2) ≈ tscaler6
+
+                    outcbands = TPB{:center}(5, 30, 1.05)
+                    outlbands = lower_bands(outcbands)
+                    outubands = upper_bands(outcbands)
+                    pbs_combined = combine(pbss, outcbands)
+
+                    @test all(pbs_combined[1:4] .≈ 0)
+
+                    i = 5
+                    j = 1
+                    @test pbs_combined[i] ≈ (
+                         tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(outubands[i] - lbands1[j]) +
+                         tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(outubands[i] - lbands4[j])
+                    )
+
+                    i = 6
+                    j = 1
+                    @test pbs_combined[i] ≈ (
+                         tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                         tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                         tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) + 
+                         tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                         tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                         tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j])
+                    )
+                    i = 7
+                    j = 2
+                    @test pbs_combined[i] ≈ (
+                         tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                         tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                         tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                         tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                         tscaler3*pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1]) +
+                         tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                         tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                         tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                         tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                         tscaler6*pbs6[j-1]/(ubands6[j-1] - lbands6[j-1])*(outubands[i] - lbands6[j-1])
+                    )
+                    for i in 8:11
+                        j += 1
+                        if TPB == ApproximateThirdOctaveBands && j == 6
+                            @test pbs_combined[i] ≈ (
+                                 tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                                 tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                                 tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                                 tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                                 tscaler3*pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(outubands[i] - outlbands[i]) +
+                                 tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                                 tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                                 tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                                 tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                                 tscaler6*pbs6[j-2]/(ubands6[j-2] - lbands6[j-2])*(outubands[i] - outlbands[i])
+                            )
+                        else
+                            @test pbs_combined[i] ≈ (
+                                 tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                                 tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                                 tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                                 tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                                 tscaler3*pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) +
+                                 tscaler3*pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1]) +
+                                 tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                                 tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                                 tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                                 tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                                 tscaler6*pbs6[j-2]/(ubands6[j-2] - lbands6[j-2])*(ubands6[j-2] - outlbands[i]) +
+                                 tscaler6*pbs6[j-1]/(ubands6[j-1] - lbands6[j-1])*(outubands[i] - lbands6[j-1])
+                            )
+                        end
+                    end
+                    i = 12
+                    j = 7
+                    if TPB == ApproximateThirdOctaveBands
+                        @test pbs_combined[i] ≈ (
+                             tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                             # tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                             tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                             tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                             tscaler3*pbs3[j-3]/(ubands3[j-3] - lbands3[j-3])*(ubands3[j-3] - outlbands[i]) + 
+                             tscaler3*pbs3[j-2] +
+                             tscaler3*pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1]) +
+                             tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                             # tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                             tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                             tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                             tscaler6*pbs6[j-3]/(ubands6[j-3] - lbands6[j-3])*(ubands6[j-3] - outlbands[i]) + 
+                             tscaler6*pbs6[j-2] +
+                             tscaler6*pbs6[j-1]/(ubands6[j-1] - lbands6[j-1])*(outubands[i] - lbands6[j-1])
+                        )
+                    else
+                        @test pbs_combined[i] ≈ (
+                             tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                             # tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                             tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                             tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                             tscaler3*pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) + 
+                             tscaler3*pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1]) +
+                             tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                             # tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                             tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                             tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                             tscaler6*pbs6[j-2]/(ubands6[j-2] - lbands6[j-2])*(ubands6[j-2] - outlbands[i]) + 
+                             tscaler6*pbs6[j-1]/(ubands6[j-1] - lbands6[j-1])*(outubands[i] - lbands6[j-1])
+                        )
+                    end
+                    i = 13
+                    j = 8
+                    @test pbs_combined[i] ≈ (
+                         # tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                         # tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                         tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                         # tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                         tscaler3*pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) + 
+                         tscaler3*pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1]) +
+                         # tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                         # tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                         tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                         # tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                         tscaler6*pbs6[j-2]/(ubands6[j-2] - lbands6[j-2])*(ubands6[j-2] - outlbands[i]) + 
+                         tscaler6*pbs6[j-1]/(ubands6[j-1] - lbands6[j-1])*(outubands[i] - lbands6[j-1])
+                    )
+                    i = 14
+                    j = 9
+                    @test pbs_combined[i] ≈ (
+                         # tscaler1*pbs1[j]/(ubands1[j] - lbands1[j])*(ubands1[j] - outlbands[i]) +
+                         # tscaler1*pbs1[j+1]/(ubands1[j+1] - lbands1[j+1])*(outubands[i] - lbands1[j+1]) +
+                         # tscaler2*pbs2[j-1]/(ubands2[j-1] - lbands2[j-1])*(ubands2[j-1] - outlbands[i]) +
+                         # tscaler2*pbs2[j]/(ubands2[j] - lbands2[j])*(outubands[i] - lbands2[j]) +
+                         tscaler3*pbs3[j-2]/(ubands3[j-2] - lbands3[j-2])*(ubands3[j-2] - outlbands[i]) + 
+                         # tscaler3*pbs3[j-1]/(ubands3[j-1] - lbands3[j-1])*(outubands[i] - lbands3[j-1])
+
+                         # tscaler4*pbs4[j]/(ubands4[j] - lbands4[j])*(ubands4[j] - outlbands[i]) +
+                         # tscaler4*pbs4[j+1]/(ubands4[j+1] - lbands4[j+1])*(outubands[i] - lbands4[j+1]) +
+                         # tscaler5*pbs5[j-1]/(ubands5[j-1] - lbands5[j-1])*(ubands5[j-1] - outlbands[i]) +
+                         # tscaler5*pbs5[j]/(ubands5[j] - lbands5[j])*(outubands[i] - lbands5[j]) +
+                         tscaler6*pbs6[j-2]/(ubands6[j-2] - lbands6[j-2])*(ubands6[j-2] - outlbands[i]) #+ 
+                         # tscaler6*pbs6[j-1]/(ubands6[j-1] - lbands6[j-1])*(outubands[i] - lbands6[j-1])
+                    )
+                    @test all(pbs_combined[15:end] .≈ 0)
+
+                    # Transpose to switch the time axis and compare to the original.
+                    time_axis = 2
+                    pbss_t = permutedims(pbss, (2, 1))
+                    pbs_combined_t = combine(pbss_t, outcbands, time_axis)
+                    @test all(pbs_combined_t .≈ pbs_combined)
+                end
+            end
+
         end
     end
 end

@@ -1,7 +1,7 @@
 module AMDocs
 using Documenter, AcousticMetrics
 
-function main()
+function doit()
     IN_CI = get(ENV, "CI", nothing)=="true"
 
     makedocs(sitename="AcousticMetrics.jl", modules=[AcousticMetrics], doctest=false,
@@ -17,7 +17,7 @@ function main()
 end
 
 if !isinteractive()
-    main()
+    doit()
 end
 
 end # module

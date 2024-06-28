@@ -115,9 +115,9 @@ function dft_hc2r(x::AbstractVector)
     return y
 end
 
-@concrete struct RFFTCache
-    val
-    jac
+struct RFFTCache{TVal,TJac}
+    val::TVal
+    jac::TJac
 end
 
 function RFFTCache(::Type{V}, M, N) where {V}
