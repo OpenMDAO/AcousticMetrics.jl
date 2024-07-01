@@ -1,5 +1,6 @@
 module AMDocs
 using Documenter, AcousticMetrics
+using AcousticMetrics: AcousticMetrics
 
 function doit()
     IN_CI = get(ENV, "CI", nothing)=="true"

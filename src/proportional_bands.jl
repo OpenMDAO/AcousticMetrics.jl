@@ -181,13 +181,6 @@ Construct an `ExactProportionalBands` with `eltype` `TF`, scaled by `scaler`, en
 ExactProportionalBands{NO,LCU}(fstart::TF, fend::TF, scaler=1) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(fstart, fend, scaler)
 ExactProportionalBands{NO,LCU,TF}(fstart::TF, fend::TF, scaler=1) where {NO,LCU,TF} = ExactProportionalBands{NO,LCU,TF}(band_exact_lower_limit(NO, fstart, scaler), band_exact_upper_limit(NO, fend, scaler), scaler)
 
-"""
-    Base.getindex(bands::ExactProportionalBands{NO,LCU}, i::Int) where {NO,LCU}
-
-Return the lower, center, or upper frequency (depending on the value of `LCU`) associated with the `i`-th proportional band frequency covered by `bands`.
-"""
-Base.getindex(bands::ExactProportionalBands, i::Int)
-
 @inline function Base.getindex(bands::ExactProportionalBands{NO,:center}, i::Int) where {NO}
     @boundscheck checkbounds(bands, i)
     # Now, how do I get the band?
@@ -323,13 +316,6 @@ end
 function ApproximateThirdOctaveBands{LCU}(bstart::Int, bend::Int, scaler=1) where {LCU} 
     return ApproximateThirdOctaveBands{LCU}(Float64, bstart, bend, scaler)
 end
-
-"""
-    Base.getindex(bands::ApproximateThirdOctaveBands{LCU}, i::Int) where {LCU}
-
-Return the lower, center, or upper frequency (depending on the value of `LCU`) associated with the `i`-th proportional band frequency covered by `bands`.
-"""
-Base.getindex(bands::ApproximateThirdOctaveBands, i::Int)
 
 @inline function Base.getindex(bands::ApproximateThirdOctaveBands{:center,TF}, i::Int) where {TF}
     @boundscheck checkbounds(bands, i)
@@ -492,13 +478,6 @@ end
 function ApproximateOctaveBands{LCU}(bstart::Int, bend::Int, scaler=1) where {LCU} 
     return ApproximateOctaveBands{LCU}(Float64, bstart, bend, scaler)
 end
-
-"""
-    Base.getindex(bands::ApproximateOctaveBands{LCU}, i::Int) where {LCU}
-
-Return the lower, center, or upper frequency (depending on the value of `LCU`) associated with the `i`-th proportional band frequency covered by `bands`.
-"""
-Base.getindex(bands::ApproximateOctaveBands, i::Int)
 
 @inline function Base.getindex(bands::ApproximateOctaveBands{:center,TF}, i::Int) where {TF}
     @boundscheck checkbounds(bands, i)
@@ -685,7 +664,7 @@ Return the observer time at which the proportional band spectrum is defined to e
 
 Return the time range over which the proportional band spectrum is defined to exist.
 """
-@inline timestep(pbs::AbstractProportionalBandSpectrum{NO,TF}) where {NO,TF} = Inf*one(TF)
+@inline timestep(pbs::AbstractProportionalBandSpectrum) = Inf*one(eltype(pbs))
 
 """
     amplitude(pbs::AbstractProportionalBandSpectrum)
@@ -715,11 +694,6 @@ time_scaler(pbs::AbstractProportionalBandSpectrum{NO,TF}, period) where {NO,TF} 
 
 @inline Base.size(pbs::AbstractProportionalBandSpectrum) = size(center_bands(pbs))
 
-"""
-    Base.getindex(pbs::AbstractProportionalBandSpectrum, i::Int)
-
-Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs`.
-"""
 @inline function Base.getindex(pbs::AbstractProportionalBandSpectrum, i::Int)
     @boundscheck checkbounds(pbs, i)
     return @inbounds amplitude(pbs)[i]
@@ -887,11 +861,6 @@ function lazy_pbs(pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::Abs
     return LazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.f1_nb, pbs.df_nb, pbs.msp_amp, cbands)
 end
 
-"""
-    Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,false}, i::Int)
-
-Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs` from a non-tonal narrowband.
-"""
 @inline function Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,false}, i::Int) where {NO}
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
@@ -958,11 +927,6 @@ Return the proportional band spectrum amplitude for the `i`th non-zero band in `
     return res_first_band + sum(msp_amp_v2) + res_last_band
 end
 
-"""
-    Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,true}, i::Int)
-
-Return the proportional band spectrum amplitude for the `i`th non-zero band in `pbs` from a tonal narrowband.
-"""
 @inline function Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,true}, i::Int) where {NO}
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
@@ -1258,11 +1222,6 @@ function combine(pbs::AbstractArray{<:AbstractProportionalBandSpectrum}, outcban
     return ProportionalBandSpectrum(pbs_out, outcbands)
 end
 
-"""
-    _combine!(pbs_out::AbstractVector, pbs::AbstractVector{<:AbstractProportionalBandSpectrum}, outcbands::AbstractProportionalBands{NO,:center}) where {N}
-
-Combine each input proportional band spectrum of `pbs` into one output Vector using the proportional center bands indicated by `outcbands`.
-"""
 function _combine!(pbs_out::AbstractVector, pbs::AbstractVector{<:AbstractProportionalBandSpectrum}, outcbands::AbstractProportionalBands{NO,:center}) where {NO}
 
     # Get the time period for this collection of PBSs.
