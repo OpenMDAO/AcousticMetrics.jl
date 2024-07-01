@@ -1,17 +1,15 @@
 name = "AcousticMetrics"
 uuid = "046f749b-9c1e-43ca-86bc-6902340f753e"
-authors = ["Ingraham, Daniel James (GRC-LTV0) <daniel.j.ingraham@nasa.gov>"]
-version = "0.6.1"
+authors = ["Ingraham, Daniel James (GRC-LTV0) <daniel.j.ingraham@nasa.gov> and contributors"]
+version = "0.7.0"
 
 [deps]
-ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+FLOWMath = "6cb5d3fb-0fe8-4cc2-bd89-9fe0b19a99d3"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 
 [compat]
-julia = "1.8.2"
-ConcreteStructs = "0.2.2"
 FFTW = "1.4.3"
+FLOWMath = "0.3.3"
 ForwardDiff = "0.10.19"
-OffsetArrays = "1.10.4"
+julia = "1.8.2"

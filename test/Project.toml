@@ -1,6 +1,13 @@
 [deps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+ForwardDiff = "0.10.19"
+JLD2 = "0.4.46"
+OffsetArrays = "1.14.0"
+Polynomials = "4.0.6"

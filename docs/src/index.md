@@ -15,7 +15,8 @@ Currently implemented metrics include:
   * Proportional band spectra
 
     * Approximate octave and third-octave spectra
-    * Exact proportional spectra of any octave fraction > 0.
+    * Exact proportional spectra of any octave fraction integer > 0.
+    * Lazy representations of proportional band spectra constructed from either narrowband or proportional band spectra
 
   * Integrated metrics
 

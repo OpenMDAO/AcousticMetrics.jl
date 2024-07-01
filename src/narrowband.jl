@@ -76,13 +76,17 @@ Return a vector of times associated with a pressure time history.
 end
 
 """
-    AbstractNarrowbandSpectrum{IsEven,Tel} <: AbstractVector{Tel}
+    AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel} <: AbstractVector{Tel}
 
 Supertype for a generic narrowband acoustic metric which will behave as an immutable `AbstractVector` of element type `Tel`.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+`IsTonal` indicates how the acoustic energy is distributed through the frequency bands:
+
+  * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
-abstract type AbstractNarrowbandSpectrum{IsEven,Tel} <: AbstractVector{Tel} end
+abstract type AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel} <: AbstractVector{Tel} end
 
 """
     halfcomplex(sm::AbstractNarrowbandSpectrum)
@@ -132,6 +136,25 @@ The frequencies are calculated using the `rfftfreq` function in the FFTW.jl pack
 """
 @inline frequency(sm::AbstractNarrowbandSpectrum) = rfftfreq(inputlength(sm), samplerate(sm))
 
+
+"""
+    frequencystep(sm::AbstractNarrowbandSpectrum)
+
+Return the frequency step size `Δf` associated with the narrowband spectrum.
+"""
+@inline function frequencystep(sm::AbstractNarrowbandSpectrum)
+    m = inputlength(sm)
+    df = 1/(timestep(sm)*m)
+    return df
+end
+
+"""
+    istonal(sm::AbstractNarrowbandSpectrum)
+
+Return `true` if the spectrum is tonal, `false` otherwise.
+"""
+@inline istonal(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = IsTonal
+
 """
     PressureTimeHistory(sm::AbstractNarrowbandSpectrum, p=similar(halfcomplex(sm)))
 
@@ -160,32 +183,37 @@ end
 end
 
 """
-    PressureSpectrumAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    PressureSpectrumAmplitude{IsEven,IsTonal,Tel} <: AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel}
 
 Representation of acoustic pressure amplitude as a function of narrowband frequency.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+The `IsTonal` `Bool` parameter, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-struct PressureSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+struct PressureSpectrumAmplitude{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
 
-    function PressureSpectrumAmplitude{IsEven}(hc, dt, t0) where {IsEven}
+    function PressureSpectrumAmplitude{IsEven,IsTonal}(hc, dt, t0) where {IsEven,IsTonal}
         n = length(hc)
         iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+        typeof(IsTonal) === Bool || throw(ArgumentError("typeof(IsTonal) should be Bool"))
+        return new{IsEven, IsTonal, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
 end
 
 """
-    PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
+    PressureSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
 
 Construct a narrowband spectrum of the pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
+The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function PressureSpectrumAmplitude(hc, dt, t0=zero(dt))
+function PressureSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
-    return PressureSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+    return PressureSpectrumAmplitude{iseven(n),istonal}(hc, dt, t0)
 end
 
 """
@@ -193,22 +221,24 @@ end
 
 Construct a narrowband spectrum of the pressure amplitude from another narrowband spectrum.
 """
-PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum) = PressureSpectrumAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = PressureSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
 """
-    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the pressure amplitude from a pressure time history.
 
 The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+function PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
     p = pressure(pth)
 
     # Get the FFT of the acoustic pressure.
     rfft!(hc, p)
 
-    return PressureSpectrumAmplitude(hc, timestep(pth), starttime(pth))
+    return PressureSpectrumAmplitude(hc, timestep(pth), starttime(pth), istonal)
 end
 
 @inline function Base.getindex(psa::PressureSpectrumAmplitude{false}, i::Int)
@@ -238,32 +268,35 @@ end
 end
 
 """
-    PressureSpectrumPhase{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    PressureSpectrumPhase{IsEven,IsTonal,Tel} <: AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel}
 
 Representation of acoustic pressure phase as a function of narrowband frequency.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+The `IsTonal` `Bool` parameter, if `true`, indicates the phase spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-struct PressureSpectrumPhase{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+struct PressureSpectrumPhase{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
 
-    function PressureSpectrumPhase{IsEven}(hc, dt, t0) where {IsEven}
+    function PressureSpectrumPhase{IsEven,IsTonal}(hc, dt, t0) where {IsEven,IsTonal}
         n = length(hc)
         iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+        typeof(IsTonal) === Bool || throw(ArgumentError("typeof(IsTonal) should be Bool"))
+        return new{IsEven, IsTonal, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
 end
 
 """
-    PressureSpectrumPhase(hc, dt, t0=zero(dt))
+    PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal::Bool=false)
 
 Construct a narrowband spectrum of the pressure phase from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
 """
-function PressureSpectrumPhase(hc, dt, t0=zero(dt))
+function PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
-    return PressureSpectrumPhase{iseven(n)}(hc, dt, t0)
+    return PressureSpectrumPhase{iseven(n),istonal}(hc, dt, t0)
 end
 
 """
@@ -271,22 +304,24 @@ end
 
 Construct a narrowband spectrum of the pressure phase from another narrowband spectrum.
 """
-PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum) = PressureSpectrumPhase(halfcomplex(sm), timestep(sm), starttime(sm))
+PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = PressureSpectrumPhase{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
 """
-    PressureSpectrumPhase(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    PressureSpectrumPhase(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the pressure phase from a pressure time history.
 
 The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function PressureSpectrumPhase(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+function PressureSpectrumPhase(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
     p = pressure(pth)
 
     # Get the FFT of the acoustic pressure.
     rfft!(hc, p)
 
-    return PressureSpectrumPhase(hc, timestep(pth), starttime(pth))
+    return PressureSpectrumPhase(hc, timestep(pth), starttime(pth), istonal)
 end
 
 @inline function Base.getindex(psp::PressureSpectrumPhase{false}, i::Int)
@@ -320,32 +355,37 @@ end
 end
 
 """
-    MSPSpectrumAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    MSPSpectrumAmplitude{IsEven,IsTonal,Tel} <: AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel}
 
 Representation of mean-squared pressure amplitude as a function of narrowband frequency.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+The `IsTonal` `Bool` parameter, if `true`, indicates the mean-squared pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the pressure spectrum is assumed to be constant over each frequency band.
 """
-struct MSPSpectrumAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+struct MSPSpectrumAmplitude{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
 
-    function MSPSpectrumAmplitude{IsEven}(hc, dt, t0) where {IsEven}
+    function MSPSpectrumAmplitude{IsEven,IsTonal}(hc, dt, t0) where {IsEven,IsTonal}
         n = length(hc)
         iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
-        return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
+        typeof(IsTonal) === Bool || throw(ArgumentError("typeof(IsTonal) should be Bool"))
+        return new{IsEven, IsTonal, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
 end
 
 """
-    MSPSpectrumAmplitude(hc, dt, t0=zero(dt))
+    MSPSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from the discrete Fourier transform in half-complex format `hc`, time step size `dt`, and initial time `t0`.
+The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function MSPSpectrumAmplitude(hc, dt, t0=zero(dt))
+function MSPSpectrumAmplitude(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
-    return MSPSpectrumAmplitude{iseven(n)}(hc, dt, t0)
+    return MSPSpectrumAmplitude{iseven(n),istonal}(hc, dt, t0)
 end
 
 """
@@ -353,22 +393,24 @@ end
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from another narrowband spectrum.
 """
-MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum) = MSPSpectrumAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = MSPSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
 """
-    MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the mean-squared pressure amplitude from a pressure time history.
 
 The optional argument `hc` will be used to store the discrete Fourier transform of the pressure time history, and should have length of `inputlength(pth)`.
+The `istonal` `Bool` argument, if `true`, indicates the pressure spectrum is tonal and thus concentrated at discrete frequencies.
+If `false`, the spectrum is assumed to be constant over each frequency band.
 """
-function MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+function MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
     p = pressure(pth)
 
     # Get the FFT of the acoustic pressure.
     rfft!(hc, p)
 
-    return MSPSpectrumAmplitude(hc, timestep(pth), starttime(pth))
+    return MSPSpectrumAmplitude(hc, timestep(pth), starttime(pth), istonal)
 end
 
 @inline function Base.getindex(psa::MSPSpectrumAmplitude{false}, i::Int)
@@ -405,13 +447,14 @@ Alias for `PressureSpectrumPhase`.
 const MSPSpectrumPhase = PressureSpectrumPhase
 
 """
-    PowerSpectralDensityAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+    PowerSpectralDensityAmplitude{IsEven,Tel} <: AbstractNarrowbandSpectrum{IsEven,false,Tel}
 
 Representation of acoustic power spectral density amplitude as a function of narrowband frequency.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is even or not, affecting how the Nyquist frequency is calculated.
+As the power spectral density is not well-defined for tones, the `IsTonal` parameter is always `false`.
 """
-struct PowerSpectralDensityAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,Tel}
+struct PowerSpectralDensityAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowbandSpectrum{IsEven,false,Tel}
     hc::Thc
     dt::Tdt
     t0::Tt0
@@ -434,14 +477,15 @@ function PowerSpectralDensityAmplitude(hc, dt, t0=zero(dt))
 end
 
 """
-    PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum)
+    PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum)
 
 Construct a narrowband spectrum of the power spectral density amplitude from another narrowband spectrum.
 """
-PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum) = PowerSpectralDensityAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,false}) where {IsEven} = PowerSpectralDensityAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
+PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,true}) where {IsEven} = throw(ArgumentError("IsTonal == true parameter cannot be used with PowerSpectralDensityAmplitude type"))
 
 """
-    PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
+    PowerSpectralDensityAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
 
 Construct a narrowband spectrum of the power spectral density amplitude from a pressure time history.
 
@@ -459,7 +503,7 @@ end
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{false}, i::Int)
     @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
-    df = 1/(timestep(psa)*m)
+    df = frequencystep(psa)
     if i == 1
         @inbounds hc_real = psa.hc[i]/m
         return hc_real^2/df
@@ -473,7 +517,7 @@ end
 @inline function Base.getindex(psa::PowerSpectralDensityAmplitude{true}, i::Int)
     @boundscheck checkbounds(psa, i)
     m = inputlength(psa)
-    df = 1/(timestep(psa)*m)
+    df = frequencystep(psa)
     if i == 1 || i == length(psa)
         @inbounds hc_real = psa.hc[i]/m
         return hc_real^2/df
@@ -490,27 +534,3 @@ end
 Alias for `PressureSpectrumPhase`.
 """
 const PowerSpectralDensityPhase = PressureSpectrumPhase
-
-"""
-    OASPL(ap::AbstractPressureTimeHistory)
-
-Return the overall sound pressure level of a pressure time history.
-"""
-function OASPL(ap::AbstractPressureTimeHistory)
-    p = pressure(ap)
-    n = inputlength(ap)
-    p_mean = sum(p)/n
-    msp = sum((p .- p_mean).^2)/n
-    return 10*log10(msp/p_ref^2)
-end
-
-"""
-    OASPL(ap::AbstractNarrowbandSpectrum)
-
-Return the overall sound pressure level of a narrowband spectrum.
-"""
-function OASPL(sp::AbstractNarrowbandSpectrum)
-    amp = MSPSpectrumAmplitude(sp)
-    msp = sum(@view amp[begin+1:end])
-    return 10*log10(msp/p_ref^2)
-end
