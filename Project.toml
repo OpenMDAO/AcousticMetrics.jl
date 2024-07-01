@@ -1,7 +1,7 @@
 name = "AcousticMetrics"
 uuid = "046f749b-9c1e-43ca-86bc-6902340f753e"
-authors = ["Ingraham, Daniel James (GRC-LTV0) <daniel.j.ingraham@nasa.gov>"]
-version = "0.6.1"
+authors = ["Ingraham, Daniel James (GRC-LTV0) <daniel.j.ingraham@nasa.gov> and contributors"]
+version = "0.7.0"
 
 [deps]
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
