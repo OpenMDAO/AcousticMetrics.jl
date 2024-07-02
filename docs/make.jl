@@ -10,7 +10,8 @@ function doit()
              pages=["Introduction"=>"index.md",
                     "API"=>"api.md",
                     "Theory"=>"theory.md",
-                    "Software Quality Assurance"=>"sqa.md"])
+                    "Software Quality Assurance"=>"sqa.md",
+                    "Developer Notes"=>"dev.md"])
 
     if IN_CI
         deploydocs(repo="github.com/OpenMDAO/AcousticMetrics.jl.git", devbranch="main")
