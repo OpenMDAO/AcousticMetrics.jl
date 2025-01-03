@@ -26,6 +26,7 @@ struct PressureTimeHistory{IsEven,Tp,Tdt,Tt0} <: AbstractPressureTimeHistory{IsE
     end
 end
 
+
 """
     PressureTimeHistory(p, dt, t0=zero(dt))
 
@@ -73,6 +74,10 @@ Return a vector of times associated with a pressure time history.
 @inline function time(pth::AbstractPressureTimeHistory)
     n = inputlength(pth)
     return starttime(pth) .+ (0:n-1) .* timestep(pth)
+end
+
+function Base.similar(pth::PressureTimeHistory{IsEven}) where {IsEven} 
+    return PressureTimeHistory{IsEven}(similar(pressure(pth)), timestep(pth), starttime(pth))
 end
 
 """
@@ -223,6 +228,10 @@ Construct a narrowband spectrum of the pressure amplitude from another narrowban
 """
 PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = PressureSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
+function Base.similar(sm::PressureSpectrumAmplitude{IsEven,IsTonal}) where {IsEven,IsTonal} 
+    return PressureSpectrumAmplitude{IsEven,IsTonal}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
+
 """
     PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
@@ -297,6 +306,10 @@ Construct a narrowband spectrum of the pressure phase from the discrete Fourier 
 function PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal::Bool=false)
     n = length(hc)
     return PressureSpectrumPhase{iseven(n),istonal}(hc, dt, t0)
+end
+
+function Base.similar(sm::PressureSpectrumPhase{IsEven,IsTonal}) where {IsEven,IsTonal} 
+    return PressureSpectrumPhase{IsEven,IsTonal}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
 end
 
 """
@@ -395,6 +408,10 @@ Construct a narrowband spectrum of the mean-squared pressure amplitude from anot
 """
 MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = MSPSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
 
+function Base.similar(sm::MSPSpectrumAmplitude{IsEven,IsTonal}) where {IsEven,IsTonal} 
+    return MSPSpectrumAmplitude{IsEven,IsTonal}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
+
 """
     MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
 
@@ -483,6 +500,10 @@ Construct a narrowband spectrum of the power spectral density amplitude from ano
 """
 PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,false}) where {IsEven} = PowerSpectralDensityAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
 PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,true}) where {IsEven} = throw(ArgumentError("IsTonal == true parameter cannot be used with PowerSpectralDensityAmplitude type"))
+
+function Base.similar(sm::PowerSpectralDensityAmplitude{IsEven}) where {IsEven} 
+    return PowerSpectralDensityAmplitude{IsEven}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
 
 """
     PowerSpectralDensityAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))

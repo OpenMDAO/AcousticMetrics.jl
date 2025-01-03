@@ -28,6 +28,6 @@ export ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, Approxima
 export AbstractProportionalBandSpectrum, LazyNBProportionalBandSpectrum, ProportionalBandSpectrum, ProportionalBandSpectrumWithTime, LazyPBSProportionalBandSpectrum
 
 include("weighting.jl")
-export W_A
+export W_A, a_weight!, a_weight
 
 end # module

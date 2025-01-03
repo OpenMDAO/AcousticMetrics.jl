@@ -16,7 +16,7 @@ using AcousticMetrics: combine
 using AcousticMetrics: freq_scaler, time_period, time_scaler, has_observer_time, observer_time
 using AcousticMetrics: ProportionalBandSpectrumWithTime
 using AcousticMetrics: LazyPBSProportionalBandSpectrum, frequency_nb
-using AcousticMetrics: W_A
+using AcousticMetrics: W_A, a_weight, a_weight!
 using ForwardDiff
 using JLD2
 using Polynomials: Polynomials
@@ -194,13 +194,13 @@ end
                 amp = PressureSpectrumAmplitude(ap)
                 phase = PressureSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amp)
+                amp_expected = zeros(eltype(amp), length(amp))
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
                 amp_expected[4] = 9
                 amp_expected[5] = 0.5
-                phase_expected = similar(phase)
+                phase_expected = zeros(eltype(phase), length(phase))
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -266,13 +266,13 @@ end
                     amp = PressureSpectrumAmplitude(ap)
                     phase = PressureSpectrumPhase(ap)
                     freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                    amp_expected = similar(amp)
+                    amp_expected = zeros(eltype(amp), length(amp))
                     amp_expected[1] = 6
                     amp_expected[2] = 8
                     amp_expected[3] = 2.5
                     amp_expected[4] = 9
                     amp_expected[5] = 0.5
-                    phase_expected = similar(phase)
+                    phase_expected = zeros(eltype(phase), length(phase))
                     phase_expected[1] = pi
                     phase_expected[2] = -pi + 0.2
                     phase_expected[3] = pi - 3
@@ -342,13 +342,13 @@ end
                 amp = PressureSpectrumAmplitude(ap)
                 phase = PressureSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amp)
+                amp_expected = zeros(eltype(amp), length(amp))
                 amp_expected[1] = 6
                 amp_expected[2] = 8
                 amp_expected[3] = 2.5
                 amp_expected[4] = 9
                 amp_expected[5] = 0.5
-                phase_expected = similar(phase)
+                phase_expected = zeros(eltype(phase), length(phase))
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -418,13 +418,13 @@ end
                 amp = MSPSpectrumAmplitude(ap)
                 phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amp)
+                amp_expected = zeros(eltype(amp), length(amp))
                 amp_expected[1] = 6^2
                 amp_expected[2] = 0.5*8^2
                 amp_expected[3] = 0.5*2.5^2
                 amp_expected[4] = 0.5*9^2
                 amp_expected[5] = 0.5*0.5^2
-                phase_expected = similar(phase)
+                phase_expected = zeros(eltype(phase), length(phase))
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -454,7 +454,7 @@ end
 
                 # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                psamp_expected = similar(amp)
+                psamp_expected = zeros(eltype(amp), length(amp))
                 psamp_expected[1] = 6
                 psamp_expected[2] = 8
                 psamp_expected[3] = 2.5
@@ -511,13 +511,13 @@ end
                 amp = MSPSpectrumAmplitude(ap)
                 phase = MSPSpectrumPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amp)
+                amp_expected = zeros(eltype(amp), length(amp))
                 amp_expected[1] = 6^2
                 amp_expected[2] = 0.5*8^2
                 amp_expected[3] = 0.5*2.5^2
                 amp_expected[4] = 0.5*9^2
                 amp_expected[5] = 0.5*0.5^2
-                phase_expected = similar(phase)
+                phase_expected = zeros(eltype(phase), length(phase))
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -549,7 +549,7 @@ end
 
                 # Make sure I can convert a mean-squared pressure to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                psamp_expected = similar(psamp)
+                psamp_expected = zeros(eltype(psamp), length(psamp))
                 psamp_expected[1] = 6
                 psamp_expected[2] = 8
                 psamp_expected[3] = 2.5
@@ -640,13 +640,13 @@ end
                 amp = PowerSpectralDensityAmplitude(ap)
                 phase = PowerSpectralDensityPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amp)
+                amp_expected = zeros(eltype(amp), length(amp))
                 amp_expected[1] = 6^2/df
                 amp_expected[2] = 0.5*8^2/df
                 amp_expected[3] = 0.5*2.5^2/df
                 amp_expected[4] = 0.5*9^2/df
                 amp_expected[5] = 0.5*0.5^2/df
-                phase_expected = similar(phase)
+                phase_expected = zeros(eltype(phase), length(phase))
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -676,7 +676,7 @@ end
 
                 # Make sure I can convert a PSD to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                psamp_expected = similar(psamp)
+                psamp_expected = zeros(eltype(psamp), length(psamp))
                 psamp_expected[1] = 6
                 psamp_expected[2] = 8
                 psamp_expected[3] = 2.5
@@ -723,13 +723,13 @@ end
                 amp = PowerSpectralDensityAmplitude(ap)
                 phase = PowerSpectralDensityPhase(ap)
                 freq_expected = [0.0, 1/T, 2/T, 3/T, 4/T, 5/T]
-                amp_expected = similar(amp)
+                amp_expected = zeros(eltype(amp), length(amp))
                 amp_expected[1] = 6^2/df
                 amp_expected[2] = 0.5*8^2/df
                 amp_expected[3] = 0.5*2.5^2/df
                 amp_expected[4] = 0.5*9^2/df
                 amp_expected[5] = 0.5*0.5^2/df
-                phase_expected = similar(phase)
+                phase_expected = zeros(eltype(phase), length(phase))
                 phase_expected[1] = 0
                 phase_expected[2] = 0.2
                 phase_expected[3] = -3
@@ -761,7 +761,7 @@ end
 
                 # Make sure I can convert a PSD to a pressure spectrum.
                 psamp = PressureSpectrumAmplitude(amp)
-                psamp_expected = similar(psamp)
+                psamp_expected = zeros(eltype(psamp), length(psamp))
                 psamp_expected[1] = 6
                 psamp_expected[2] = 8
                 psamp_expected[3] = 2.5
@@ -4577,6 +4577,19 @@ end
                 # 4th power, and one of the coefficients is about 2.24e16).
                 # @show T_ms n amp_A nbs_A_a2[(T_ms, n)]
                 @test all(isapprox.(amp_A, nbs_A_a2[(T_ms, n)], atol=1e-6))
+
+                # Make sure the new A-weighting stuff works.
+                amp_A2 = MSPSpectrumAmplitude(ap)
+                a_weight!(amp_A2)
+                @test timestep(amp_A2) ≈ dt
+                @test starttime(amp_A2) ≈ 0.0
+                @test all(isapprox.(amp_A2, nbs_A_a2[(T_ms, n)], atol=1e-6))
+
+                amp_A3 = a_weight(nbs)
+                @test timestep(amp_A3) ≈ dt
+                @test starttime(amp_A3) ≈ 0.0
+                @test all(isapprox.(amp_A3, nbs_A_a2[(T_ms, n)], atol=1e-6))
+
             end
         end
     end
@@ -4600,7 +4613,112 @@ end
                 # This is lame. Should be able to get this to match better,
                 # right?
                 @test all(isapprox.(amp_A, nbs, atol=1e-5))
+
+                # Make sure the new A-weighting stuff works.
+                amp_A2 = MSPSpectrumAmplitude(ap)
+                a_weight!(amp_A2)
+                @test timestep(amp_A2) ≈ dt
+                @test starttime(amp_A2) ≈ 0.0
+                @test all(isapprox.(amp_A2, nbs, atol=1e-5))
+
+                amp_A3 = a_weight(nbs)
+                @test timestep(amp_A3) ≈ dt
+                @test starttime(amp_A3) ≈ 0.0
+                @test all(isapprox.(amp_A3, nbs, atol=1e-5))
             end
         end
     end
+
+    @testset "simple functions with known MSP" begin
+        pref = 20e-6 # reference pressure in Pa
+
+        for N in [64, 65]
+            omega1 = 2*pi*50.0  # 50 Hz in rad/s
+            omega2 = 2*pi*100.0  # 100 Hz in rad/s
+            omega3 = 2*pi*150.0  # 150 Hz in rad/s
+            omega4 = 2*pi*200.0  # 200 Hz in rad/s
+             # Set the time period to be one cycle of the lowest non-zero frequency.
+            period = 2*pi/min(omega1, omega2, omega3, omega4)
+            # Starting time shouldn't matter, so make it some random value.
+            t0 = 1.23
+            dt = period/N
+            t = t0 .+ (0:(N-1)).*dt
+
+            # These will be the pressure amplitudes
+            A0 = 1.2
+            A1 = 2.345
+            A2 = 2.789
+            A3 = 1.12
+            A4 = 1.34
+
+            # Phase offsets shouldn't matter either.
+            phi1 = 5.1
+            phi2 = 6.2
+            phi3 = 7.1
+            phi4 = 8.2
+
+            # Now calculate the pressure time history.
+            p1 = @. (A0 +
+                     A1*cos(omega1*(t - phi1)) +
+                     A2*cos(omega2*(t - phi2)) +
+                     A3*cos(omega3*(t - phi3)) +
+                     A4*cos(omega4*(t - phi4)) )
+
+            # Create the pressure time history struct.
+            apth = PressureTimeHistory(p1, dt, t[1])
+
+            # Find the MSP.
+            msp = MSPSpectrumAmplitude(apth)
+
+            # Let's find the expected frequencies and amplitudes.
+            freqs_expected = [0.0, omega1, omega2, omega3, omega4] ./ (2*pi)
+            # Zero-frequency MSP is a special-case (but in practice isn't important).
+            msp_expected = [A0^2, A1^2/2, A2^2/2, A3^2/2, A4^2/2]
+
+            @test all(frequency(msp)[1:length(msp_expected)] .≈ freqs_expected)
+            @test all(msp[1:length(msp_expected)] .≈ msp_expected)
+
+            # Let's also compare the OASPL as calculated from the acoustic pressure time history and the mean squared pressure spectrum.
+            oaspl_apth = OASPL(apth)
+            oaspl_msp = OASPL(msp)
+            oaspl_expected = 10.0 .* log10.(sum(msp_expected[2:end])./pref^2)
+
+            # Now, let's do the A-weighting.
+            # First we'll create a new MSP object from the same pressure time history.
+            msp_Aweight = MSPSpectrumAmplitude(apth)
+
+            # Now, A-weight it.
+            a_weight!(msp_Aweight)
+
+            # Can also do the non-mutating version.
+            msp_Aweight2 = a_weight(msp)
+
+            # Now, figure out what the A-weighted MSP spectrum should be.
+            # First need to get the weight for each frequency, skipping the zero frequency.
+            weights = W_A.(freqs_expected[2:end])
+
+            # Now we calculate the expected A-weighted MSP/SPL/whatever.
+            msp_Aweight_expected = weights.*msp_expected[2:end]
+
+            # Make sure we got the right thing.
+            @test all(msp_Aweight[2:length(msp_expected)] .≈ msp_Aweight_expected)
+            @test all(isapprox.(msp_Aweight[length(msp_expected)+1:end], 0.0; atol=1e-24))
+
+            @test all(msp_Aweight2[2:length(msp_expected)] .≈ msp_Aweight_expected)
+            @test all(isapprox.(msp_Aweight2[length(msp_expected)+1:end], 0.0; atol=1e-24))
+
+            # And now we can find the A-weighted OASPL.
+            oaspl_msp_Aweight = OASPL(msp_Aweight)
+            oaspl_msp_Aweight2 = OASPL(msp_Aweight2)
+
+            # The expected value:
+            oaspl_Aweight_expected = 10.0 .* log10.(sum(msp_Aweight_expected)./pref^2)
+
+            # Now compare.
+            @test oaspl_msp_Aweight ≈ oaspl_Aweight_expected
+            @test oaspl_msp_Aweight2 ≈ oaspl_Aweight_expected
+        end
+
+    end
+
 end

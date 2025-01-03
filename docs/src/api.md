@@ -84,6 +84,8 @@ AcousticMetrics.combine
 ## Weighting
 ```@docs
 W_A
+a_weight
+a_weight!
 ```
 
 ## Integrated Metrics
