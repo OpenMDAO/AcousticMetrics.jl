@@ -4651,18 +4651,18 @@ end
             A3 = 1.12
             A4 = 1.34
 
-            # Phase offsets shouldn't matter either.
-            phi1 = 5.1
-            phi2 = 6.2
-            phi3 = 7.1
-            phi4 = 8.2
+            # Time offsets shouldn't matter either.
+            t1 = 5.1
+            t2 = 6.2
+            t3 = 7.1
+            t4 = 8.2
 
             # Now calculate the pressure time history.
             p1 = @. (A0 +
-                     A1*cos(omega1*(t - phi1)) +
-                     A2*cos(omega2*(t - phi2)) +
-                     A3*cos(omega3*(t - phi3)) +
-                     A4*cos(omega4*(t - phi4)) )
+                     A1*cos(omega1*(t - t1)) +
+                     A2*cos(omega2*(t - t2)) +
+                     A3*cos(omega3*(t - t3)) +
+                     A4*cos(omega4*(t - t4)) )
 
             # Create the pressure time history struct.
             apth = PressureTimeHistory(p1, dt, t[1])
@@ -4694,17 +4694,17 @@ end
             msp_Aweight2 = a_weight(msp)
 
             # Now, figure out what the A-weighted MSP spectrum should be.
-            # First need to get the weight for each frequency, skipping the zero frequency.
-            weights = W_A.(freqs_expected[2:end])
+            # First need to get the weight for each frequency.
+            weights = W_A.(freqs_expected)
 
             # Now we calculate the expected A-weighted MSP/SPL/whatever.
-            msp_Aweight_expected = weights.*msp_expected[2:end]
+            msp_Aweight_expected = weights.*msp_expected
 
             # Make sure we got the right thing.
-            @test all(msp_Aweight[2:length(msp_expected)] .≈ msp_Aweight_expected)
+            @test all(msp_Aweight[1:length(msp_expected)] .≈ msp_Aweight_expected)
             @test all(isapprox.(msp_Aweight[length(msp_expected)+1:end], 0.0; atol=1e-24))
 
-            @test all(msp_Aweight2[2:length(msp_expected)] .≈ msp_Aweight_expected)
+            @test all(msp_Aweight2[1:length(msp_expected)] .≈ msp_Aweight_expected)
             @test all(isapprox.(msp_Aweight2[length(msp_expected)+1:end], 0.0; atol=1e-24))
 
             # And now we can find the A-weighted OASPL.
