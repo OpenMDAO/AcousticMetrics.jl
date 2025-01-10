@@ -52,13 +52,15 @@ omega1 = 2*pi*50.0  # 50 Hz in rad/s
 omega2 = 2*pi*100.0  # 100 Hz in rad/s
 omega3 = 2*pi*150.0  # 150 Hz in rad/s
 omega4 = 2*pi*200.0  # 200 Hz in rad/s
+nothing # hide
 ```
 
 We'll sample the simple function 16 times, and set the time period to be one cycle of the lowest non-zero frequency: 
 
 ```@example msp_a_weighting
-N = 16
+N = 64  # way more than necessary, but it makes the pressure time history look nice
 period = 2*pi/min(omega1, omega2, omega3, omega4)
+nothing # hide
 ```
 
 The starting time shouldn't matter, so set it to some random value, then define the time levels.
@@ -145,7 +147,7 @@ nothing # hide
 Now we can find the sound pressure level using the usual formula:
 
 ```@example msp_a_weighting
-pref2 = (20e-6)^2  # usual squared reference pressure in Pa
+pref2 = (20e-6)^2  # usual squared reference pressure in Pa^2
 spl_msp = 10 .* log10.(msp./pref2)
 spl_msp_expected = 10 .* log10.(msp_expected./pref2)
 nothing # hide
@@ -239,7 +241,6 @@ lines!(ax1, t, p1)
 scatter!(ax2, freqs_expected, spl_msp_expected; label="expected", marker=:circle, strokewidth=1, color=(colors[1], 0), strokecolor=(colors[1], 1.0))
 scatter!(ax2, frequency(msp), spl_msp; label="AcousticMetrics.jl", marker=:x, color=colors[1])
 
-# scatter!(ax2, freqs_expected[2:end], spl_Aweight_expected; label="expected, A-weighted", marker=:circle, strokewidth=1, color=(colors[2], 0), strokecolor=(colors[2], 1.0))
 scatter!(ax2, freqs_expected, spl_Aweight_expected; label="expected, A-weighted", marker=:circle, strokewidth=1, color=(colors[2], 0), strokecolor=(colors[2], 1.0))
 scatter!(ax2, frequency(msp), spl_Aweight1; label="AcousticMetrics.jl, A-weighted", marker=:x, color=colors[2])
 
