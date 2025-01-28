@@ -130,6 +130,34 @@ function a_weight(sm::AbstractNarrowbandSpectrum{true})
     return smout
 end
 
+function a_weight!(pbs::ProportionalBandSpectrum)
+    cbands = center_bands(pbs)
+    scaler = freq_scaler(pbs)
+    msp = pbs.pbs
+    @inbounds begin
+        for i in eachindex(msp)
+            freq = cbands[i]*scaler
+            msp[i] *= W_A(freq)
+        end
+    end
+    return pbs
+end
+
+function a_weight(pbs::ProportionalBandSpectrum)
+    pbs_out = similar(pbs)
+    cbands = center_bands(pbs_out)
+    scaler = freq_scaler(pbs_out)
+    msp = pbs.pbs
+    msp_out = pbs_out.pbs
+    @inbounds begin
+        for i in eachindex(msp)
+            freq = cbands[i]*scaler
+            msp_out[i] = W_A(freq)*msp[i]
+        end
+    end
+    return pbs_out
+end
+
 # """
 #     W_A(nbs::AbstractNarrowbandSpectrum)
 

@@ -21,3 +21,7 @@ function OASPL(sp::AbstractNarrowbandSpectrum)
     msp = sum(@view amp[begin+1:end])
     return 10*log10(msp/p_ref^2)
 end
+
+function OASPL(pbs::ProportionalBandSpectrum)
+    return 10*log10(sum(pbs)/p_ref^2)
+end

@@ -4721,4 +4721,20 @@ end
 
     end
 
+    @testset "ProportionalBandSpectrum" begin
+        @testset "From Brenda's book" begin
+            pref = 20e-6 # reference pressure in Pa
+            cbands = ApproximateOctaveCenterBands(30.0, 8001.0)
+            spls = [95.0, 95.0, 90.0, 85.0, 80.0, 81.0, 75.0, 70.0, 65.0]
+            msps = 10.0.^(spls./10) .* (pref^2)
+            pbs = ProportionalBandSpectrum(msps, cbands)
+            @test isapprox(OASPL(pbs), 99.0; atol=0.1)
+            pbs_A = a_weight(pbs)
+            spl_A = 10.0 .* log10.(pbs_A./(pref^2))
+            spl_A_expected = [55.6, 68.6, 73.9, 76.4, 76.8, 81.0, 76.2, 71.0, 63.9]
+            @test all(isapprox.(spl_A, spl_A_expected; atol=0.19))
+            @test isapprox(OASPL(pbs_A), 84.9; atol=0.1)
+        end
+    end
+
 end

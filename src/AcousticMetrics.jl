@@ -15,9 +15,6 @@ export AbstractPressureTimeHistory, PressureTimeHistory
 export AbstractNarrowbandSpectrum
 export PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
 
-include("integrated.jl")
-export OASPL
-
 include("proportional_bands.jl")
 export AbstractProportionalBands
 export ExactProportionalBands
@@ -29,5 +26,8 @@ export AbstractProportionalBandSpectrum, LazyNBProportionalBandSpectrum, Proport
 
 include("weighting.jl")
 export W_A, a_weight!, a_weight
+
+include("integrated.jl")
+export OASPL
 
 end # module

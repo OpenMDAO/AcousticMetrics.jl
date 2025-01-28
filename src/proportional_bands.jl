@@ -1019,6 +1019,10 @@ function ProportionalBandSpectrum(TBandsC::Type{<:AbstractProportionalBands{NO,:
     return ProportionalBandSpectrum(pbs, cbands)
 end
 
+function Base.similar(pbs::ProportionalBandSpectrum)
+    return ProportionalBandSpectrum(similar(pbs.pbs), center_bands(pbs))
+end
+
 """
     ProportionalBandSpectrumWithTime{NO,TF,TPBS,TBandsC,TTime,TDTime}
 
@@ -1050,6 +1054,10 @@ end
 
 function lazy_pbs(pbs::ProportionalBandSpectrumWithTime, cbands::AbstractProportionalBands{NO,:center}) where {NO}
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
+end
+
+function Base.similar(pbs::ProportionalBandSpectrumWithTime)
+    return ProportionalBandSpectrumWithTime(similar(pbs.pbs), center_bands(pbs), timestep(pbs), observer_time(pbs))
 end
 
 """
