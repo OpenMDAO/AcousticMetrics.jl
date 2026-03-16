@@ -160,10 +160,47 @@ end
 
 function a_weight!(pbs::LazyPBSProportionalBandSpectrum)
     a_weight!(pbs.pbs)
+    return pbs
 end
 
 function a_weight(pbs::LazyPBSProportionalBandSpectrum)
     return lazy_pbs(a_weight(pbs.pbs), pbs.cbands)
+end
+
+function a_weight!(pbs::GenericLazyNBProportionalBandSpectrum)
+    freqs = frequency_nb(pbs)
+    msp = msp_amplitude(pbs)
+    @inbounds begin
+        for i in eachindex(msp)
+            msp[i] *= W_A(freqs[i])
+        end
+    end
+    return pbs
+end
+
+function a_weight(pbs::GenericLazyNBProportionalBandSpectrum)
+    freqs = frequency_nb(pbs)
+    msp = msp_amplitude(pbs)
+    msp_out = similar(msp)
+    @inbounds begin
+        for i in eachindex(msp)
+            msp_out[i] = W_A(freqs[i])*msp[i]
+        end
+    end
+    NO = octave_fraction(pbs)
+    IsTonal = istonal(pbs)
+    df_nb = frequencystep(pbs)
+    cbands = center_bands(pbs)
+    return GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_out, cbands)
+end
+
+function a_weight!(pbs::LazyNBProportionalBandSpectrum)
+    a_weight!(pbs.msp)
+    return pbs
+end
+
+function a_weight(pbs::LazyNBProportionalBandSpectrum)
+    return lazy_pbs(a_weight(pbs.msp), center_bands(pbs))
 end
 
 # """
