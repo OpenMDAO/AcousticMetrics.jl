@@ -138,8 +138,8 @@ Construct an `ExactProportionalBands` with `eltype` `TF` encomposing band index 
 
 The "standard" band frequencies will be scaled by `scaler`, e.g. if `scaler = 0.5` then what would normally be the `1000 Hz` frequency will be `500 Hz`, etc..
 """
-function ExactProportionalBands{NO,LCU}(TF::Type, bstart::Int, bend::Int, scalar=1) where {NO,LCU}
-    return ExactProportionalBands{NO,LCU,TF}(bstart, bend, scalar)
+function ExactProportionalBands{NO,LCU}(TF::Type, bstart::Int, bend::Int, scaler=1) where {NO,LCU}
+    return ExactProportionalBands{NO,LCU,TF}(bstart, bend, scaler)
 end
 function ExactProportionalBands{NO,LCU}(bstart::Int, bend::Int, scaler=1) where {NO,LCU} 
     return ExactProportionalBands{NO,LCU}(Float64, bstart, bend, scaler)
@@ -666,12 +666,12 @@ Return the time range over which the proportional band spectrum is defined to ex
 """
 @inline timestep(pbs::AbstractProportionalBandSpectrum) = Inf*one(eltype(pbs))
 
-"""
-    amplitude(pbs::AbstractProportionalBandSpectrum)
+# """
+#     amplitude(pbs::AbstractProportionalBandSpectrum)
 
-Return the underlying `Vector` containing the proportional band spectrum amplitudes contained in `pbs`.
-"""
-@inline amplitude(pbs::AbstractProportionalBandSpectrum) = pbs.pbs
+# Return the underlying `Vector` containing the proportional band spectrum amplitudes contained in `pbs`.
+# """
+# @inline amplitude(pbs::AbstractProportionalBandSpectrum) = pbs.pbs
 
 """
     time_period(pbs::AbstractArray{<:AbstractProportionalBandSpectrum})
@@ -700,7 +700,39 @@ time_scaler(pbs::AbstractProportionalBandSpectrum{NO,TF}, period) where {NO,TF} 
 end
 
 """
-    LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsC}
+    lazy_pbs(pbs, cbands::AbstractProportionalBands{NO,:center})
+
+Construct a lazy proportional band spectrum on proportional center bands `cbands` using the proportional band spectrum `pbs`.
+"""
+lazy_pbs
+
+function _cbands_for_nontonal_narrowband(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, len_nb, scaler)
+    # TF = eltype(msp_amp)
+    # TAmp = typeof(msp_amp)
+    # We're thinking of each non-zero freqeuncy as being a bin with center frequency `f` and width `df_nb`.
+    # So to get the lowest non-zero frequency we'll subtract 0.5*df_nb from the lowest non-zero frequency center:
+    # fstart = max(f1_nb - 0.5*df_nb, TF(fmin_exact))
+    fstart = max(f1_nb - 0.5*df_nb, fmin_exact)
+    fend = f1_nb + (len_nb-1)*df_nb + 0.5*df_nb
+    cbands = TBands{:center}(fstart, fend, scaler)
+    return cbands
+end
+
+function _cbands_for_tonal_narrowband(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, len_nb, scaler)
+    # TF = eltype(msp_amp)
+    # TAmp = typeof(msp_amp)
+    # We're thinking of each non-zero freqeuncy as being an infinitely thin "bin" with center frequency `f` and spacing `df_nb`.
+    # So to get the lowest non-zero frequency is f1_nb, and the highest is f1_nb + (length(msp_amp)-1)*df_nb.
+    fstart = f1_nb
+    fend = f1_nb + (len_nb-1)*df_nb
+    cbands = TBands{:center}(fstart, fend, scaler)
+    return cbands
+end
+
+abstract type AbstractLazyNBProportionalBandSpectrum{NO,IsTonal,TF} <: AbstractProportionalBandSpectrum{NO,TF} end
+
+"""
+    GenericLazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsC}
 
 Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a narrowband (`NB`) spectrum.
 
@@ -709,13 +741,13 @@ Lazy representation of a proportional band spectrum with octave fraction `NO` an
   * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
   * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
-struct LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractProportionalBandSpectrum{NO,TF}
+struct GenericLazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp<:AbstractVector{TF},TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractLazyNBProportionalBandSpectrum{NO,IsTonal,TF}
     f1_nb::TF
     df_nb::TF
     msp_amp::TAmp
     cbands::TBandsC
 
-    function LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(f1_nb::TF, df_nb::TF, msp_amp::TAmp, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsTonal,TF,TAmp<:AbstractVector{TF}}
+    function GenericLazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(f1_nb::TF, df_nb::TF, msp_amp::TAmp, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsTonal,TF,TAmp<:AbstractVector{TF}}
         f1_nb > zero(f1_nb) || throw(ArgumentError("f1_nb must be > 0"))
         df_nb > zero(df_nb) || throw(ArgumentError("df_nb must be > 0"))
         return new{NO,IsTonal,TF,TAmp,typeof(cbands)}(f1_nb, df_nb, msp_amp, cbands)
@@ -723,7 +755,7 @@ struct LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp<:AbstractVector{TF},TBa
 end
 
 """
-    LazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center})
+    GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center})
 
 Construct a lazy representation of a proportional band spectrum with proportional center bands `cbands` from a narrowband spectrum.
 
@@ -735,14 +767,14 @@ The narrowband frequencies are defined by the first narrowband frequency `f1_nb`
   * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
   * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
-function LazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsTonal}
+function GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsTonal}
     TF = eltype(msp_amp)
     TAmp = typeof(msp_amp)
-    return LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
+    return GenericLazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
 end
 
 """
-    LazyNBProportionalBandSpectrum(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}, istonal=false)
+    GenericLazyNBProportionalBandSpectrum(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}, istonal=false)
 
 Construct a lazy representation of a proportional band spectrum with proportional center bands `cbands` from a narrowband spectrum.
 
@@ -754,12 +786,12 @@ The narrowband frequencies are defined by the first narrowband frequency `f1_nb`
   * `istonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
   * `istonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
-function LazyNBProportionalBandSpectrum(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}, istonal::Bool=false) where {NO}
-    return LazyNBProportionalBandSpectrum{NO,istonal}(f1_nb, df_nb, msp_amp, cbands)
+function GenericLazyNBProportionalBandSpectrum(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center}, istonal::Bool=false) where {NO}
+    return GenericLazyNBProportionalBandSpectrum{NO,istonal}(f1_nb, df_nb, msp_amp, cbands)
 end
 
 """
-    LazyNBProportionalBandSpectrum{NO,IsTonal}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1)
+    GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1)
 
 Construct a lazy representation of a proportional band spectrum with proportional band type `TBands` from a narrowband spectrum.
 
@@ -772,41 +804,96 @@ The proportional band frequencies will be scaled by `scaler`.
   * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
   * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
-function LazyNBProportionalBandSpectrum{NO,false}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1) where {NO}
+function GenericLazyNBProportionalBandSpectrum{NO,false}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1) where {NO}
+    # TF = eltype(msp_amp)
+    # TAmp = typeof(msp_amp)
+    # # We're thinking of each non-zero freqeuncy as being a bin with center frequency `f` and width `df_nb`.
+    # # So to get the lowest non-zero frequency we'll subtract 0.5*df_nb from the lowest non-zero frequency center:
+    # fstart = max(f1_nb - 0.5*df_nb, TF(fmin_exact))
+    # fend = f1_nb + (length(msp_amp)-1)*df_nb + 0.5*df_nb
+    # cbands = TBands{:center}(fstart, fend, scaler)
+
     TF = eltype(msp_amp)
     TAmp = typeof(msp_amp)
-    # We're thinking of each non-zero freqeuncy as being a bin with center frequency `f` and width `df_nb`.
-    # So to get the lowest non-zero frequency we'll subtract 0.5*df_nb from the lowest non-zero frequency center:
-    fstart = max(f1_nb - 0.5*df_nb, TF(fmin_exact))
-    fend = f1_nb + (length(msp_amp)-1)*df_nb + 0.5*df_nb
-    cbands = TBands{:center}(fstart, fend, scaler)
+    cbands = _cbands_for_nontonal_narrowband(TBands, f1_nb, df_nb, length(msp_amp), scaler)
 
-    return LazyNBProportionalBandSpectrum{NO,false,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
+    return GenericLazyNBProportionalBandSpectrum{NO,false,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
 end
-function LazyNBProportionalBandSpectrum{NO,true}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1) where {NO}
+
+function GenericLazyNBProportionalBandSpectrum{NO,true}(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1) where {NO}
+    # TF = eltype(msp_amp)
+    # TAmp = typeof(msp_amp)
+    # # We're thinking of each non-zero freqeuncy as being an infinitely thin "bin" with center frequency `f` and spacing `df_nb`.
+    # # So to get the lowest non-zero frequency is f1_nb, and the highest is f1_nb + (length(msp_amp)-1)*df_nb.
+    # fstart = f1_nb
+    # fend = f1_nb + (length(msp_amp)-1)*df_nb
+    # cbands = TBands{:center}(fstart, fend, scaler)
+
     TF = eltype(msp_amp)
     TAmp = typeof(msp_amp)
-    # We're thinking of each non-zero freqeuncy as being an infinitely thin "bin" with center frequency `f` and spacing `df_nb`.
-    # So to get the lowest non-zero frequency is f1_nb, and the highest is f1_nb + (length(msp_amp)-1)*df_nb.
-    fstart = f1_nb
-    fend = f1_nb + (length(msp_amp)-1)*df_nb
-    cbands = TBands{:center}(fstart, fend, scaler)
+    cbands = _cbands_for_tonal_narrowband(TBands, f1_nb, df_nb, length(msp_amp), scaler)
 
-    return LazyNBProportionalBandSpectrum{NO,true,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
+    return GenericLazyNBProportionalBandSpectrum{NO,true,TF,TAmp}(TF(f1_nb), TF(df_nb), msp_amp, cbands)
 end
 
 """
-    LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, msp_amp, scaler=1, istonal::Bool=false)
+    GenericLazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, msp_amp, scaler=1, istonal::Bool=false)
 
-Construct a `LazyNBProportionalBandSpectrum` using proportional bands `TBands` and narrowband mean squared pressure amplitude vector `msp_amp` and optional proportional band frequency scaler `scaler`.
+Construct a `GenericLazyNBProportionalBandSpectrum` using proportional bands `TBands` and narrowband mean squared pressure amplitude vector `msp_amp` and optional proportional band frequency scaler `scaler`.
 
 `f1_nb` is the first non-zero narrowband frequency, and `df_nb` is the narrowband frequency spacing.
 The `istonal` `Bool` argument, if `true`, indicates the narrowband spectrum is tonal and thus concentrated at discrete frequencies.
 If `false`, the spectrum is assumed to be constant over each narrow frequency band.
 The proportional band frequencies will be scaled by `scaler`.
 """
-function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1, istonal::Bool=false) where {NO}
-    return LazyNBProportionalBandSpectrum{NO,istonal}(TBands, f1_nb, df_nb, msp_amp, scaler)
+function GenericLazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, msp_amp, scaler=1, istonal::Bool=false) where {NO}
+    return GenericLazyNBProportionalBandSpectrum{NO,istonal}(TBands, f1_nb, df_nb, msp_amp, scaler)
+end
+
+
+"""
+    frequency_nb(pbs::GenericLazyNBProportionalBandSpectrum)
+
+Return the narrowband frequencies associated with the underlying narrowband spectrum contained in `pbs`.
+"""
+frequency_nb(pbs::GenericLazyNBProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.msp_amp)-1).*pbs.df_nb
+
+"""
+    frequencystep(pbs::GenericLazyNBProportionalBandSpectrum)
+
+Return the frequency step size `Δf` associated with the underlying narrowband spectrum.
+"""
+frequencystep(pbs::GenericLazyNBProportionalBandSpectrum) = pbs.df_nb
+
+"""
+    msp_amplitude(pbs::GenericLazyNBProportionalBandSpectrum)
+
+Return the MSP amplitude associated with the underlying narrowband spectrum.
+"""
+msp_amplitude(pbs::GenericLazyNBProportionalBandSpectrum) = pbs.msp_amp
+
+function lazy_pbs(pbs::GenericLazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,IsTonal,NO}
+    return GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.f1_nb, pbs.df_nb, pbs.msp_amp, cbands)
+end
+
+"""
+    LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsC}
+
+Lazy representation of a proportional band spectrum with octave fraction `NO` and `eltype` `TF` constructed from a narrowband (`NB`) spectrum.
+
+`IsTonal` indicates how the acoustic energy is distributed through the narrow frequency bands:
+
+  * `IsTonal == false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
+"""
+struct LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TMSP<:AbstractNarrowbandSpectrum{<:Any,IsTonal},TBandsC<:AbstractProportionalBands{NO,:center}} <: AbstractLazyNBProportionalBandSpectrum{NO,IsTonal,TF}
+    msp::TMSP
+    cbands::TBandsC
+
+    function LazyNBProportionalBandSpectrum{NO,IsTonal}(sm::TNBS, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsEven,IsTonal,TF,TNBS<:AbstractNarrowbandSpectrum{IsEven,IsTonal,TF}}
+        msp = MSPSpectrumAmplitude(sm)
+        return new{NO,IsTonal,TF,typeof(msp),typeof(cbands)}(msp, cbands)
+    end
 end
 
 """
@@ -815,32 +902,55 @@ end
 Construct a `LazyNBProportionalBandSpectrum` using a proportional band `TBands` and narrowband spectrum `sm`, and optional frequency scaler `scaler`.
 The proportional band frequencies will be scaled by `scaler`.
 """
-function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}, scaler=1) where {NO,IsEven,IsTonal}
-    msp = MSPSpectrumAmplitude(sm)
-    freq = frequency(msp)
+function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, sm::AbstractNarrowbandSpectrum{IsEven,false,TF}, scaler=1) where {NO,IsEven,TF}
+    # msp = MSPSpectrumAmplitude(sm)
+    # freq = frequency(msp)
+    # f1_nb = freq[begin+1]
+    # df_nb = step(freq)
+    # # Skip the zero frequency.
+    # msp_amp = @view msp[begin+1:end]
+    freq = frequency(sm)
     f1_nb = freq[begin+1]
     df_nb = step(freq)
     # Skip the zero frequency.
-    msp_amp = @view msp[begin+1:end]
-    return LazyNBProportionalBandSpectrum{NO,IsTonal}(TBands, f1_nb, df_nb, msp_amp, scaler)
+    len_nb = length(freq) - 1
+    cbands = _cbands_for_nontonal_narrowband(TBands, f1_nb, df_nb, len_nb, scaler)
+    return LazyNBProportionalBandSpectrum{NO,false}(sm, cbands)
+end
+
+function LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, sm::AbstractNarrowbandSpectrum{IsEven,true,TF}, scaler=1) where {NO,IsEven,TF}
+    # msp = MSPSpectrumAmplitude(sm)
+    # freq = frequency(msp)
+    # f1_nb = freq[begin+1]
+    # df_nb = step(freq)
+    # # Skip the zero frequency.
+    # msp_amp = @view msp[begin+1:end]
+    freq = frequency(sm)
+    f1_nb = freq[begin+1]
+    df_nb = step(freq)
+    # Skip the zero frequency.
+    len_nb = length(freq) - 1
+    cbands = _cbands_for_tonal_narrowband(TBands, f1_nb, df_nb, len_nb, scaler)
+    return LazyNBProportionalBandSpectrum{NO,true}(sm, cbands)
 end
 
 """
     LazyNBProportionalBandSpectrum(sm::AbstractNarrowbandSpectrum, cbands::AbstractProportionalBands{NO,:center})
 
 Construct a `LazyNBProportionalBandSpectrum` using proportional centerbands `cbands` and narrowband spectrum `sm`.
-The proportional band frequencies will be scaled by `scaler`.
 """
 function LazyNBProportionalBandSpectrum(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NO,IsEven,IsTonal}
-    msp = MSPSpectrumAmplitude(sm)
-    TF = eltype(msp)
-    freq = frequency(msp)
-    f1_nb = TF(freq[begin+1])
-    df_nb = TF(step(freq))
-    # Skip the zero frequency.
-    msp_amp = @view msp[begin+1:end]
-    TAmp = typeof(msp_amp)
-    return LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(f1_nb, df_nb, msp_amp, cbands)
+    # # Hmm... how does this work?
+    # msp = MSPSpectrumAmplitude(sm)
+    # TF = eltype(msp)
+    # freq = frequency(msp)
+    # f1_nb = TF(freq[begin+1])
+    # df_nb = TF(step(freq))
+    # # Skip the zero frequency.
+    # msp_amp = @view msp[begin+1:end]
+    # TAmp = typeof(msp_amp)
+    # return LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp}(f1_nb, df_nb, msp_amp, cbands)
+    return LazyNBProportionalBandSpectrum{NO,IsTonal}(sm, cbands)
 end
 
 """
@@ -848,20 +958,36 @@ end
 
 Return the narrowband frequencies associated with the underlying narrowband spectrum contained in `pbs`.
 """
-frequency_nb(pbs::LazyNBProportionalBandSpectrum) = pbs.f1_nb .+ (0:length(pbs.msp_amp)-1).*pbs.df_nb
-
-"""
-    lazy_pbs(pbs, cbands::AbstractProportionalBands{NO,:center})
-
-Construct a lazy proportional band spectrum on proportional center bands `cbands` using the proportional band spectrum `pbs`.
-"""
-lazy_pbs
-
-function lazy_pbs(pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,IsTonal,NO}
-    return LazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.f1_nb, pbs.df_nb, pbs.msp_amp, cbands)
+function frequency_nb(pbs::LazyNBProportionalBandSpectrum) 
+    freqs_all = frequency(pbs.msp)
+    # Skip the zero frequency.
+    freq = @view freqs_all[begin+1:end]
+    return freq
 end
 
-@inline function Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,false}, i::Int) where {NO}
+"""
+    frequencystep(pbs::LazyNBProportionalBandSpectrum)
+
+Return the frequency step size `Δf` associated with the underlying narrowband spectrum.
+"""
+frequencystep(pbs::LazyNBProportionalBandSpectrum) = frequencystep(pbs.msp)
+
+"""
+    msp_amplitude(pbs::LazyNBProportionalBandSpectrum)
+
+Return the MSP amplitude associated with the underlying narrowband spectrum.
+"""
+function msp_amplitude(pbs::LazyNBProportionalBandSpectrum)
+    # Skip the zero frequency.
+    msp = @view pbs.msp[begin+1:end]
+    return msp
+end
+
+function lazy_pbs(pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,IsTonal,NO}
+    return LazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.msp, cbands)
+end
+
+@inline function Base.getindex(pbs::AbstractLazyNBProportionalBandSpectrum{NO,false}, i::Int) where {NO}
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.
@@ -874,7 +1000,8 @@ end
     f_nb = frequency_nb(pbs)
 
     # This is the narrowband frequency spacing.
-    Δf = pbs.df_nb
+    # Δf = pbs.df_nb
+    Δf = frequencystep(pbs)
 
     # So, what is the first index we want?
     # It's the one that has f_nb[i] + 0.5*Δf >= fl.
@@ -899,7 +1026,8 @@ end
 
     # Need the msp amplitude relavent for this band.
     # First, get all of the msp amplitudes.
-    msp_amp = pbs.msp_amp
+    # msp_amp = pbs.msp_amp
+    msp_amp = msp_amplitude(pbs)
     # Now get the amplitudes we actually want.
     msp_amp_v = @view msp_amp[istart:iend]
     f_nb_v = @view f_nb[istart:iend]
@@ -927,7 +1055,7 @@ end
     return res_first_band + sum(msp_amp_v2) + res_last_band
 end
 
-@inline function Base.getindex(pbs::LazyNBProportionalBandSpectrum{NO,true}, i::Int) where {NO}
+@inline function Base.getindex(pbs::AbstractLazyNBProportionalBandSpectrum{NO,true}, i::Int) where {NO}
     @boundscheck checkbounds(pbs, i)
     # This is where the fun begins.
     # So, first I want the lower and upper bands of this band.
@@ -949,7 +1077,8 @@ end
     f_nb = frequency_nb(pbs)
 
     # This is the narrowband frequency spacing.
-    Δf = pbs.df_nb
+    # Δf = pbs.df_nb
+    Δf = frequencystep(pbs)
 
     # So, what is the first index we want?
     # It's the one that has f_nb[i] >= fl.
@@ -975,7 +1104,8 @@ end
 
     # Need the msp amplitude relavent for this band.
     # First, get all of the msp amplitudes.
-    msp_amp = pbs.msp_amp
+    # msp_amp = pbs.msp_amp
+    msp_amp = msp_amplitude(pbs)
     # Now get the amplitudes we actually want.
     msp_amp_v = @view msp_amp[istart:iend]
 
@@ -1002,6 +1132,13 @@ end
 function lazy_pbs(pbs::ProportionalBandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
 end
+
+"""
+    amplitude(pbs::ProportionalBandSpectrum)
+
+Return the underlying `Vector` containing the proportional band spectrum amplitudes contained in `pbs`.
+"""
+@inline amplitude(pbs::ProportionalBandSpectrum) = pbs.pbs
 
 """
     ProportionalBandSpectrum(TBandsC, cfreq_start, pbs, scaler=1)
@@ -1051,6 +1188,13 @@ end
 @inline observer_time(pbs::ProportionalBandSpectrumWithTime) = pbs.t
 @inline timestep(pbs::ProportionalBandSpectrumWithTime{NO,TF}) where {NO,TF} = pbs.dt
 @inline time_scaler(pbs::ProportionalBandSpectrumWithTime, period) = timestep(pbs)/period
+
+"""
+    amplitude(pbs::ProportionalBandSpectrumWithTime)
+
+Return the underlying `Vector` containing the proportional band spectrum amplitudes contained in `pbs`.
+"""
+@inline amplitude(pbs::ProportionalBandSpectrumWithTime) = pbs.pbs
 
 function lazy_pbs(pbs::ProportionalBandSpectrumWithTime, cbands::AbstractProportionalBands{NO,:center}) where {NO}
     return LazyPBSProportionalBandSpectrum(pbs, cbands)

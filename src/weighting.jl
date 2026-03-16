@@ -130,7 +130,7 @@ function a_weight(sm::AbstractNarrowbandSpectrum{true})
     return smout
 end
 
-function a_weight!(pbs::ProportionalBandSpectrum)
+function a_weight!(pbs::Union{ProportionalBandSpectrum,ProportionalBandSpectrumWithTime})
     cbands = center_bands(pbs)
     scaler = freq_scaler(pbs)
     msp = pbs.pbs
@@ -143,7 +143,7 @@ function a_weight!(pbs::ProportionalBandSpectrum)
     return pbs
 end
 
-function a_weight(pbs::ProportionalBandSpectrum)
+function a_weight(pbs::Union{ProportionalBandSpectrum,ProportionalBandSpectrumWithTime})
     pbs_out = similar(pbs)
     cbands = center_bands(pbs_out)
     scaler = freq_scaler(pbs_out)
@@ -156,6 +156,14 @@ function a_weight(pbs::ProportionalBandSpectrum)
         end
     end
     return pbs_out
+end
+
+function a_weight!(pbs::LazyPBSProportionalBandSpectrum)
+    a_weight!(pbs.pbs)
+end
+
+function a_weight(pbs::LazyPBSProportionalBandSpectrum)
+    return lazy_pbs(a_weight(pbs.pbs), pbs.cbands)
 end
 
 # """
