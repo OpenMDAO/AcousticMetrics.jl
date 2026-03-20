@@ -23,6 +23,7 @@ export ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctave
 export ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 export ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
 export AbstractProportionalBandSpectrum, LazyNBProportionalBandSpectrum, ProportionalBandSpectrum, ProportionalBandSpectrumWithTime, LazyPBSProportionalBandSpectrum
+export lazy_pbs
 
 include("weighting.jl")
 export W_A, a_weight!, a_weight

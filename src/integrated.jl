@@ -22,6 +22,20 @@ function OASPL(sp::AbstractNarrowbandSpectrum)
     return 10*log10(msp/p_ref^2)
 end
 
-function OASPL(pbs::ProportionalBandSpectrum)
+function OASPL(pbs::AbstractProportionalBandSpectrum)
     return 10*log10(sum(pbs)/p_ref^2)
+end
+
+function OASPL(pbs::LazyNBProportionalBandSpectrum)
+    return OASPL(pbs.msp)
+end
+
+function OASPL(pbs::GenericLazyNBProportionalBandSpectrum)
+    # GenericLazyNBProportionalBandSpectrum doesn't allow for a zero frequency, so no need to skip the first entry.
+    msp = sum(pbs.msp_amp)
+    return 10*log10(msp/p_ref^2)
+end
+
+function OASPL(pbs::LazyPBSProportionalBandSpectrum)
+    return OASPL(pbs.pbs)
 end

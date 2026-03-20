@@ -189,6 +189,7 @@ function a_weight(pbs::GenericLazyNBProportionalBandSpectrum)
     end
     NO = octave_fraction(pbs)
     IsTonal = istonal(pbs)
+    f1_nb = startfrequency(pbs)
     df_nb = frequencystep(pbs)
     cbands = center_bands(pbs)
     return GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_out, cbands)

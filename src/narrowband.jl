@@ -154,6 +154,17 @@ Return the frequency step size `Δf` associated with the narrowband spectrum.
 end
 
 """
+    startfrequency(sm::AbstractNarrowbandSpectrum)
+
+Return the first frequency associated with the spectrum.
+
+Should be zero.
+"""
+@inline function startfrequency(sm::AbstractNarrowbandSpectrum)
+    return frequency(sm)[begin]
+end
+
+"""
     istonal(sm::AbstractNarrowbandSpectrum)
 
 Return `true` if the spectrum is tonal, `false` otherwise.

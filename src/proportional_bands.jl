@@ -400,6 +400,7 @@ ApproximateThirdOctaveBands{LCU,TF}(fstart::TF, fend::TF, scaler=1) where {LCU,T
 
 Alias for `ApproximateThirdOctaveBands{:center,TF}`
 """
+const ApproximateThirdOctaveCenterBands = ApproximateThirdOctaveBands{:center}
 const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:center,TF}
 
 """
@@ -407,6 +408,7 @@ const ApproximateThirdOctaveCenterBands{TF} = ApproximateThirdOctaveBands{:cente
 
 Alias for `ApproximateThirdOctaveBands{:lower,TF}`
 """
+const ApproximateThirdOctaveLowerBands = ApproximateThirdOctaveBands{:lower}
 const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,TF}
 
 """
@@ -414,6 +416,7 @@ const ApproximateThirdOctaveLowerBands{TF} = ApproximateThirdOctaveBands{:lower,
 
 Alias for `ApproximateThirdOctaveBands{:upper,TF}`
 """
+const ApproximateThirdOctaveUpperBands = ApproximateThirdOctaveBands{:upper}
 const ApproximateThirdOctaveUpperBands{TF} = ApproximateThirdOctaveBands{:upper,TF}
 
 """
@@ -706,7 +709,15 @@ Construct a lazy proportional band spectrum on proportional center bands `cbands
 """
 lazy_pbs
 
-function _cbands_for_nontonal_narrowband(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, len_nb, scaler)
+function lazy_pbs(sm::AbstractNarrowbandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
+    return LazyNBProportionalBandSpectrum(sm, cbands)
+end
+
+function lazy_pbs(TBands::Type{<:AbstractProportionalBands{NO}}, sm::AbstractNarrowbandSpectrum, scaler=1) where {NO}
+    return LazyNBProportionalBandSpectrum(TBands, sm, scaler)
+end
+
+function _cbands_for_nontonal_narrowband(TBands::Type{<:AbstractProportionalBands{NO,LCU}}, f1_nb, df_nb, len_nb, scaler) where {NO,LCU}
     # TF = eltype(msp_amp)
     # TAmp = typeof(msp_amp)
     # We're thinking of each non-zero freqeuncy as being a bin with center frequency `f` and width `df_nb`.
@@ -714,22 +725,32 @@ function _cbands_for_nontonal_narrowband(TBands::Type{<:AbstractProportionalBand
     # fstart = max(f1_nb - 0.5*df_nb, TF(fmin_exact))
     fstart = max(f1_nb - 0.5*df_nb, fmin_exact)
     fend = f1_nb + (len_nb-1)*df_nb + 0.5*df_nb
-    cbands = TBands{:center}(fstart, fend, scaler)
+    # cbands = TBands{:center}(fstart, fend, scaler)
+    cbands = center_bands(TBands(fstart, fend, scaler))
     return cbands
 end
+function _cbands_for_nontonal_narrowband(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, len_nb, scaler) where {NO}
+    return _cbands_for_nontonal_narrowband(TBands{:center}, f1_nb, df_nb, len_nb, scaler)
+end
 
-function _cbands_for_tonal_narrowband(TBands::Type{<:AbstractProportionalBands}, f1_nb, df_nb, len_nb, scaler)
+function _cbands_for_tonal_narrowband(TBands::Type{<:AbstractProportionalBands{NO,LCU}}, f1_nb, df_nb, len_nb, scaler) where {NO,LCU}
     # TF = eltype(msp_amp)
     # TAmp = typeof(msp_amp)
     # We're thinking of each non-zero freqeuncy as being an infinitely thin "bin" with center frequency `f` and spacing `df_nb`.
     # So to get the lowest non-zero frequency is f1_nb, and the highest is f1_nb + (length(msp_amp)-1)*df_nb.
     fstart = f1_nb
     fend = f1_nb + (len_nb-1)*df_nb
-    cbands = TBands{:center}(fstart, fend, scaler)
+    # cbands = TBands{:center}(fstart, fend, scaler)
+    cbands = center_bands(TBands(fstart, fend, scaler))
     return cbands
+end
+function _cbands_for_tonal_narrowband(TBands::Type{<:AbstractProportionalBands{NO}}, f1_nb, df_nb, len_nb, scaler) where {NO}
+    return _cbands_for_tonal_narrowband(TBands{:center}, f1_nb, df_nb, len_nb, scaler) 
 end
 
 abstract type AbstractLazyNBProportionalBandSpectrum{NO,IsTonal,TF} <: AbstractProportionalBandSpectrum{NO,TF} end
+
+istonal(::AbstractLazyNBProportionalBandSpectrum{NO,IsTonal}) where {NO,IsTonal} = IsTonal
 
 """
     GenericLazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsC}
@@ -753,6 +774,8 @@ struct GenericLazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp<:AbstractVector{
         return new{NO,IsTonal,TF,TAmp,typeof(cbands)}(f1_nb, df_nb, msp_amp, cbands)
     end
 end
+
+startfrequency(pbs::GenericLazyNBProportionalBandSpectrum) = pbs.f1_nb
 
 """
     GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(f1_nb, df_nb, msp_amp, cbands::AbstractProportionalBands{NO,:center})
@@ -876,6 +899,10 @@ function lazy_pbs(pbs::GenericLazyNBProportionalBandSpectrum{NOIn,IsTonal}, cban
     return GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.f1_nb, pbs.df_nb, pbs.msp_amp, cbands)
 end
 
+function lazy_pbs(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::GenericLazyNBProportionalBandSpectrum{NOIn,IsTonal}, scaler=1) where {NOIn,IsTonal,NO}
+    return GenericLazyNBProportionalBandSpectrum{NO,IsTonal}(TBands, pbs.f1_nb, pbf.df_nb, pbs.msp_amp, scaler)
+end
+
 """
     LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TAmp,TBandsC}
 
@@ -895,6 +922,8 @@ struct LazyNBProportionalBandSpectrum{NO,IsTonal,TF,TMSP<:AbstractNarrowbandSpec
         return new{NO,IsTonal,TF,typeof(msp),typeof(cbands)}(msp, cbands)
     end
 end
+
+startfrequency(pbs::LazyNBProportionalBandSpectrum) = startfrequency(pbs.msp)
 
 """
     LazyNBProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands}, sm::AbstractNarrowbandSpectrum, scaler=1)
@@ -985,6 +1014,10 @@ end
 
 function lazy_pbs(pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, cbands::AbstractProportionalBands{NO,:center}) where {NOIn,IsTonal,NO}
     return LazyNBProportionalBandSpectrum{NO,IsTonal}(pbs.msp, cbands)
+end
+
+function lazy_pbs(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::LazyNBProportionalBandSpectrum{NOIn,IsTonal}, scaler=1) where {NOIn,IsTonal,NO}
+    return LazyNBProportionalBandSpectrum{NO,IsTonal}(TBands, pbs.msp, scaler)
 end
 
 @inline function Base.getindex(pbs::AbstractLazyNBProportionalBandSpectrum{NO,false}, i::Int) where {NO}
@@ -1133,6 +1166,10 @@ function lazy_pbs(pbs::ProportionalBandSpectrum, cbands::AbstractProportionalBan
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
 end
 
+function lazy_pbs(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::ProportionalBandSpectrum, scaler=1) where {NO}
+    return LazyPBSProportionalBandSpectrum(TBands, pbs, scaler)
+end
+
 """
     amplitude(pbs::ProportionalBandSpectrum)
 
@@ -1200,6 +1237,10 @@ function lazy_pbs(pbs::ProportionalBandSpectrumWithTime, cbands::AbstractProport
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
 end
 
+function lazy_pbs(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::ProportionalBandSpectrumWithTime, scaler=1) where {NO}
+    return LazyPBSProportionalBandSpectrum(TBands, pbs, scalar)
+end
+
 function Base.similar(pbs::ProportionalBandSpectrumWithTime)
     return ProportionalBandSpectrumWithTime(similar(pbs.pbs), center_bands(pbs), timestep(pbs), observer_time(pbs))
 end
@@ -1218,14 +1259,19 @@ struct LazyPBSProportionalBandSpectrum{NO,TF,TPBS<:AbstractProportionalBandSpect
     end
 end
 
-function LazyPBSProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::AbstractProportionalBandSpectrum, scaler=1) where {NO}
+function LazyPBSProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO,LCU}}, pbs::AbstractProportionalBandSpectrum, scaler=1) where {NO,LCU}
     # First, get the minimum and maximum frequencies associated with the input pbs.
     fstart = lower_bands(pbs)[begin]
     fend = upper_bands(pbs)[end]
     # Now use those frequencies to construct some centerbands.
-    cbands = TBands{:center}(fstart, fend, scaler)
+    # cbands = TBands{:center}(fstart, fend, scaler)
+    cbands = center_bands(TBands(fstart, fend, scaler))
     # Now we can create the object.
     return LazyPBSProportionalBandSpectrum(pbs, cbands)
+end
+
+function LazyPBSProportionalBandSpectrum(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::AbstractProportionalBandSpectrum, scaler=1) where {NO}
+    return LazyPBSProportionalBandSpectrum(TBands{:center}, pbs, scaler)
 end
 
 @inline has_observer_time(pbs::LazyPBSProportionalBandSpectrum) = has_observer_time(pbs.pbs)
@@ -1235,6 +1281,10 @@ end
 
 function lazy_pbs(pbs::LazyPBSProportionalBandSpectrum, cbands::AbstractProportionalBands{NO,:center}) where {NO}
     return LazyPBSProportionalBandSpectrum(pbs.pbs, cbands)
+end
+
+function lazy_pbs(TBands::Type{<:AbstractProportionalBands{NO}}, pbs::LazyPBSProportionalBandSpectrum, scaler=1) where {NO}
+    return LazyPBSProportionalBandSpectrum(TBands, pbs.pbs, scaler)
 end
 
 @inline function Base.getindex(pbs::LazyPBSProportionalBandSpectrum, i::Int)

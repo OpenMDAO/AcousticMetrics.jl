@@ -15,7 +15,7 @@ using AcousticMetrics: ApproximateThirdOctaveBands, ApproximateThirdOctaveCenter
 using AcousticMetrics: combine
 using AcousticMetrics: freq_scaler, time_period, time_scaler, has_observer_time, observer_time
 using AcousticMetrics: ProportionalBandSpectrumWithTime
-using AcousticMetrics: LazyPBSProportionalBandSpectrum, frequency_nb
+using AcousticMetrics: LazyPBSProportionalBandSpectrum, frequency_nb, lazy_pbs
 using AcousticMetrics: W_A, a_weight, a_weight!
 using ForwardDiff
 using JLD2
@@ -4734,6 +4734,135 @@ end
             spl_A_expected = [55.6, 68.6, 73.9, 76.4, 76.8, 81.0, 76.2, 71.0, 63.9]
             @test all(isapprox.(spl_A, spl_A_expected; atol=0.19))
             @test isapprox(OASPL(pbs_A), 84.9; atol=0.1)
+
+            # Test that we get the same thing if we construct a lazy PBS.
+            pbs_lazy = lazy_pbs(ApproximateThirdOctaveCenterBands, pbs)
+            @test OASPL(pbs_lazy) ≈ OASPL(pbs)
+
+            # Make sure it works with a less specific type.
+            # Need to deepcopy the pbs to avoid the in-place A-weighting modifying the same underlying data twice.
+            pbs_lazy2 = lazy_pbs(ApproximateThirdOctaveBands, deepcopy(pbs))
+            @test OASPL(pbs_lazy2) ≈ OASPL(pbs)
+
+            # We should be able to a-weight these and get the same OASPL.
+            @test OASPL(a_weight(pbs_lazy)) ≈ OASPL(pbs_A)
+            @test OASPL(a_weight(pbs_lazy2)) ≈ OASPL(pbs_A)
+
+            # And in-place.
+            a_weight!(pbs_lazy)
+            @test OASPL(pbs_lazy) ≈ OASPL(pbs_A)
+            a_weight!(pbs_lazy2)
+            @test OASPL(pbs_lazy2) ≈ OASPL(pbs_A)
+        end
+
+        @testset "From LazyNB to OASPL check check" begin
+            pref = 20e-6 # reference pressure in Pa
+
+            for N in [64, 65]
+                omega1 = 2*pi*50.0  # 50 Hz in rad/s
+                omega2 = 2*pi*100.0  # 100 Hz in rad/s
+                omega3 = 2*pi*150.0  # 150 Hz in rad/s
+                omega4 = 2*pi*200.0  # 200 Hz in rad/s
+                 # Set the time period to be one cycle of the lowest non-zero frequency.
+                period = 2*pi/min(omega1, omega2, omega3, omega4)
+                # Starting time shouldn't matter, so make it some random value.
+                t0 = 1.23
+                dt = period/N
+                t = t0 .+ (0:(N-1)).*dt
+
+                # These will be the pressure amplitudes
+                A0 = 1.2
+                A1 = 2.345
+                A2 = 2.789
+                A3 = 1.12
+                A4 = 1.34
+
+                # Time offsets shouldn't matter either.
+                t1 = 5.1
+                t2 = 6.2
+                t3 = 7.1
+                t4 = 8.2
+
+                # Now calculate the pressure time history.
+                p1 = @. (A0 +
+                         A1*cos(omega1*(t - t1)) +
+                         A2*cos(omega2*(t - t2)) +
+                         A3*cos(omega3*(t - t3)) +
+                         A4*cos(omega4*(t - t4)) )
+
+                # Create the pressure time history struct.
+                apth = PressureTimeHistory(p1, dt, t[1])
+
+                # Find the MSP.
+                msp = MSPSpectrumAmplitude(apth)
+
+                # Let's find the expected frequencies and amplitudes.
+                freqs_expected = [0.0, omega1, omega2, omega3, omega4] ./ (2*pi)
+                # Zero-frequency MSP is a special-case (but in practice isn't important).
+                msp_expected = [A0^2, A1^2/2, A2^2/2, A3^2/2, A4^2/2]
+
+                @test all(frequency(msp)[1:length(msp_expected)] .≈ freqs_expected)
+                @test all(msp[1:length(msp_expected)] .≈ msp_expected)
+
+                # Let's also compare the OASPL as calculated from the acoustic pressure time history and the mean squared pressure spectrum.
+                oaspl_apth = OASPL(apth)
+                oaspl_msp = OASPL(msp)
+                oaspl_expected = 10.0 .* log10.(sum(msp_expected[2:end])./pref^2)
+
+                # Now create a lazy PBS from the narrowband.
+                pbs = lazy_pbs(ApproximateThirdOctaveCenterBands, msp)
+                # The OASPL should be the same.
+                @test OASPL(pbs) ≈ oaspl_expected
+                # Should get the same thing if we create a "generic" lazy PBS from a plain array.
+                pbs_generic = GenericLazyNBProportionalBandSpectrum(frequencystep(msp), frequencystep(msp), msp[2:end], center_bands(pbs))
+                @test OASPL(pbs_generic) ≈ oaspl_expected
+                # Should also be the same if we create a "normal" (non-lazy) pbs.
+                pbs_non_lazy = ProportionalBandSpectrum(collect(pbs), center_bands(pbs))
+                @test OASPL(pbs_non_lazy) ≈ oaspl_expected
+                # And adding a time to it shouldn't matter either.
+                pbs_non_lazy_time = ProportionalBandSpectrumWithTime(collect(pbs), center_bands(pbs), 0.2, 0.3)
+                @test OASPL(pbs_non_lazy_time) ≈ oaspl_expected
+
+                # Now, let's do the A-weighting.
+                # First we'll create a new MSP object from the same pressure time history.
+                msp_Aweight = MSPSpectrumAmplitude(apth)
+
+                # Now, A-weight it.
+                a_weight!(msp_Aweight)
+
+                # Can also do the non-mutating version.
+                msp_Aweight2 = a_weight(msp)
+
+                # Now, figure out what the A-weighted MSP spectrum should be.
+                # First need to get the weight for each frequency.
+                weights = W_A.(freqs_expected)
+
+                # Now we calculate the expected A-weighted MSP/SPL/whatever.
+                msp_Aweight_expected = weights.*msp_expected
+
+                # Make sure we got the right thing.
+                @test all(msp_Aweight[1:length(msp_expected)] .≈ msp_Aweight_expected)
+                @test all(isapprox.(msp_Aweight[length(msp_expected)+1:end], 0.0; atol=1e-24))
+
+                @test all(msp_Aweight2[1:length(msp_expected)] .≈ msp_Aweight_expected)
+                @test all(isapprox.(msp_Aweight2[length(msp_expected)+1:end], 0.0; atol=1e-24))
+
+                # And now we can find the A-weighted OASPL.
+                oaspl_msp_Aweight = OASPL(msp_Aweight)
+                oaspl_msp_Aweight2 = OASPL(msp_Aweight2)
+
+                # The expected value:
+                oaspl_Aweight_expected = 10.0 .* log10.(sum(msp_Aweight_expected)./pref^2)
+
+                # Now compare.
+                @test oaspl_msp_Aweight ≈ oaspl_Aweight_expected
+                @test oaspl_msp_Aweight2 ≈ oaspl_Aweight_expected
+                
+                # Should also get the same OASPL form the lazy NB stuff.
+                @test OASPL(a_weight(pbs)) ≈ oaspl_Aweight_expected
+                @test OASPL(a_weight(pbs_generic)) ≈ oaspl_Aweight_expected
+
+            end
         end
     end
 
