@@ -73,7 +73,10 @@ AcousticMetrics.amplitude
 AcousticMetrics.time_period
 AcousticMetrics.time_scaler
 LazyNBProportionalBandSpectrum
-AcousticMetrics.frequency_nb
+GenericLazyNBProportionalBandSpectrum
+msp_amplitude
+startfrequency
+frequency_nb
 AcousticMetrics.lazy_pbs
 ProportionalBandSpectrum
 LazyPBSProportionalBandSpectrum
