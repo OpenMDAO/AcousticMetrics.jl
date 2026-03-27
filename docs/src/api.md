@@ -30,6 +30,7 @@ AcousticMetrics.samplerate
 AcousticMetrics.frequency
 AcousticMetrics.frequencystep
 AcousticMetrics.istonal
+AcousticMetrics.isevenlength
 PressureSpectrumAmplitude
 PressureSpectrumPhase
 MSPSpectrumAmplitude
