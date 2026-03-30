@@ -15,9 +15,6 @@ export AbstractPressureTimeHistory, PressureTimeHistory
 export AbstractNarrowbandSpectrum
 export PressureSpectrumAmplitude, PressureSpectrumPhase, MSPSpectrumAmplitude, MSPSpectrumPhase, PowerSpectralDensityAmplitude, PowerSpectralDensityPhase
 
-include("integrated.jl")
-export OASPL
-
 include("proportional_bands.jl")
 export AbstractProportionalBands
 export ExactProportionalBands
@@ -25,9 +22,13 @@ export ExactOctaveCenterBands, ExactOctaveLowerBands, ExactOctaveUpperBands
 export ExactThirdOctaveCenterBands, ExactThirdOctaveLowerBands, ExactThirdOctaveUpperBands
 export ApproximateOctaveBands, ApproximateOctaveCenterBands, ApproximateOctaveLowerBands, ApproximateOctaveUpperBands
 export ApproximateThirdOctaveBands, ApproximateThirdOctaveCenterBands, ApproximateThirdOctaveLowerBands, ApproximateThirdOctaveUpperBands
-export AbstractProportionalBandSpectrum, LazyNBProportionalBandSpectrum, ProportionalBandSpectrum, ProportionalBandSpectrumWithTime, LazyPBSProportionalBandSpectrum
+export AbstractProportionalBandSpectrum, LazyNBProportionalBandSpectrum, ProportionalBandSpectrum, ProportionalBandSpectrumWithTime, LazyPBSProportionalBandSpectrum, GenericLazyNBProportionalBandSpectrum, msp_amplitude, frequency_nb, startfrequency
+export lazy_pbs
 
 include("weighting.jl")
-export W_A
+export W_A, a_weight!, a_weight
+
+include("integrated.jl")
+export OASPL
 
 end # module

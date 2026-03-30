@@ -10,6 +10,7 @@ function doit()
              pages=["Introduction"=>"index.md",
                     "API"=>"api.md",
                     "Theory"=>"theory.md",
+                    "Narrowband"=>"narrowband.md",
                     "Software Quality Assurance"=>"sqa.md",
                     "Developer Notes"=>"dev.md"])
 

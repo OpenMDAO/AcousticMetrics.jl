@@ -30,6 +30,7 @@ AcousticMetrics.samplerate
 AcousticMetrics.frequency
 AcousticMetrics.frequencystep
 AcousticMetrics.istonal
+AcousticMetrics.isevenlength
 PressureSpectrumAmplitude
 PressureSpectrumPhase
 MSPSpectrumAmplitude
@@ -73,7 +74,10 @@ AcousticMetrics.amplitude
 AcousticMetrics.time_period
 AcousticMetrics.time_scaler
 LazyNBProportionalBandSpectrum
-AcousticMetrics.frequency_nb
+GenericLazyNBProportionalBandSpectrum
+msp_amplitude
+startfrequency
+frequency_nb
 AcousticMetrics.lazy_pbs
 ProportionalBandSpectrum
 LazyPBSProportionalBandSpectrum
@@ -84,6 +88,8 @@ AcousticMetrics.combine
 ## Weighting
 ```@docs
 W_A
+a_weight
+a_weight!
 ```
 
 ## Integrated Metrics

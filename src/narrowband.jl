@@ -1,11 +1,11 @@
 """
-    AbstractPressureTimeHistory{IsEven}
+    AbstractPressureTimeHistory{IsEven,Tel} <: AbstractVector{Tel}
 
 Supertype for a pressure time history, i.e., pressure as a function of time defined on evenly-spaced time samples.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the pressure time history is even or not.
 """
-abstract type AbstractPressureTimeHistory{IsEven} end
+abstract type AbstractPressureTimeHistory{IsEven,Tel} <: AbstractVector{Tel} end
 
 """
     PressureTimeHistory{IsEven} <: AbstractPressureTimeHistory{IsEven}
@@ -14,17 +14,24 @@ Pressure as a function of time defined on evenly-spaced time samples.
 
 The `IsEven` parameter is a `Bool` indicating if the length of the pressure time history is even or not.
 """
-struct PressureTimeHistory{IsEven,Tp,Tdt,Tt0} <: AbstractPressureTimeHistory{IsEven}
+struct PressureTimeHistory{IsEven,Tel,Tp,Tdt,Tt0} <: AbstractPressureTimeHistory{IsEven,Tel}
     p::Tp
     dt::Tdt
     t0::Tt0
 
     function PressureTimeHistory{IsEven}(p, dt, t0) where {IsEven}
         n = length(p)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(p) = $n"))
-        return new{IsEven, typeof(p), typeof(dt), typeof(t0)}(p, dt, t0)
+        iseven(n) == IsEven || throw(ArgumentError("IsEven type parameter is not consistent with length of p"))
+        return new{IsEven, eltype(p), typeof(p), typeof(dt), typeof(t0)}(p, dt, t0)
     end
 end
+
+"""
+    isevenlength(apth::AbstractPressureTimeHistory)
+
+Return `Bool` indicating if the length of the pressure time history is even.
+"""
+@inline isevenlength(::AbstractPressureTimeHistory{IsEven}) where {IsEven} = IsEven
 
 """
     PressureTimeHistory(p, dt, t0=zero(dt))
@@ -76,6 +83,26 @@ Return a vector of times associated with a pressure time history.
 end
 
 """
+    samplerate(pth::AbstractPressureTimeHistory)
+
+Return the sample rate (aka the inverse of the time step size) associated with a pressure time history.
+"""
+@inline samplerate(pth::AbstractPressureTimeHistory) = 1/timestep(pth)
+
+function Base.similar(pth::PressureTimeHistory{IsEven}) where {IsEven} 
+    return PressureTimeHistory{IsEven}(similar(pressure(pth)), timestep(pth), starttime(pth))
+end
+
+@inline function Base.size(pth::AbstractPressureTimeHistory)
+    return size(pressure(pth))
+end
+
+@inline function Base.getindex(pth::AbstractPressureTimeHistory, i::Int)
+    @boundscheck checkbounds(pth, i)
+    return pressure(pth)[i]
+end
+
+"""
     AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel} <: AbstractVector{Tel}
 
 Supertype for a generic narrowband acoustic metric which will behave as an immutable `AbstractVector` of element type `Tel`.
@@ -87,6 +114,23 @@ The `IsEven` parameter is a `Bool` indicating if the length of the spectrum is e
   * `IsTonal == true` means the acoustic energy is assumed to be concentrated at each band center
 """
 abstract type AbstractNarrowbandSpectrum{IsEven,IsTonal,Tel} <: AbstractVector{Tel} end
+
+"""
+    isevenlength(sm::AbstractNarrowbandSpectrum)
+
+Return `Bool` indicating if the length of the spectrum is even.
+"""
+@inline isevenlength(::AbstractNarrowbandSpectrum{IsEven}) where {IsEven} = IsEven
+
+"""
+    istonal(sm::AbstractNarrowbandSpectrum)
+
+Return `Bool` indicating if the narrowband spectrum is tonal.
+
+  * `false` means the acoustic energy is assumed to be evenly distributed thoughout each band
+  * `true` means the acoustic energy is assumed to be concentrated at each band center
+"""
+@inline istonal(::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = IsTonal
 
 """
     halfcomplex(sm::AbstractNarrowbandSpectrum)
@@ -149,11 +193,15 @@ Return the frequency step size `Δf` associated with the narrowband spectrum.
 end
 
 """
-    istonal(sm::AbstractNarrowbandSpectrum)
+    startfrequency(sm::AbstractNarrowbandSpectrum)
 
-Return `true` if the spectrum is tonal, `false` otherwise.
+Return the first frequency associated with the spectrum.
+
+Should be zero.
 """
-@inline istonal(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = IsTonal
+@inline function startfrequency(sm::AbstractNarrowbandSpectrum)
+    return frequency(sm)[begin]
+end
 
 """
     PressureTimeHistory(sm::AbstractNarrowbandSpectrum, p=similar(halfcomplex(sm)))
@@ -198,7 +246,7 @@ struct PressureSpectrumAmplitude{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarr
 
     function PressureSpectrumAmplitude{IsEven,IsTonal}(hc, dt, t0) where {IsEven,IsTonal}
         n = length(hc)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        iseven(n) == IsEven || throw(ArgumentError("IsEven is not consistent with length(hc)"))
         typeof(IsTonal) === Bool || throw(ArgumentError("typeof(IsTonal) should be Bool"))
         return new{IsEven, IsTonal, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
@@ -222,6 +270,10 @@ end
 Construct a narrowband spectrum of the pressure amplitude from another narrowband spectrum.
 """
 PressureSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = PressureSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
+
+function Base.similar(sm::PressureSpectrumAmplitude{IsEven,IsTonal}) where {IsEven,IsTonal} 
+    return PressureSpectrumAmplitude{IsEven,IsTonal}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
 
 """
     PressureSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
@@ -299,6 +351,10 @@ function PressureSpectrumPhase(hc, dt, t0=zero(dt), istonal::Bool=false)
     return PressureSpectrumPhase{iseven(n),istonal}(hc, dt, t0)
 end
 
+function Base.similar(sm::PressureSpectrumPhase{IsEven,IsTonal}) where {IsEven,IsTonal} 
+    return PressureSpectrumPhase{IsEven,IsTonal}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
+
 """
     PressureSpectrumPhase(sm::AbstractNarrowbandSpectrum)
 
@@ -370,7 +426,7 @@ struct MSPSpectrumAmplitude{IsEven,IsTonal,Tel,Thc,Tdt,Tt0} <: AbstractNarrowban
 
     function MSPSpectrumAmplitude{IsEven,IsTonal}(hc, dt, t0) where {IsEven,IsTonal}
         n = length(hc)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        iseven(n) == IsEven || throw(ArgumentError("IsEven is not consistent with length(hc)"))
         typeof(IsTonal) === Bool || throw(ArgumentError("typeof(IsTonal) should be Bool"))
         return new{IsEven, IsTonal, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
@@ -394,6 +450,10 @@ end
 Construct a narrowband spectrum of the mean-squared pressure amplitude from another narrowband spectrum.
 """
 MSPSpectrumAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,IsTonal}) where {IsEven,IsTonal} = MSPSpectrumAmplitude{IsEven,IsTonal}(halfcomplex(sm), timestep(sm), starttime(sm))
+
+function Base.similar(sm::MSPSpectrumAmplitude{IsEven,IsTonal}) where {IsEven,IsTonal} 
+    return MSPSpectrumAmplitude{IsEven,IsTonal}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
 
 """
     MSPSpectrumAmplitude(pth::AbstractPressureTimeHistory, istonal::Bool=false, hc=similar(pressure(pth)))
@@ -461,7 +521,7 @@ struct PowerSpectralDensityAmplitude{IsEven,Tel,Thc,Tdt,Tt0} <: AbstractNarrowba
 
     function PowerSpectralDensityAmplitude{IsEven}(hc, dt, t0) where {IsEven}
         n = length(hc)
-        iseven(n) == IsEven || throw(ArgumentError("IsEven = $(IsEven) is not consistent with length(hc) = $n"))
+        iseven(n) == IsEven || throw(ArgumentError("IsEven is not consistent with length(hc)"))
         return new{IsEven, eltype(hc), typeof(hc), typeof(dt), typeof(t0)}(hc, dt, t0)
     end
 end
@@ -483,6 +543,10 @@ Construct a narrowband spectrum of the power spectral density amplitude from ano
 """
 PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,false}) where {IsEven} = PowerSpectralDensityAmplitude(halfcomplex(sm), timestep(sm), starttime(sm))
 PowerSpectralDensityAmplitude(sm::AbstractNarrowbandSpectrum{IsEven,true}) where {IsEven} = throw(ArgumentError("IsTonal == true parameter cannot be used with PowerSpectralDensityAmplitude type"))
+
+function Base.similar(sm::PowerSpectralDensityAmplitude{IsEven}) where {IsEven} 
+    return PowerSpectralDensityAmplitude{IsEven}(similar(halfcomplex(sm)), timestep(sm), starttime(sm))
+end
 
 """
     PowerSpectralDensityAmplitude(pth::AbstractPressureTimeHistory, hc=similar(pressure(pth)))
