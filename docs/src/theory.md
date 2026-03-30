@@ -101,7 +101,7 @@ that we're sampling ``n`` times. So we're sampling a sinusoid an integer number
 of times over its period, and summing it up. That will give us... zero. Same thing will
 happen to the second sum if ``m+k=r \ne 0``: we'll also get zero. So now we just
 have to figure out what happens when ``m - k = 0`` and ``m + k = 0``, i.e., when
-``k ± m``. Let's try ``k = m`` first. The first sum will be
+``k = ± m``. Let's try ``k = m`` first. The first sum will be
 ```math
   \sum_{j=0}^{n-1} e^{2π\imath j(m-m)/n} = \sum_{j=0}^{n-1} e^{0} = \sum_{j=0}^{n-1} 1 = n
 ```
