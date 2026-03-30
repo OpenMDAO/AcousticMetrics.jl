@@ -390,7 +390,8 @@ AcousticMetrics.jl also exposes a function `W_A` that takes a frequency and retu
 We can use that to plot the A-weighting curve, but first we'll calculate the gain in decibels associated with the A-weighting:
 
 ```@example narrowband1
-gain_A = 10 .* log10.(W_A.(freq))
+freqs_gain_A = 10.0.^(range(1, 5; length=100))
+gain_A = 10 .* log10.(W_A.(freqs_gain_A))
 extrema(gain_A)
 ```
 
@@ -398,10 +399,12 @@ And here's the plot:
 
 ```@example narrowband1
 fig6 = Figure()
-ax6_1 = fig6[1, 1] = Axis(fig6, xlabel="frequency, Hz", ylabel="A-weighting gain, dB", xticks=0:500:4000)
-scatter!(ax6_1, freq, gain_A, marker='x', markersize=20)
-xlims!(ax6_1, 0.0, 4000)
-ylims!(ax6_1, -10, 2)
-save("narrowband1-a_weighting.png", fig6)
+ax6_1 = fig6[1, 1] = Axis(fig6, xlabel="frequency, Hz", ylabel="A-weighting gain, dB", xscale=log10, xticks=[10^i for i in 1:5])
+lines!(ax6_1, freqs_gain_A, gain_A)
+xlims!(ax6_1, 10.0, 100e3)
+ylims!(ax6_1, -50, 20)
+save("narrowband1-a_weighting_gain.png", fig6)
 ```
-![](narrowband1-a_weighting.png)
+![](narrowband1-a_weighting_gain.png)
+
+That lines up quite well with the corresponding plot in the [Wikipedia page on A-weighting](https://en.wikipedia.org/wiki/A-weighting).
